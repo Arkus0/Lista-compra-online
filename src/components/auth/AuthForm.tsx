@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Mail, Lock, User, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -18,6 +19,7 @@ export function AuthForm() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
+  const router = useRouter()
   const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -45,7 +47,10 @@ export function AuthForm() {
         })
 
         if (error) throw error
-        // La redirección se manejará en el middleware
+
+        // Redirigir al inicio después de login exitoso
+        router.push('/')
+        router.refresh()
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ha ocurrido un error')

@@ -27,6 +27,29 @@ export default function NewListPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
+      // Verificar si el perfil existe, si no, crearlo
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) {
+        // Crear perfil si no existe (puede pasar si el trigger falló)
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email || '',
+            name: user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario',
+          })
+
+        if (profileError) {
+          console.error('Error creando perfil:', profileError)
+          throw new Error(`Error al crear perfil: ${profileError.message}`)
+        }
+      }
+
       // Generar código de compartir único
       const shareCode = Math.random().toString(36).substring(2, 8).toUpperCase()
 
@@ -40,7 +63,12 @@ export default function NewListPage() {
         .select()
         .single()
 
-      if (insertError) throw insertError
+      if (insertError) {
+        console.error('Error creando lista:', insertError)
+        throw new Error(`Error al crear lista: ${insertError.message}`)
+      }
+
+      if (!data) throw new Error('No se pudo crear la lista')
 
       router.push(`/lists/${data.id}`)
     } catch (err) {
