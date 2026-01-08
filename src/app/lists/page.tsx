@@ -4,9 +4,9 @@ import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Plus, ShoppingBag, Users } from 'lucide-react' // MoreVertical eliminado de aquí
+import { Plus, ShoppingBag, Users } from 'lucide-react'
 import Link from 'next/link'
-import { ListMenuButton } from '@/components/shopping/ListMenuButton' // <--- NUEVO IMPORT
+import { ListMenuButton } from '@/components/shopping/ListMenuButton' // <--- Importamos el componente potente
 
 export default async function ListsPage() {
   const supabase = await createClient()
@@ -16,13 +16,14 @@ export default async function ListsPage() {
     redirect('/auth')
   }
 
-  // Obtener todas las listas del usuario (propias y compartidas)
+  // Obtener todas las listas del usuario (propias)
   const { data: ownLists } = await supabase
     .from('shopping_lists')
     .select('*, list_items(count)')
     .eq('owner_id', user.id)
     .order('updated_at', { ascending: false })
 
+  // Obtener listas compartidas
   const { data: sharedLists } = await supabase
     .from('list_collaborators')
     .select('shopping_lists(*, list_items(count))')
@@ -41,7 +42,7 @@ export default async function ListsPage() {
       <Header title="Mis Listas" />
 
       <main className="p-4 space-y-6">
-        {/* Create new list button */}
+        {/* Botón Crear nueva lista */}
         <Link href="/lists/new">
           <Button className="w-full" size="lg">
             <Plus className="w-5 h-5" />
@@ -49,7 +50,7 @@ export default async function ListsPage() {
           </Button>
         </Link>
 
-        {/* Own lists */}
+        {/* Sección: Mis listas (Propias) */}
         <section>
           <h3 className="font-semibold text-lg mb-3">Mis listas</h3>
           {ownLists && ownLists.length > 0 ? (
@@ -64,6 +65,7 @@ export default async function ListsPage() {
                       <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
                         <ShoppingBag className="w-6 h-6 text-primary" />
                       </div>
+                      
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{list.name}</p>
                         <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -72,8 +74,11 @@ export default async function ListsPage() {
                           <span>{new Date(list.updated_at).toLocaleDateString('es-ES')}</span>
                         </div>
                       </div>
-                      {/* BOTÓN REEMPLAZADO POR COMPONENTE CLIENTE */}
-                      <ListMenuButton />
+
+                      {/* AQUÍ ESTÁ EL CAMBIO PRINCIPAL */}
+                      {/* Pasamos ID y Nombre para que funcionen los modales de editar/borrar */}
+                      <ListMenuButton listId={list.id} listName={list.name} />
+                      
                     </div>
                   </Card>
                 </Link>
@@ -86,7 +91,7 @@ export default async function ListsPage() {
           )}
         </section>
 
-        {/* Shared lists */}
+        {/* Sección: Compartidas conmigo */}
         {allSharedLists.length > 0 && (
           <section>
             <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
@@ -112,6 +117,8 @@ export default async function ListsPage() {
                           <span>Compartida</span>
                         </div>
                       </div>
+                      {/* Nota: En listas compartidas normalmente no mostramos el menú de borrar/editar 
+                          a menos que seamos dueños, por eso aquí no pongo el ListMenuButton */}
                     </div>
                   </Card>
                 </Link>

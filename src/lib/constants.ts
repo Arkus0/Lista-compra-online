@@ -10,6 +10,7 @@ export type CategoryId =
   | 'pets' | 'other'
 
 interface CategoryConfig {
+  id: CategoryId
   label: string
   icon: LucideIcon
   color: string // Tailwind color class helper
@@ -95,8 +96,10 @@ export function detectCategory(text: string): CategoryId {
   
   for (const cat of Object.values(CATEGORIES)) {
     if (cat.id === 'other') continue
-    if (cat.keywords.some(k =>
+    if (cat.keywords.some(k => normalizedText.includes(k))) {
+      return cat.id
     }
   }
   return 'other'
 }
+
