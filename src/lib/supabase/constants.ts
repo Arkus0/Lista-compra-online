@@ -9,11 +9,13 @@ export type CategoryId =
   | 'frozen' | 'beverages' | 'household' | 'hygiene' 
   | 'pets' | 'other'
 
+// 👇 AQUÍ ESTABA EL PROBLEMA: Nos aseguramos de que 'id' esté definido
 interface CategoryConfig {
+  id: CategoryId
   label: string
   icon: LucideIcon
-  color: string // Tailwind color class helper
-  keywords: string[] // Palabras clave para autodetectar
+  color: string 
+  keywords: string[] 
 }
 
 export const CATEGORIES: Record<CategoryId, CategoryConfig> = {
@@ -95,7 +97,8 @@ export function detectCategory(text: string): CategoryId {
   
   for (const cat of Object.values(CATEGORIES)) {
     if (cat.id === 'other') continue
-    if (cat.keywords.some(k =>
+    if (cat.keywords.some(k => normalizedText.includes(k))) {
+      return cat.id
     }
   }
   return 'other'
