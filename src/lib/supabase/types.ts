@@ -164,6 +164,18 @@ export interface Database {
         }
       }
     }
+    Functions: {
+      join_list_by_code: {
+        Args: {
+          share_code_input: string
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      // Aquí irían enums si los tuvieras definidos en Postgres, 
+      // por ahora el role se maneja como string literal en las tablas.
+    }
   }
 }
 
