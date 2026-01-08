@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
 import { createClient } from '@/lib/supabase/client'
+import { revalidateListsCache } from '@/app/actions'
 
 export default function NewListPage() {
   const [name, setName] = useState('')
@@ -70,7 +71,11 @@ export default function NewListPage() {
 
       if (!data) throw new Error('No se pudo crear la lista')
 
-      router.push(`/lists/${data.id}`)
+      // Revalidar caché para que las páginas de listas se actualicen
+      await revalidateListsCache()
+
+      // Usar replace para que no quede /lists/new en el historial
+      router.replace(`/lists/${data.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al crear la lista')
     } finally {

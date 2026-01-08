@@ -42,11 +42,38 @@ export default async function ListPage({ params }: Props) {
   }
 
   // Obtener el perfil del usuario
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
 
-  return <ShoppingListClient list={list} user={profile!} />
+  // Si el perfil no existe, crearlo (puede pasar si el trigger falló)
+  if (!profile) {
+    const { data: newProfile, error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        id: user.id,
+        email: user.email || '',
+        name: user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario',
+      })
+      .select()
+      .single()
+
+    if (profileError) {
+      console.error('Error creando perfil:', profileError)
+      // Crear un perfil temporal para evitar el error
+      profile = {
+        id: user.id,
+        email: user.email || '',
+        name: user.email?.split('@')[0] || 'Usuario',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+    } else {
+      profile = newProfile
+    }
+  }
+
+  return <ShoppingListClient list={list} user={profile} />
 }
