@@ -45,7 +45,8 @@ export default function NewListPage() {
           })
 
         if (profileError) {
-          throw new Error('Error al crear perfil de usuario')
+          console.error('Error creando perfil:', profileError)
+          throw new Error(`Error al crear perfil: ${profileError.message}`)
         }
       }
 
@@ -62,7 +63,10 @@ export default function NewListPage() {
         .select()
         .single()
 
-      if (insertError) throw insertError
+      if (insertError) {
+        console.error('Error creando lista:', insertError)
+        throw new Error(`Error al crear lista: ${insertError.message}`)
+      }
 
       if (!data) throw new Error('No se pudo crear la lista')
 
