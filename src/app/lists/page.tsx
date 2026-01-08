@@ -4,8 +4,9 @@ import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Plus, ShoppingBag, Users, MoreVertical } from 'lucide-react'
+import { Plus, ShoppingBag, Users } from 'lucide-react' // MoreVertical eliminado de aquí
 import Link from 'next/link'
+import { ListMenuButton } from '@/components/shopping/ListMenuButton' // <--- NUEVO IMPORT
 
 export default async function ListsPage() {
   const supabase = await createClient()
@@ -71,12 +72,8 @@ export default async function ListsPage() {
                           <span>{new Date(list.updated_at).toLocaleDateString('es-ES')}</span>
                         </div>
                       </div>
-                      <button
-                        className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center"
-                        onClick={(e) => e.preventDefault()}
-                      >
-                        <MoreVertical className="w-4 h-4 text-gray-400" />
-                      </button>
+                      {/* BOTÓN REEMPLAZADO POR COMPONENTE CLIENTE */}
+                      <ListMenuButton />
                     </div>
                   </Card>
                 </Link>

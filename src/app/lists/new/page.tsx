@@ -35,7 +35,7 @@ export default function NewListPage() {
         .single()
 
       if (!profile) {
-        // Crear perfil si no existe (puede pasar si el trigger falló)
+        // Crear perfil si no existe
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
@@ -70,7 +70,10 @@ export default function NewListPage() {
 
       if (!data) throw new Error('No se pudo crear la lista')
 
+      // AQUÍ ESTÁ EL CAMBIO CLAVE:
+      router.refresh() // <--- Actualiza la caché del servidor
       router.push(`/lists/${data.id}`)
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al crear la lista')
     } finally {
