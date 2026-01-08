@@ -78,11 +78,17 @@ export function ShoppingList({ list }: ShoppingListProps) {
         .from('list_items')
         .select('*')
         .eq('list_id', list.id)
-        .order('position', { ascending: true })
         .order('created_at', { ascending: true })
 
       if (!error && data) {
-        setItems(data)
+        // Sort by position if it exists, otherwise keep order by created_at
+        const sortedData = data.sort((a, b) => {
+          if (a.position !== undefined && b.position !== undefined) {
+            return a.position - b.position
+          }
+          return 0
+        })
+        setItems(sortedData)
       }
       setIsLoading(false)
     }
@@ -127,15 +133,22 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   const handleAddItem = async (name: string, category?: string) => {
     if (!user) return
-    // Get max position to add new item at the end
+    // Get max position to add new item at the end (if position field exists)
     const maxPosition = items.length > 0 ? Math.max(...items.map(i => i.position || 0)) : -1
-    const { error } = await supabase.from('list_items').insert({
+
+    const itemData: any = {
       list_id: list.id,
       name,
       category,
       added_by: user.id,
-      position: maxPosition + 1,
-    })
+    }
+
+    // Only add position if the field exists in the first item
+    if (items.length === 0 || items[0].position !== undefined) {
+      itemData.position = maxPosition + 1
+    }
+
+    const { error } = await supabase.from('list_items').insert(itemData)
     if (error) console.error('Error adding item:', error)
   }
 
@@ -171,27 +184,33 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
     if (!over || active.id === over.id) return
 
-    const oldIndex = items.findIndex((item) => item.id === active.id)
-    const newIndex = items.findIndex((item) => item.id === over.id)
+    const oldIndex = uncheckedItems.findIndex((item) => item.id === active.id)
+    const newIndex = uncheckedItems.findIndex((item) => item.id === over.id)
 
     if (oldIndex === -1 || newIndex === -1) return
 
     // Reorder items locally
-    const reorderedItems = arrayMove(items, oldIndex, newIndex)
-    setItems(reorderedItems)
+    const reorderedUnchecked = arrayMove(uncheckedItems, oldIndex, newIndex)
 
-    // Update positions in database
-    const updates = reorderedItems.map((item, index) => ({
-      id: item.id,
-      position: index,
-    }))
+    // Merge with checked items
+    const allItems = [...reorderedUnchecked, ...checkedItems]
+    setItems(allItems)
 
-    // Update all positions in batch
-    for (const update of updates) {
-      await supabase
-        .from('list_items')
-        .update({ position: update.position })
-        .eq('id', update.id)
+    // Only update positions if position field exists
+    if (uncheckedItems[0]?.position !== undefined) {
+      // Update positions in database
+      const updates = reorderedUnchecked.map((item, index) => ({
+        id: item.id,
+        position: index,
+      }))
+
+      // Update all positions in batch
+      for (const update of updates) {
+        await supabase
+          .from('list_items')
+          .update({ position: update.position })
+          .eq('id', update.id)
+      }
     }
   }
 
