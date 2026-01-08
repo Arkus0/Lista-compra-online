@@ -14,13 +14,34 @@ export default async function Home() {
     redirect('/auth')
   }
 
-  // Obtener listas del usuario
-  const { data: lists } = await supabase
+  // Obtener listas del usuario (propias)
+  const { data: ownLists } = await supabase
     .from('shopping_lists')
     .select('*, list_items(count)')
-    .or(`owner_id.eq.${user.id},list_collaborators.user_id.eq.${user.id}`)
+    .eq('owner_id', user.id)
     .order('updated_at', { ascending: false })
     .limit(5)
+
+  // Obtener listas compartidas
+  const { data: sharedLists } = await supabase
+    .from('list_collaborators')
+    .select('shopping_lists(*, list_items(count))')
+    .eq('user_id', user.id)
+    .limit(5)
+
+  interface SharedListItem {
+    id: string
+    name: string
+    updated_at: string
+    list_items: { count: number }[]
+  }
+
+  const allSharedLists = (sharedLists?.map((s: any) => s.shopping_lists).filter(Boolean) || []) as SharedListItem[]
+
+  // Combinar ambas listas
+  const lists = [...(ownLists || []), ...allSharedLists]
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, 5)
 
   return (
     <div className="min-h-screen pb-20">

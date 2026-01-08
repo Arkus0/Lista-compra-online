@@ -22,6 +22,7 @@ import { Profile } from '@/lib/supabase/types'
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [stats, setStats] = useState({ lists: 0, items: 0 })
   const router = useRouter()
   const supabase = createClient()
 
@@ -40,6 +41,39 @@ export default function ProfilePage() {
         .single()
 
       setProfile(data)
+
+      // Cargar estadísticas
+      // Contar listas propias
+      const { count: ownListsCount } = await supabase
+        .from('shopping_lists')
+        .select('*', { count: 'exact', head: true })
+        .eq('owner_id', user.id)
+
+      // Contar listas compartidas
+      const { count: sharedListsCount } = await supabase
+        .from('list_collaborators')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+
+      const totalLists = (ownListsCount || 0) + (sharedListsCount || 0)
+
+      // Contar items en listas propias
+      const { data: ownLists } = await supabase
+        .from('shopping_lists')
+        .select('id')
+        .eq('owner_id', user.id)
+
+      let totalItems = 0
+      if (ownLists && ownLists.length > 0) {
+        const { count: itemsCount } = await supabase
+          .from('list_items')
+          .select('*', { count: 'exact', head: true })
+          .in('list_id', ownLists.map(l => l.id))
+
+        totalItems = itemsCount || 0
+      }
+
+      setStats({ lists: totalLists, items: totalItems })
       setIsLoading(false)
     }
 
@@ -98,11 +132,11 @@ export default function ProfilePage() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           <Card variant="outlined" className="text-center">
-            <p className="text-2xl font-bold text-primary">0</p>
+            <p className="text-2xl font-bold text-primary">{stats.lists}</p>
             <p className="text-xs text-gray-500">Listas</p>
           </Card>
           <Card variant="outlined" className="text-center">
-            <p className="text-2xl font-bold text-primary">0</p>
+            <p className="text-2xl font-bold text-primary">{stats.items}</p>
             <p className="text-xs text-gray-500">Productos</p>
           </Card>
           <Card variant="outlined" className="text-center">
