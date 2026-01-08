@@ -14,13 +14,34 @@ export default async function Home() {
     redirect('/auth')
   }
 
-  // Obtener listas del usuario
-  const { data: lists } = await supabase
+  // Obtener listas del usuario (propias)
+  const { data: ownLists } = await supabase
     .from('shopping_lists')
     .select('*, list_items(count)')
-    .or(`owner_id.eq.${user.id},list_collaborators.user_id.eq.${user.id}`)
+    .eq('owner_id', user.id)
     .order('updated_at', { ascending: false })
     .limit(5)
+
+  // Obtener listas compartidas
+  const { data: sharedLists } = await supabase
+    .from('list_collaborators')
+    .select('shopping_lists(*, list_items(count))')
+    .eq('user_id', user.id)
+    .limit(5)
+
+  interface SharedListItem {
+    id: string
+    name: string
+    updated_at: string
+    list_items: { count: number }[]
+  }
+
+  const allSharedLists = (sharedLists?.map((s: any) => s.shopping_lists).filter(Boolean) || []) as SharedListItem[]
+
+  // Combinar ambas listas
+  const lists = [...(ownLists || []), ...allSharedLists]
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, 5)
 
   return (
     <div className="min-h-screen pb-20">
@@ -124,33 +145,39 @@ export default async function Home() {
         <section>
           <h3 className="font-semibold text-lg mb-3">Funcionalidades</h3>
           <div className="grid grid-cols-1 gap-3">
-            <Card variant="outlined">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-blue-500" />
+            <Link href="/lists/shared">
+              <Card variant="outlined" className="hover:border-primary transition-colors cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">Listas colaborativas</p>
+                    <p className="text-sm text-gray-500">
+                      Comparte y edita en tiempo real
+                    </p>
+                  </div>
+                  <div className="text-gray-400">→</div>
                 </div>
-                <div>
-                  <p className="font-medium">Listas colaborativas</p>
-                  <p className="text-sm text-gray-500">
-                    Comparte y edita en tiempo real
-                  </p>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            </Link>
 
-            <Card variant="outlined">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
-                  <TrendingDown className="w-5 h-5 text-green-500" />
+            <Link href="/compare">
+              <Card variant="outlined" className="hover:border-primary transition-colors cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                    <TrendingDown className="w-5 h-5 text-green-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">Compara precios</p>
+                    <p className="text-sm text-gray-500">
+                      Encuentra los mejores precios cerca
+                    </p>
+                  </div>
+                  <div className="text-gray-400">→</div>
                 </div>
-                <div>
-                  <p className="font-medium">Compara precios</p>
-                  <p className="text-sm text-gray-500">
-                    Encuentra los mejores precios cerca
-                  </p>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            </Link>
           </div>
         </section>
       </main>
