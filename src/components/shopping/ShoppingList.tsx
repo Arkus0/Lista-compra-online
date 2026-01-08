@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  ShoppingBag, Users, Share2, MoreVertical, 
-  Trash2, Edit2, Copy, Check, X, QrCode, Link as LinkIcon 
+import {
+  ShoppingBag, Users, Share2, MoreVertical,
+  Trash2, Edit2, Copy, Check, X, QrCode, Link as LinkIcon
 } from 'lucide-react'
 import { ShoppingItem } from './ShoppingItem'
 import { AddItemForm } from './AddItemForm'
@@ -14,6 +14,22 @@ import { Input } from '@/components/ui/Input'
 import { ListItem, ShoppingList as ShoppingListType } from '@/lib/supabase/types'
 import { createClient } from '@/lib/supabase/client'
 import { useStore } from '@/store/useStore'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { SortableShoppingItem } from './SortableShoppingItem'
 
 interface ShoppingListProps {
   list: ShoppingListType
@@ -43,6 +59,18 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const supabase = createClient()
   const router = useRouter()
 
+  // Configure drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
   // Cargar items iniciales
   useEffect(() => {
     const loadItems = async () => {
@@ -50,6 +78,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
         .from('list_items')
         .select('*')
         .eq('list_id', list.id)
+        .order('position', { ascending: true })
         .order('created_at', { ascending: true })
 
       if (!error && data) {
@@ -98,8 +127,14 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   const handleAddItem = async (name: string, category?: string) => {
     if (!user) return
+    // Get max position to add new item at the end
+    const maxPosition = items.length > 0 ? Math.max(...items.map(i => i.position || 0)) : -1
     const { error } = await supabase.from('list_items').insert({
-      list_id: list.id, name, category, added_by: user.id,
+      list_id: list.id,
+      name,
+      category,
+      added_by: user.id,
+      position: maxPosition + 1,
     })
     if (error) console.error('Error adding item:', error)
   }
@@ -126,6 +161,37 @@ export function ShoppingList({ list }: ShoppingListProps) {
     if (error) {
       const item = items.find((i) => i.id === id)
       if (item) updateItem(id, { quantity: item.quantity })
+    }
+  }
+
+  // --- Drag and Drop ---
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) return
+
+    const oldIndex = items.findIndex((item) => item.id === active.id)
+    const newIndex = items.findIndex((item) => item.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) return
+
+    // Reorder items locally
+    const reorderedItems = arrayMove(items, oldIndex, newIndex)
+    setItems(reorderedItems)
+
+    // Update positions in database
+    const updates = reorderedItems.map((item, index) => ({
+      id: item.id,
+      position: index,
+    }))
+
+    // Update all positions in batch
+    for (const update of updates) {
+      await supabase
+        .from('list_items')
+        .update({ position: update.position })
+        .eq('id', update.id)
     }
   }
 
@@ -284,9 +350,20 @@ export function ShoppingList({ list }: ShoppingListProps) {
           </div>
         ) : (
           <>
-            {uncheckedItems.map((item) => (
-              <ShoppingItem key={item.id} item={item} onToggle={handleToggleItem} onDelete={handleDeleteItem} onUpdateQuantity={handleUpdateQuantity} />
-            ))}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={uncheckedItems.map(item => item.id)} strategy={verticalListSortingStrategy}>
+                {uncheckedItems.map((item) => (
+                  <SortableShoppingItem
+                    key={item.id}
+                    item={item}
+                    onToggle={handleToggleItem}
+                    onDelete={handleDeleteItem}
+                    onUpdateQuantity={handleUpdateQuantity}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+
             {checkedItems.length > 0 && (
               <div className="mt-6">
                 <p className="text-sm font-medium text-gray-400 mb-2">Completados ({checkedItems.length})</p>
