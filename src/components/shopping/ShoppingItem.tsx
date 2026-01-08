@@ -9,9 +9,10 @@ interface ShoppingItemProps {
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
+  dragHandleProps?: any
 }
 
-export function ShoppingItem({ item, onToggle, onDelete, onUpdateQuantity }: ShoppingItemProps) {
+export function ShoppingItem({ item, onToggle, onDelete, onUpdateQuantity, dragHandleProps }: ShoppingItemProps) {
   const [isDeleting, setIsDeleting] = useState(false)
 
   const handleDelete = () => {
@@ -45,7 +46,7 @@ export function ShoppingItem({ item, onToggle, onDelete, onUpdateQuantity }: Sho
       `}
     >
       {/* Drag handle */}
-      <div className="text-gray-300 cursor-grab active:cursor-grabbing touch-none">
+      <div {...dragHandleProps} className="text-gray-300 cursor-grab active:cursor-grabbing touch-none">
         <GripVertical className="w-5 h-5" />
       </div>
 

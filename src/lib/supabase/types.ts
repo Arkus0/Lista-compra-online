@@ -67,6 +67,7 @@ export interface Database {
           category: string | null
           checked: boolean
           added_by: string
+          position?: number
           created_at: string
           updated_at: string
         }
@@ -79,6 +80,7 @@ export interface Database {
           category?: string | null
           checked?: boolean
           added_by: string
+          position?: number
           created_at?: string
           updated_at?: string
         }
@@ -88,6 +90,7 @@ export interface Database {
           unit?: string | null
           category?: string | null
           checked?: boolean
+          position?: number
           updated_at?: string
         }
       }
