@@ -229,7 +229,15 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
       setSelectedCategory(category as CategoryId)
       setManuallySelected(true)
     }
-    inputRef.current?.focus()
+    setShowBarcodeScanner(false)
+    // Asegurar que el input esté enfocado y editable
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus()
+        // Posicionar el cursor al final del texto
+        inputRef.current.setSelectionRange(productName.length, productName.length)
+      }
+    }, 100)
   }, [])
 
   // Handler para abrir el escáner de código de barras
@@ -240,42 +248,43 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
   }, [])
 
   // Handler para el botón de voz (push-to-talk)
-  const handleVoiceMouseDown = useCallback(() => {
-    if (!isListening) {
-      // Blur del input para ocultar el teclado
-      inputRef.current?.blur()
-      startListening()
-    }
-  }, [isListening, startListening])
+  const handleVoiceMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    // Blur del input para ocultar el teclado
+    inputRef.current?.blur()
+    startListening()
+  }, [startListening])
 
-  const handleVoiceMouseUp = useCallback(() => {
-    if (isListening) {
-      stopListening()
-      // Volver a enfocar el input después de soltar
-      setTimeout(() => {
-        inputRef.current?.focus()
-      }, 100)
-    }
-  }, [isListening, stopListening])
+  const handleVoiceMouseUp = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    stopListening()
+    // Volver a enfocar el input después de soltar
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 100)
+  }, [stopListening])
 
   // Handler para touch devices
   const handleVoiceTouchStart = useCallback((e: React.TouchEvent) => {
     e.preventDefault()
-    if (!isListening) {
-      inputRef.current?.blur()
-      startListening()
-    }
-  }, [isListening, startListening])
+    e.stopPropagation()
+    inputRef.current?.blur()
+    startListening()
+  }, [startListening])
 
   const handleVoiceTouchEnd = useCallback((e: React.TouchEvent) => {
     e.preventDefault()
-    if (isListening) {
-      stopListening()
-      setTimeout(() => {
-        inputRef.current?.focus()
-      }, 100)
-    }
-  }, [isListening, stopListening])
+    e.stopPropagation()
+    stopListening()
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 100)
+  }, [stopListening])
+
+  const handleVoiceTouchCancel = useCallback((e: React.TouchEvent) => {
+    e.preventDefault()
+    stopListening()
+  }, [stopListening])
 
   // Obtener la configuración visual de la categoría actual
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
@@ -396,9 +405,16 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
                   setSelectedCategory('other')
                 }
               }}
+              onKeyDown={(e) => {
+                // Asegurar que las teclas de borrar funcionen siempre
+                if (e.key === 'Backspace' || e.key === 'Delete') {
+                  e.stopPropagation()
+                }
+              }}
               placeholder={isListening ? "Escuchando..." : "Añadir producto..."}
               className={`w-full h-12 rounded-xl bg-secondary pl-4 pr-24 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-gray-400 ${isListening ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
               autoComplete="off"
+              readOnly={isListening}
             />
 
             {/* Input File oculto */}
@@ -421,7 +437,8 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
                   onMouseLeave={handleVoiceMouseUp}
                   onTouchStart={handleVoiceTouchStart}
                   onTouchEnd={handleVoiceTouchEnd}
-                  className={`p-2 rounded-lg transition-all ${
+                  onTouchCancel={handleVoiceTouchCancel}
+                  className={`p-2 rounded-lg transition-all select-none ${
                     isListening
                       ? 'text-red-500 bg-red-100 animate-pulse'
                       : 'text-gray-400 hover:text-primary hover:bg-primary/10'

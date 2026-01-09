@@ -124,8 +124,12 @@ export function ListMenuButton({ listId, listName }: Props) {
       .eq('id', listId)
 
     if (!error) {
-      router.refresh()
       setActiveModal(null)
+      // Redirigir a /lists y forzar recarga
+      router.push('/lists')
+      router.refresh()
+    } else {
+      console.error('Error al eliminar lista:', error)
     }
     setIsLoading(false)
   }
@@ -230,9 +234,14 @@ export function ListMenuButton({ listId, listName }: Props) {
                   </Button>
                 </div>
               </div>
-              <div className="w-full p-3 bg-blue-50 text-blue-700 rounded-lg text-sm flex items-center gap-2">
-                <QrCode className="w-4 h-4" />
-                <span>Código de lista: <strong>{shareCode || 'Cargando...'}</strong></span>
+              <div className="w-full p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-900 dark:text-blue-100 rounded-lg border-2 border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <QrCode className="w-5 h-5" />
+                  <span className="text-sm font-medium">Código de lista</span>
+                </div>
+                <div className="text-center">
+                  <span className="text-2xl font-bold tracking-wider">{shareCode || 'Cargando...'}</span>
+                </div>
               </div>
             </div>
           </Modal>
