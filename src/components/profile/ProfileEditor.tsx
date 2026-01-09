@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Camera, User, Loader2, Check, X } from 'lucide-react'
+import { Camera, User, Loader2, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
@@ -12,14 +12,19 @@ import { useImageUpload } from '@/hooks/useImageUpload'
 interface ProfileEditorProps {
   profile: Profile
   onUpdate: (profile: Profile) => void
+  children?: React.ReactNode
 }
 
-export function ProfileEditor({ profile, onUpdate }: ProfileEditorProps) {
+export function ProfileEditor({ profile, onUpdate, children }: ProfileEditorProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [name, setName] = useState(profile.name || '')
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -86,43 +91,98 @@ export function ProfileEditor({ profile, onUpdate }: ProfileEditorProps) {
     setName(profile.name || '')
     setAvatarUrl(profile.avatar_url || '')
     setError(null)
+    setShowPasswordChange(false)
+    setNewPassword('')
+    setConfirmPassword('')
+    setPasswordSuccess(false)
     setIsEditing(false)
+  }
+
+  const handlePasswordChange = async () => {
+    if (!newPassword || !confirmPassword) {
+      setError('Por favor completa todos los campos de contraseña')
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('Las contraseñas no coinciden')
+      return
+    }
+
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      const supabase = createClient()
+      const { error: passwordError } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
+
+      if (passwordError) throw passwordError
+
+      setPasswordSuccess(true)
+      setNewPassword('')
+      setConfirmPassword('')
+      setShowPasswordChange(false)
+
+      setTimeout(() => {
+        setPasswordSuccess(false)
+      }, 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cambiar contraseña')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
     <>
-      {/* Avatar con botón de edición */}
-      <div className="relative group">
-        <button
-          onClick={() => setIsEditing(true)}
-          className="relative w-20 h-20 rounded-full overflow-hidden border-4 border-background shadow-lg"
-        >
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={name || 'Avatar'}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-primary/10 flex items-center justify-center">
-              <User className="w-10 h-10 text-primary" />
-            </div>
-          )}
+      {/* Si hay children, hacerlos clickeables. Si no, usar el botón de avatar original */}
+      {children ? (
+        <div onClick={() => setIsEditing(true)}>
+          {children}
+        </div>
+      ) : (
+        <>
+          {/* Avatar con botón de edición */}
+          <div className="relative group">
+            <button
+              onClick={() => setIsEditing(true)}
+              className="relative w-20 h-20 rounded-full overflow-hidden border-4 border-background shadow-lg"
+            >
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={name || 'Avatar'}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-primary/10 flex items-center justify-center">
+                  <User className="w-10 h-10 text-primary" />
+                </div>
+              )}
 
-          {/* Overlay de edición */}
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <Camera className="w-6 h-6 text-white" />
+              {/* Overlay de edición */}
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera className="w-6 h-6 text-white" />
+              </div>
+            </button>
+
+            {/* Badge de edición */}
+            <button
+              onClick={() => setIsEditing(true)}
+              className="absolute -bottom-1 -right-1 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors"
+            >
+              <Camera className="w-4 h-4" />
+            </button>
           </div>
-        </button>
-
-        {/* Badge de edición */}
-        <button
-          onClick={() => setIsEditing(true)}
-          className="absolute -bottom-1 -right-1 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors"
-        >
-          <Camera className="w-4 h-4" />
-        </button>
-      </div>
+        </>
+      )}
 
       {/* Modal de edición */}
       <Modal isOpen={isEditing} onClose={handleCancel} title="Editar perfil">
@@ -182,18 +242,59 @@ export function ProfileEditor({ profile, onUpdate }: ProfileEditorProps) {
             placeholder="Tu nombre"
           />
 
-          {/* Email (read only) */}
-          <div>
-            <label className="block text-sm font-medium text-muted mb-1">
-              Email
-            </label>
-            <div className="px-3 py-2 bg-secondary rounded-lg text-muted text-sm">
-              {profile.email}
-            </div>
-            <p className="text-xs text-muted mt-1">
-              El email no se puede cambiar
-            </p>
+          {/* Cambiar contraseña - Sección desplegable */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <button
+              onClick={() => setShowPasswordChange(!showPasswordChange)}
+              className="w-full flex items-center justify-between p-3 bg-secondary rounded-lg hover:bg-secondary/80 transition-colors"
+            >
+              <span className="text-sm font-medium">Cambiar contraseña</span>
+              {showPasswordChange ? (
+                <ChevronUp className="w-4 h-4 text-muted" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted" />
+              )}
+            </button>
+
+            {showPasswordChange && (
+              <div className="mt-3 space-y-3">
+                <Input
+                  label="Nueva contraseña"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+                <Input
+                  label="Confirmar contraseña"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repite la contraseña"
+                />
+                <Button
+                  onClick={handlePasswordChange}
+                  disabled={isSaving || !newPassword || !confirmPassword}
+                  variant="secondary"
+                  className="w-full"
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Actualizar contraseña'
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
+
+          {/* Success message */}
+          {passwordSuccess && (
+            <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg text-sm flex items-center gap-2">
+              <Check className="w-4 h-4" />
+              Contraseña actualizada correctamente
+            </div>
+          )}
 
           {/* Error message */}
           {error && (

@@ -155,9 +155,34 @@ export function ListNotes({ listId, listName, currentUser, isCollaborative = fal
   // Contar notas fijadas
   const pinnedCount = notes.filter((n) => n.is_pinned).length
 
+  // Separar notas fijadas y no fijadas
+  const pinnedNotes = notes.filter((n) => n.is_pinned)
+  const unpinnedNotes = notes.filter((n) => !n.is_pinned)
+
   return (
     <div className="border-t border-gray-100 dark:border-gray-800">
-      {/* Header toggle */}
+      {/* Notas fijadas - siempre visibles */}
+      {pinnedNotes.length > 0 && (
+        <div className="px-3 pt-3 space-y-2">
+          <div className="flex items-center gap-2 mb-2">
+            <Pin className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+              Notas fijadas
+            </span>
+          </div>
+          {pinnedNotes.map((note) => (
+            <NoteCard
+              key={note.id}
+              note={note}
+              isOwner={note.user_id === currentUser.id}
+              onTogglePin={() => handleTogglePin(note.id, note.is_pinned)}
+              onDelete={() => handleDeleteNote(note.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Header toggle para ver todas las notas */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between p-3 hover:bg-secondary/50 transition-colors"
@@ -165,13 +190,8 @@ export function ListNotes({ listId, listName, currentUser, isCollaborative = fal
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-muted" />
           <span className="text-sm font-medium">
-            Notas {notes.length > 0 && `(${notes.length})`}
+            {isExpanded ? 'Ocultar notas' : `Ver todas las notas (${notes.length})`}
           </span>
-          {pinnedCount > 0 && (
-            <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded">
-              {pinnedCount} fijadas
-            </span>
-          )}
         </div>
         {isExpanded ? (
           <ChevronUp className="w-4 h-4 text-muted" />
@@ -213,7 +233,7 @@ export function ListNotes({ listId, listName, currentUser, isCollaborative = fal
             </Button>
           </div>
 
-          {/* Lista de notas */}
+          {/* Lista de todas las notas */}
           {isLoading ? (
             <div className="flex justify-center py-4">
               <Loader2 className="w-5 h-5 animate-spin text-muted" />
@@ -224,15 +244,25 @@ export function ListNotes({ listId, listName, currentUser, isCollaborative = fal
             </p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {notes.map((note) => (
-                <NoteCard
-                  key={note.id}
-                  note={note}
-                  isOwner={note.user_id === currentUser.id}
-                  onTogglePin={() => handleTogglePin(note.id, note.is_pinned)}
-                  onDelete={() => handleDeleteNote(note.id)}
-                />
-              ))}
+              {/* Notas no fijadas */}
+              {unpinnedNotes.length > 0 && (
+                <>
+                  {pinnedNotes.length > 0 && (
+                    <p className="text-xs font-medium text-muted mt-4 mb-2">
+                      Otras notas
+                    </p>
+                  )}
+                  {unpinnedNotes.map((note) => (
+                    <NoteCard
+                      key={note.id}
+                      note={note}
+                      isOwner={note.user_id === currentUser.id}
+                      onTogglePin={() => handleTogglePin(note.id, note.is_pinned)}
+                      onDelete={() => handleDeleteNote(note.id)}
+                    />
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>

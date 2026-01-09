@@ -15,6 +15,7 @@ import {
   Star,
   ChevronDown,
   ChevronUp,
+  User,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Profile } from '@/lib/supabase/types'
@@ -112,23 +113,37 @@ export default function ProfilePage() {
 
       <main className="p-4 space-y-6">
         {/* Profile card con editor */}
-        <Card variant="elevated">
-          <div className="flex items-center gap-4">
-            {profile && (
-              <ProfileEditor profile={profile} onUpdate={handleProfileUpdate} />
-            )}
-            <div className="flex-1">
-              <h2 className="font-bold text-lg">{profile?.name || 'Usuario'}</h2>
-              <p className="text-sm text-gray-500 flex items-center gap-1">
-                <Mail className="w-4 h-4" />
-                {profile?.email}
-              </p>
-              <p className="text-xs text-muted mt-1">
-                Toca la foto para editar tu perfil
-              </p>
-            </div>
-          </div>
-        </Card>
+        {profile && (
+          <ProfileEditor profile={profile} onUpdate={handleProfileUpdate}>
+            <Card variant="elevated" className="cursor-pointer hover:shadow-lg transition-shadow">
+              <div className="flex items-center gap-4">
+                <div className="relative w-20 h-20 rounded-full overflow-hidden border-4 border-background shadow-lg shrink-0">
+                  {profile.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.name || 'Avatar'}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-primary/10 flex items-center justify-center">
+                      <User className="w-10 h-10 text-primary" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h2 className="font-bold text-lg">{profile.name || 'Usuario'}</h2>
+                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <Mail className="w-4 h-4" />
+                    {profile.email}
+                  </p>
+                  <p className="text-xs text-muted mt-1">
+                    Toca para editar tu perfil
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </ProfileEditor>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
