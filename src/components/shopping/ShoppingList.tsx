@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ShoppingBag, Users, Share2, MoreVertical,
-  Trash2, Edit2, Copy, Check, QrCode, Link as LinkIcon
+  Trash2, Edit2, Copy, Check, QrCode, Link as LinkIcon, 
+  ChevronDown, ChevronRight, CheckCircle2
 } from 'lucide-react'
 import { ShoppingItem } from './ShoppingItem'
 import { AddItemForm } from './AddItemForm'
@@ -95,10 +96,11 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [activeModal, setActiveModal] = useState<'share' | 'collaborators' | 'edit' | 'delete' | null>(null)
   const [showMenu, setShowMenu] = useState(false)
+  const [showCompleted, setShowCompleted] = useState(false) // Estado para colapsar completados
 
   // Estados para funcionalidades especificas
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
-  const [collaboratorsLoaded, setCollaboratorsLoaded] = useState(false) // Cache flag
+  const [collaboratorsLoaded, setCollaboratorsLoaded] = useState(false)
   const [newName, setNewName] = useState(list.name)
   const [isCopied, setIsCopied] = useState(false)
   const [isDuplicating, setIsDuplicating] = useState(false)
@@ -110,13 +112,13 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   const router = useRouter()
 
-  // QR URL memoizada - solo se recalcula si cambia share_code
+  // QR URL memoizada
   const shareUrl = useMemo(() =>
     typeof window !== 'undefined' ? `${window.location.origin}/join/${list.share_code}` : '',
     [list.share_code]
   )
 
-  // Configure drag and drop sensors - memoizado
+  // Configure drag and drop sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -170,7 +172,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     return () => { isMounted = false }
   }, [list.id, setItems, supabase])
 
-  // Cargar colaboradores - con caché
+  // Cargar colaboradores
   useEffect(() => {
     if (activeModal === 'collaborators' && !collaboratorsLoaded) {
       const loadCollaborators = async () => {
@@ -188,19 +190,16 @@ export function ShoppingList({ list }: ShoppingListProps) {
     }
   }, [activeModal, list.id, supabase, collaboratorsLoaded])
 
-  // Cargar perfiles de usuarios que añadieron/compraron items
+  // Cargar perfiles
   useEffect(() => {
     const loadProfiles = async () => {
-      // Recopilar IDs únicos de usuarios
       const userIds = new Set<string>()
       items.forEach((item) => {
         if (item.added_by) userIds.add(item.added_by)
         if (item.checked_by) userIds.add(item.checked_by)
       })
 
-      // Filtrar los que ya tenemos en caché
       const missingIds = Array.from(userIds).filter((id) => !profilesCache.has(id))
-
       if (missingIds.length === 0) return
 
       const { data } = await supabase
@@ -222,7 +221,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     }
   }, [items, supabase, profilesCache])
 
-  // --- Handlers de Items - memoizados ---
+  // --- Handlers ---
 
   const handleAddItem = useCallback(async (name: string, category?: string) => {
     if (!user) return
@@ -243,7 +242,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
     if (error) {
       console.error('Error adding item:', error)
     } else {
-      // Enviar notificación push a colaboradores
       sendPushNotification({
         listId: list.id,
         listName: list.name,
@@ -260,9 +258,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     if (!item || !user) return
 
     const newChecked = !item.checked
-
-    // Optimistic update
-    toggleItemChecked(id)
+    toggleItemChecked(id) // Optimistic
 
     const { error } = await supabase
       .from('list_items')
@@ -273,10 +269,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
       .eq('id', id)
 
     if (error) {
-      // Rollback on error
-      toggleItemChecked(id)
+      toggleItemChecked(id) // Rollback
     } else if (newChecked) {
-      // Solo notificar cuando se marca como comprado
       sendPushNotification({
         listId: list.id,
         listName: list.name,
@@ -292,8 +286,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     const item = items.find((i) => i.id === id)
     if (!item || !user) return
 
-    // Optimistic update
-    removeItem(id)
+    removeItem(id) // Optimistic
 
     const { error } = await supabase
       .from('list_items')
@@ -301,10 +294,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
       .eq('id', id)
 
     if (error) {
-      // Rollback on error
-      addItem(item)
+      addItem(item) // Rollback
     } else {
-      // Enviar notificación push a colaboradores
       sendPushNotification({
         listId: list.id,
         listName: list.name,
@@ -319,18 +310,15 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleUpdateQuantity = useCallback(async (id: string, quantity: number) => {
     const item = items.find((i) => i.id === id)
     if (!item) return
-
     const oldQuantity = item.quantity
-
-    // Optimistic update
-    updateItem(id, { quantity })
+    
+    updateItem(id, { quantity }) // Optimistic
 
     const { error } = await supabase
       .from('list_items')
       .update({ quantity })
       .eq('id', id)
 
-    // Rollback on error
     if (error) updateItem(id, { quantity: oldQuantity })
   }, [items, updateItem, supabase])
 
@@ -344,63 +332,62 @@ export function ShoppingList({ list }: ShoppingListProps) {
     })
   }, [addFavoriteItem])
 
-  // Añadir item desde favoritos a la lista actual
+  // Añadir item desde favoritos a la lista actual (CORREGIDO)
   const handleAddFromFavorite = useCallback(async (favorite: typeof favoriteItems[0]) => {
-    await addItemToListFromFavorite(favorite, list.id)
-  }, [addItemToListFromFavorite, list.id])
+    // 1. Llamar al hook que ahora devuelve datos
+    const result = await addItemToListFromFavorite(favorite, list.id)
+    
+    // 2. Actualizar estado local inmediatamente
+    if (result) {
+      if (result.action === 'created') {
+        addItem(result.item)
+      } else {
+        updateItem(result.item.id, {
+          quantity: result.item.quantity,
+          checked: result.item.checked
+        })
+      }
+    }
+  }, [addItemToListFromFavorite, list.id, addItem, updateItem])
 
-  // --- Drag and Drop - OPTIMIZADO con batch updates ---
+  // --- Drag and Drop ---
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event
-
     if (!over || active.id === over.id) return
-
     const oldIndex = uncheckedItems.findIndex((item) => item.id === active.id)
     const newIndex = uncheckedItems.findIndex((item) => item.id === over.id)
-
     if (oldIndex === -1 || newIndex === -1) return
 
-    // Reorder items locally
     const reorderedUnchecked = arrayMove(uncheckedItems, oldIndex, newIndex)
-
-    // Merge with checked items and update state
     const allItems = [...reorderedUnchecked, ...checkedItems]
     setItems(allItems)
 
-    // Preparar updates con nuevas posiciones
     const updates = reorderedUnchecked.map((item, index) => ({
       id: item.id,
       position: index,
     }))
 
-    // Update state batch
     updateItemsPositions(updates)
 
-    // BATCH UPDATE en BD - todas las actualizaciones en paralelo
     try {
       await Promise.all(
         updates.map(update =>
-          supabase
-            .from('list_items')
-            .update({ position: update.position })
-            .eq('id', update.id)
+          supabase.from('list_items').update({ position: update.position }).eq('id', update.id)
         )
       )
     } catch (error) {
       console.error('Error updating positions:', error)
-      // En caso de error, recargar items desde BD
       const { data } = await supabase
         .from('list_items')
         .select('*')
         .eq('list_id', list.id)
         .order('position', { ascending: true })
-
       if (data) setItems(data)
     }
   }, [uncheckedItems, checkedItems, setItems, updateItemsPositions, supabase, list.id])
 
-  // --- Funcionalidades Modales - memoizadas ---
-
+  // --- Funcionalidades Modales ---
+  // (Mantener igual que antes...)
   const handleCopyLink = useCallback(() => {
     navigator.clipboard.writeText(shareUrl)
     setIsCopied(true)
@@ -409,12 +396,10 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   const handleUpdateName = useCallback(async () => {
     if (!newName.trim() || newName === list.name) return
-
     const { error } = await supabase
       .from('shopping_lists')
       .update({ name: newName })
       .eq('id', list.id)
-
     if (!error) {
       router.refresh()
       setActiveModal(null)
@@ -422,11 +407,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   }, [newName, list.name, list.id, supabase, router])
 
   const handleDeleteList = useCallback(async () => {
-    const { error } = await supabase
-      .from('shopping_lists')
-      .delete()
-      .eq('id', list.id)
-
+    const { error } = await supabase.from('shopping_lists').delete().eq('id', list.id)
     if (!error) {
       router.push('/lists')
       router.refresh()
@@ -436,9 +417,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleDuplicateList = useCallback(async () => {
     if (!user) return
     setIsDuplicating(true)
-
     try {
-      // 1. Crear nueva lista
       const { data: newList, error: listError } = await supabase
         .from('shopping_lists')
         .insert({
@@ -448,12 +427,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
         })
         .select()
         .single()
+      if (listError || !newList) throw listError
 
-      if (listError || !newList) {
-        throw listError
-      }
-
-      // 2. Copiar items en batch
       if (items.length > 0) {
         const itemsToInsert = items.map((item, index) => ({
           list_id: newList.id,
@@ -465,10 +440,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
           added_by: user.id,
           position: index
         }))
-
         await supabase.from('list_items').insert(itemsToInsert)
       }
-
       setShowMenu(false)
       router.push(`/lists/${newList.id}`)
     } catch (error) {
@@ -483,16 +456,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const openCollaboratorsModal = useCallback(() => setActiveModal('collaborators'), [])
   const closeModal = useCallback(() => setActiveModal(null), [])
   const toggleMenu = useCallback(() => setShowMenu(prev => !prev), [])
-
-  const openEditModal = useCallback(() => {
-    setActiveModal('edit')
-    setShowMenu(false)
-  }, [])
-
-  const openDeleteModal = useCallback(() => {
-    setActiveModal('delete')
-    setShowMenu(false)
-  }, [])
+  const openEditModal = useCallback(() => { setActiveModal('edit'); setShowMenu(false); }, [])
+  const openDeleteModal = useCallback(() => { setActiveModal('delete'); setShowMenu(false); }, [])
 
   return (
     <div className="flex flex-col h-full relative">
@@ -502,7 +467,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center relative">
               <ShoppingBag className="w-5 h-5 text-primary" />
-              {/* Indicador de conexión */}
               <span
                 className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-background ${
                   isConnected ? 'bg-green-500' : 'bg-gray-400'
@@ -524,53 +488,31 @@ export function ShoppingList({ list }: ShoppingListProps) {
           </div>
 
           <div className="flex items-center gap-2 relative">
-            {/* Mostrar usuarios presentes */}
             {presenceUsers.length > 0 && (
               <PresenceIndicator users={presenceUsers} maxVisible={3} />
             )}
-
-            <button
-              onClick={openCollaboratorsModal}
-              className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors"
-            >
+            <button onClick={openCollaboratorsModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors">
               <Users className="w-5 h-5 text-gray-500" />
             </button>
-            <button
-              onClick={openShareModal}
-              className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors"
-            >
+            <button onClick={openShareModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors">
               <Share2 className="w-5 h-5 text-muted" />
             </button>
-            <button
-              onClick={toggleMenu}
-              className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors"
-            >
+            <button onClick={toggleMenu} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors">
               <MoreVertical className="w-5 h-5 text-muted" />
             </button>
-
-            {/* Menú Desplegable */}
+            
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={closeMenu} />
                 <div className="absolute top-12 right-0 w-48 bg-card border border-border rounded-xl shadow-xl z-20 py-2 animate-in fade-in zoom-in-95 duration-100">
-                  <button
-                    onClick={openEditModal}
-                    className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-hover flex items-center gap-2 transition-colors"
-                  >
+                  <button onClick={openEditModal} className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-hover flex items-center gap-2 transition-colors">
                     <Edit2 className="w-4 h-4 text-muted" /> Editar nombre
                   </button>
-                  <button
-                    onClick={handleDuplicateList}
-                    disabled={isDuplicating}
-                    className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-hover flex items-center gap-2 transition-colors disabled:opacity-50"
-                  >
+                  <button onClick={handleDuplicateList} disabled={isDuplicating} className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-hover flex items-center gap-2 transition-colors disabled:opacity-50">
                     <Copy className="w-4 h-4 text-muted" /> {isDuplicating ? 'Duplicando...' : 'Duplicar lista'}
                   </button>
                   <div className="h-px bg-border-light my-1" />
-                  <button
-                    onClick={openDeleteModal}
-                    className="w-full px-4 py-2 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2 transition-colors"
-                  >
+                  <button onClick={openDeleteModal} className="w-full px-4 py-2 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2 transition-colors">
                     <Trash2 className="w-4 h-4" /> Eliminar lista
                   </button>
                 </div>
@@ -579,7 +521,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
           </div>
         </div>
 
-        {/* Progress bar */}
         <div className="h-2 bg-secondary rounded-full overflow-hidden">
           <div
             className="h-full bg-primary transition-all duration-300"
@@ -591,7 +532,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
         </p>
       </header>
 
-      {/* Notas de la lista - siempre visibles después del header */}
       {user && (
         <div className="flex-shrink-0">
           <ListNotes
@@ -603,8 +543,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
         </div>
       )}
 
-      {/* Items List (Scrollable Area) */}
-      {/* Aumentamos el padding bottom (pb-40) para que el contenido no quede oculto tras el formulario fijo */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-40">
         {isLoading ? (
           <div className="space-y-2">
@@ -631,25 +569,43 @@ export function ShoppingList({ list }: ShoppingListProps) {
               </SortableContext>
             </DndContext>
 
+            {/* SECCIÓN COMPLETADOS COLAPSABLE */}
             {checkedItems.length > 0 && (
-              <div className="mt-6">
-                <p className="text-sm font-medium text-gray-400 mb-2">Completados ({checkedItems.length})</p>
-                <div className="space-y-2 opacity-60">
-                  {checkedItems.map((item) => (
-                    <ShoppingItem
-                      key={item.id}
-                      item={item}
-                      onToggle={handleToggleItem}
-                      onDelete={handleDeleteItem}
-                      onUpdateQuantity={handleUpdateQuantity}
-                      onAddToFavorites={handleAddToFavorites}
-                      addedByProfile={profilesCache.get(item.added_by) || null}
-                      checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) || null : null}
-                    />
-                  ))}
-                </div>
+              <div className="mt-6 border-t border-dashed border-gray-100 pt-4">
+                <button
+                  onClick={() => setShowCompleted(!showCompleted)}
+                  className="flex items-center gap-2 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors w-full mb-3"
+                >
+                  <div className="p-1 rounded bg-gray-100">
+                    {showCompleted ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
+                    )}
+                  </div>
+                  <span>Completados ({checkedItems.length})</span>
+                  <div className="h-px flex-1 bg-gray-100 ml-2" />
+                </button>
+
+                {showCompleted && (
+                  <div className="space-y-2 opacity-60 animate-in slide-in-from-top-2 duration-200">
+                    {checkedItems.map((item) => (
+                      <ShoppingItem
+                        key={item.id}
+                        item={item}
+                        onToggle={handleToggleItem}
+                        onDelete={handleDeleteItem}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        onAddToFavorites={handleAddToFavorites}
+                        addedByProfile={profilesCache.get(item.added_by) || null}
+                        checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) || null : null}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
+            
             {items.length === 0 && (
               <div className="flex flex-col items-center justify-center h-64 text-center">
                 <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
@@ -663,8 +619,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
         )}
       </div>
 
-      {/* FIXED BOTTOM AREA: Favoritos + Formulario */}
-      {/* Usamos fixed bottom-0 para garantizar que siempre esté visible y encima del contenido */}
       <div className="fixed bottom-0 left-0 right-0 bg-background z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-border/50">
         <FavoriteItems
           favorites={favoriteItems}
@@ -675,102 +629,56 @@ export function ShoppingList({ list }: ShoppingListProps) {
         <AddItemForm onAdd={handleAddItem} />
       </div>
 
-      {/* --- MODALES --- */}
-
-      {/* Modal Compartir */}
+      {/* MODALES */}
       <Modal isOpen={activeModal === 'share'} onClose={closeModal} title="Compartir lista">
         <div className="space-y-6 flex flex-col items-center">
           <div className="bg-card p-4 rounded-xl border-2 border-dashed border-border">
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shareUrl)}`}
-              alt="QR Code"
-              className="w-40 h-40"
-              loading="lazy"
-            />
+            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shareUrl)}`} alt="QR Code" className="w-40 h-40" loading="lazy" />
           </div>
           <div className="w-full space-y-2">
             <p className="text-sm font-medium text-muted">Enlace de invitación</p>
             <div className="flex gap-2">
-              <div className="flex-1 bg-secondary px-3 py-2 rounded-lg text-sm text-muted truncate font-mono">
-                {shareUrl}
-              </div>
-              <Button onClick={handleCopyLink} variant={isCopied ? 'primary' : 'secondary'} size="sm">
-                {isCopied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
-              </Button>
+              <div className="flex-1 bg-secondary px-3 py-2 rounded-lg text-sm text-muted truncate font-mono">{shareUrl}</div>
+              <Button onClick={handleCopyLink} variant={isCopied ? 'primary' : 'secondary'} size="sm">{isCopied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}</Button>
             </div>
           </div>
-          <div className="w-full p-3 bg-primary/10 text-primary rounded-lg text-sm flex items-center gap-2">
-            <QrCode className="w-4 h-4" />
-            <span>Código de lista: <strong>{list.share_code}</strong></span>
-          </div>
+          <div className="w-full p-3 bg-primary/10 text-primary rounded-lg text-sm flex items-center gap-2"><QrCode className="w-4 h-4" /><span>Código de lista: <strong>{list.share_code}</strong></span></div>
         </div>
       </Modal>
 
-      {/* Modal Colaboradores */}
       <Modal isOpen={activeModal === 'collaborators'} onClose={closeModal} title="Colaboradores">
         <div className="space-y-4">
           <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                {user?.name?.[0]?.toUpperCase() ?? '?'}
-              </div>
-              <div>
-                <p className="font-medium">Tú</p>
-                <p className="text-xs text-muted-light">Propietario</p>
-              </div>
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">{user?.name?.[0]?.toUpperCase() ?? '?'}</div>
+              <div><p className="font-medium">Tú</p><p className="text-xs text-muted-light">Propietario</p></div>
             </div>
             <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">Owner</span>
           </div>
-
-          {collaborators.length > 0 ? (
-            collaborators.map((collab, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 border border-border rounded-xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted font-bold">
-                    {collab.profiles.name?.[0]?.toUpperCase() ?? '?'}
-                  </div>
-                  <div>
-                    <p className="font-medium">{collab.profiles.name || 'Usuario'}</p>
-                    <p className="text-xs text-muted-light">{collab.profiles.email}</p>
-                  </div>
-                </div>
-                <span className="text-xs bg-secondary text-muted px-2 py-1 rounded-full capitalize">{collab.role}</span>
+          {collaborators.length > 0 ? collaborators.map((collab, idx) => (
+            <div key={idx} className="flex items-center justify-between p-3 border border-border rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted font-bold">{collab.profiles.name?.[0]?.toUpperCase() ?? '?'}</div>
+                <div><p className="font-medium">{collab.profiles.name || 'Usuario'}</p><p className="text-xs text-muted-light">{collab.profiles.email}</p></div>
               </div>
-            ))
-          ) : (
-            <p className="text-center text-muted text-sm py-4">No hay otros colaboradores</p>
-          )}
+              <span className="text-xs bg-secondary text-muted px-2 py-1 rounded-full capitalize">{collab.role}</span>
+            </div>
+          )) : <p className="text-center text-muted text-sm py-4">No hay otros colaboradores</p>}
         </div>
       </Modal>
 
-      {/* Modal Editar */}
       <Modal isOpen={activeModal === 'edit'} onClose={closeModal} title="Editar lista">
         <div className="space-y-4">
-          <Input
-            label="Nombre de la lista"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-          />
-          <div className="flex gap-3 justify-end mt-4">
-            <Button variant="ghost" onClick={closeModal}>Cancelar</Button>
-            <Button onClick={handleUpdateName}>Guardar</Button>
-          </div>
+          <Input label="Nombre de la lista" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <div className="flex gap-3 justify-end mt-4"><Button variant="ghost" onClick={closeModal}>Cancelar</Button><Button onClick={handleUpdateName}>Guardar</Button></div>
         </div>
       </Modal>
 
-      {/* Modal Eliminar */}
       <Modal isOpen={activeModal === 'delete'} onClose={closeModal} title="¿Eliminar lista?">
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto text-danger">
-            <Trash2 className="w-6 h-6" />
-          </div>
-          <p className="text-gray-600">
-            Esta acción no se puede deshacer. Se perderán todos los productos.
-          </p>
-          <div className="flex gap-3 justify-center mt-6">
-            <Button variant="secondary" onClick={closeModal}>Cancelar</Button>
-            <Button variant="danger" onClick={handleDeleteList}>Sí, eliminar</Button>
-          </div>
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto text-danger"><Trash2 className="w-6 h-6" /></div>
+          <p className="text-gray-600">Esta acción no se puede deshacer. Se perderán todos los productos.</p>
+          <div className="flex gap-3 justify-center mt-6"><Button variant="secondary" onClick={closeModal}>Cancelar</Button><Button variant="danger" onClick={handleDeleteList}>Sí, eliminar</Button></div>
         </div>
       </Modal>
     </div>
