@@ -47,11 +47,12 @@ export default function RootLayout({
                 try {
                   const theme = localStorage.getItem('theme') || 'system';
                   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                  if (isDark) {
-                    document.documentElement.classList.add('dark');
-                  } else {
-                    document.documentElement.classList.remove('dark');
-                  }
+                  
+                  // CORRECCIÓN: Limpiamos ambas clases y forzamos la correcta.
+                  // Al añadir explícitamente 'light' cuando no es dark, evitamos que
+                  // el CSS fallback (:root:not(.dark):not(.light)) se active en móviles.
+                  document.documentElement.classList.remove('light', 'dark');
+                  document.documentElement.classList.add(isDark ? 'dark' : 'light');
                 } catch (e) {}
               })();
             `,
