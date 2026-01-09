@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ShoppingBag, Users, Share2, MoreVertical,
-  Trash2, Edit2, Copy, Check, QrCode, Link as LinkIcon, 
-  ChevronDown, ChevronRight, CheckCircle2
+  Trash2, Edit2, Copy, Check, QrCode, Link as LinkIcon,
+  ChevronDown, ChevronRight
 } from 'lucide-react'
 import { ShoppingItem } from './ShoppingItem'
 import { AddItemForm } from './AddItemForm'
@@ -100,7 +100,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   // Estados para funcionalidades especificas
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
-  const [collaboratorsLoaded, setCollaboratorsLoaded] = useState(false)
+  const [collaboratorsLoaded, setCollaboratorsLoaded] = useState(false) // Cache flag
   const [newName, setNewName] = useState(list.name)
   const [isCopied, setIsCopied] = useState(false)
   const [isDuplicating, setIsDuplicating] = useState(false)
@@ -226,32 +226,82 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleAddItem = useCallback(async (name: string, category?: string) => {
     if (!user) return
 
-    const maxPosition = items.length > 0
-      ? Math.max(...items.map(i => i.position ?? 0))
-      : -1
+    // Normalizar nombre para la búsqueda (trim y lowerCase)
+    const normalizedName = name.trim().toLowerCase()
+    
+    // 1. Buscar si ya existe (en el estado local es suficiente y más rápido)
+    const existingItem = items.find(item => item.name.trim().toLowerCase() === normalizedName)
 
-    const itemData = {
-      list_id: list.id,
-      name,
-      category,
-      added_by: user.id,
-      position: maxPosition + 1
-    }
-
-    const { error } = await supabase.from('list_items').insert(itemData)
-    if (error) {
-      console.error('Error adding item:', error)
-    } else {
-      sendPushNotification({
-        listId: list.id,
-        listName: list.name,
-        action: 'item_added',
-        actorName: user.name || 'Alguien',
-        itemName: name,
-        excludeUserId: user.id,
+    if (existingItem) {
+      // --- LOGICA DE ACTUALIZACIÓN (SI EXISTE) ---
+      const newQuantity = (existingItem.quantity || 1) + 1
+      
+      // Optimistic update
+      updateItem(existingItem.id, { 
+        quantity: newQuantity,
+        checked: false // Lo traemos de vuelta si estaba completado
       })
+
+      const { error } = await supabase
+        .from('list_items')
+        .update({ 
+          quantity: newQuantity, 
+          checked: false,
+          checked_by: null,
+          // Actualizar categoría si la tenía como 'other' y ahora viene una mejor
+          category: existingItem.category === 'other' && category ? category : existingItem.category
+        })
+        .eq('id', existingItem.id)
+
+      if (error) {
+        console.error('Error updating item quantity:', error)
+        // Rollback optimistic (restaurar estado anterior)
+        updateItem(existingItem.id, { 
+          quantity: existingItem.quantity,
+          checked: existingItem.checked 
+        })
+      } else {
+        // Notificación de "item añadido" (para que suene igual a los demás)
+         sendPushNotification({
+          listId: list.id,
+          listName: list.name,
+          action: 'item_added', 
+          actorName: user.name || 'Alguien',
+          itemName: existingItem.name, // Usar nombre original (con mayúsculas correctas)
+          excludeUserId: user.id,
+        })
+      }
+
+    } else {
+      // --- LOGICA DE INSERCIÓN (SI NO EXISTE) ---
+      const maxPosition = items.length > 0
+        ? Math.max(...items.map(i => i.position ?? 0))
+        : -1
+
+      const itemData = {
+        list_id: list.id,
+        name: name.trim(),
+        category,
+        added_by: user.id,
+        position: maxPosition + 1
+      }
+
+      const { error } = await supabase.from('list_items').insert(itemData)
+      
+      if (error) {
+        console.error('Error adding item:', error)
+      } else {
+        sendPushNotification({
+          listId: list.id,
+          listName: list.name,
+          action: 'item_added',
+          actorName: user.name || 'Alguien',
+          itemName: name,
+          excludeUserId: user.id,
+        })
+      }
     }
-  }, [user, items, list.id, list.name, supabase])
+  }, [user, items, list.id, list.name, supabase, updateItem])
 
   const handleToggleItem = useCallback(async (id: string) => {
     const item = items.find((i) => i.id === id)
@@ -332,12 +382,10 @@ export function ShoppingList({ list }: ShoppingListProps) {
     })
   }, [addFavoriteItem])
 
-  // Añadir item desde favoritos a la lista actual (CORREGIDO)
+  // Añadir item desde favoritos a la lista actual
   const handleAddFromFavorite = useCallback(async (favorite: typeof favoriteItems[0]) => {
-    // 1. Llamar al hook que ahora devuelve datos
     const result = await addItemToListFromFavorite(favorite, list.id)
     
-    // 2. Actualizar estado local inmediatamente
     if (result) {
       if (result.action === 'created') {
         addItem(result.item)
@@ -387,7 +435,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
   }, [uncheckedItems, checkedItems, setItems, updateItemsPositions, supabase, list.id])
 
   // --- Funcionalidades Modales ---
-  // (Mantener igual que antes...)
   const handleCopyLink = useCallback(() => {
     navigator.clipboard.writeText(shareUrl)
     setIsCopied(true)
