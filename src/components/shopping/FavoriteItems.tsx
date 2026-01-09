@@ -8,7 +8,7 @@ interface FavoriteItemsProps {
   favorites: UserFavoriteItem[]
   isLoading: boolean
   onAddToList: (favorite: UserFavoriteItem) => Promise<void>
-  onRemove: (itemId: string) => Promise<void>
+  onRemove: (itemId: string) => Promise<boolean | void>
 }
 
 export function FavoriteItems({
