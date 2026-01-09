@@ -593,6 +593,16 @@ export function ShoppingList({ list }: ShoppingListProps) {
         </p>
       </header>
 
+      {/* Notas de la lista - siempre visibles después del header */}
+      {user && (
+        <ListNotes
+          listId={list.id}
+          listName={list.name}
+          currentUser={user}
+          isCollaborative={collaborators.length > 0 || list.share_code !== null}
+        />
+      )}
+
       {/* Items List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {isLoading ? (
@@ -659,16 +669,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
         onAddToList={handleAddFromFavorite}
         onRemove={removeFavoriteItem}
       />
-
-      {/* Notas de la lista - justo encima del formulario de añadir */}
-      {user && (
-        <ListNotes
-          listId={list.id}
-          listName={list.name}
-          currentUser={user}
-          isCollaborative={collaborators.length > 0 || list.share_code !== null}
-        />
-      )}
 
       <AddItemForm onAdd={handleAddItem} />
 
