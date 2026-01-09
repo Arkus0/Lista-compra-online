@@ -6,7 +6,10 @@ import { useTheme } from '@/contexts/ThemeContext';
 export default function ThemeToggle() {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
-  const toggleTheme = () => {
+  const toggleTheme = (e: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     if (theme === 'system') {
       // Si está en modo sistema, cambiar al opuesto del actual
       setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
@@ -19,13 +22,18 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-lg hover:bg-secondary transition-colors"
+      onTouchEnd={(e) => {
+        e.preventDefault();
+        toggleTheme(e);
+      }}
+      className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-secondary active:bg-secondary transition-colors touch-none select-none"
       aria-label="Cambiar tema"
+      type="button"
     >
       {resolvedTheme === 'dark' ? (
-        <Sun className="w-5 h-5 text-foreground" />
+        <Sun className="w-5 h-5 text-foreground pointer-events-none" />
       ) : (
-        <Moon className="w-5 h-5 text-foreground" />
+        <Moon className="w-5 h-5 text-foreground pointer-events-none" />
       )}
     </button>
   );
