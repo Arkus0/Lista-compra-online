@@ -166,7 +166,7 @@ export default function ProfilePage() {
           <h3 className="font-semibold text-lg mb-3">Accesos rápidos</h3>
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => router.push('/lists?tab=favorites')}
+              onClick={() => router.push('/favorites')}
               className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl flex items-center gap-3 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
             >
               <Star className="w-6 h-6 text-amber-500" />
