@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Mail, Lock, User, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -18,11 +18,14 @@ export function AuthForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
   const router = useRouter()
-  const supabase = createClient()
+  // Usar ref para evitar recrear el cliente en cada render
+  const supabaseRef = useRef(createClient())
+  const supabase = supabaseRef.current
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
@@ -48,18 +51,20 @@ export function AuthForm() {
 
         if (error) throw error
 
-        // Redirigir al inicio después de login exitoso
-        router.push('/')
-        router.refresh()
+        // Usar startTransition para navegación más suave
+        startTransition(() => {
+          router.push('/')
+          router.refresh()
+        })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ha ocurrido un error')
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [mode, email, password, name, supabase, router])
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
@@ -74,7 +79,15 @@ export function AuthForm() {
       setError(error.message)
       setIsLoading(false)
     }
-  }
+  }, [supabase])
+
+  const toggleMode = useCallback(() => {
+    setMode(prev => prev === 'login' ? 'register' : 'login')
+    setError(null)
+    setMessage(null)
+  }, [])
+
+  const isSubmitting = isLoading || isPending
 
   return (
     <Card variant="elevated" className="w-full max-w-md mx-auto">
@@ -98,6 +111,7 @@ export function AuthForm() {
             onChange={(e) => setName(e.target.value)}
             leftIcon={<User className="w-5 h-5" />}
             required
+            disabled={isSubmitting}
           />
         )}
 
@@ -109,6 +123,7 @@ export function AuthForm() {
           onChange={(e) => setEmail(e.target.value)}
           leftIcon={<Mail className="w-5 h-5" />}
           required
+          disabled={isSubmitting}
         />
 
         <Input
@@ -120,6 +135,7 @@ export function AuthForm() {
           leftIcon={<Lock className="w-5 h-5" />}
           required
           minLength={6}
+          disabled={isSubmitting}
         />
 
         {error && (
@@ -134,8 +150,15 @@ export function AuthForm() {
           </div>
         )}
 
-        <Button type="submit" className="w-full" isLoading={isLoading}>
-          {mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              {mode === 'login' ? 'Iniciando...' : 'Creando...'}
+            </>
+          ) : (
+            mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'
+          )}
         </Button>
       </form>
 
@@ -153,7 +176,7 @@ export function AuthForm() {
         variant="secondary"
         className="w-full"
         onClick={handleGoogleLogin}
-        disabled={isLoading}
+        disabled={isSubmitting}
       >
         <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
           <path
@@ -180,8 +203,9 @@ export function AuthForm() {
         {mode === 'login' ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}{' '}
         <button
           type="button"
-          onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+          onClick={toggleMode}
           className="text-primary font-medium hover:underline"
+          disabled={isSubmitting}
         >
           {mode === 'login' ? 'Regístrate' : 'Inicia sesión'}
         </button>

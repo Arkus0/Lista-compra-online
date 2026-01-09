@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { Card } from '@/components/ui/Card'
@@ -8,38 +7,43 @@ import Link from 'next/link'
 
 export default async function Home() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+
+  // El middleware ya verificó la autenticación, obtenemos el usuario de la sesión
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
 
   if (!user) {
-    redirect('/auth')
+    // Fallback - el middleware debería haber redirigido
+    return null
   }
 
-  // Obtener listas del usuario (propias)
-  const { data: ownLists } = await supabase
-    .from('shopping_lists')
-    .select('*, list_items(count)')
-    .eq('owner_id', user.id)
-    .order('updated_at', { ascending: false })
-    .limit(5)
+  // Ejecutar ambas queries en PARALELO para mayor velocidad
+  const [ownListsResult, sharedListsResult] = await Promise.all([
+    supabase
+      .from('shopping_lists')
+      .select('id, name, updated_at, list_items(count)')
+      .eq('owner_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('list_collaborators')
+      .select('shopping_lists(id, name, updated_at, list_items(count))')
+      .eq('user_id', user.id)
+      .limit(5)
+  ])
 
-  // Obtener listas compartidas
-  const { data: sharedLists } = await supabase
-    .from('list_collaborators')
-    .select('shopping_lists(*, list_items(count))')
-    .eq('user_id', user.id)
-    .limit(5)
-
-  interface SharedListItem {
+  interface ListItem {
     id: string
     name: string
     updated_at: string
     list_items: { count: number }[]
   }
 
-  const allSharedLists = (sharedLists?.map((s: any) => s.shopping_lists).filter(Boolean) || []) as SharedListItem[]
+  const ownLists = ownListsResult.data || []
+  const allSharedLists = (sharedListsResult.data?.map((s: any) => s.shopping_lists).filter(Boolean) || []) as ListItem[]
 
-  // Combinar ambas listas
-  const lists = [...(ownLists || []), ...allSharedLists]
+  // Combinar y ordenar
+  const lists = [...ownLists, ...allSharedLists]
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     .slice(0, 5)
 
@@ -50,17 +54,13 @@ export default async function Home() {
       <main className="p-4 space-y-6">
         {/* Welcome section */}
         <section>
-          <h2 className="text-2xl font-bold mb-1">
-            Hola!
-          </h2>
-          <p className="text-gray-500">
-            Que vas a comprar hoy?
-          </p>
+          <h2 className="text-2xl font-bold mb-1">Hola!</h2>
+          <p className="text-gray-500">Que vas a comprar hoy?</p>
         </section>
 
         {/* Quick actions */}
         <section className="grid grid-cols-2 gap-3">
-          <Link href="/lists/new">
+          <Link href="/lists/new" prefetch={true}>
             <Card variant="elevated" className="h-full hover:scale-[1.02] transition-transform cursor-pointer">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -74,7 +74,7 @@ export default async function Home() {
             </Card>
           </Link>
 
-          <Link href="/compare">
+          <Link href="/compare" prefetch={true}>
             <Card variant="elevated" className="h-full hover:scale-[1.02] transition-transform cursor-pointer">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
@@ -93,19 +93,16 @@ export default async function Home() {
         <section>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-lg">Tus listas</h3>
-            <Link href="/lists" className="text-primary text-sm font-medium">
+            <Link href="/lists" className="text-primary text-sm font-medium" prefetch={true}>
               Ver todas
             </Link>
           </div>
 
-          {lists && lists.length > 0 ? (
+          {lists.length > 0 ? (
             <div className="space-y-3">
               {lists.map((list) => (
-                <Link key={list.id} href={`/lists/${list.id}`}>
-                  <Card
-                    variant="outlined"
-                    className="hover:border-primary transition-colors cursor-pointer"
-                  >
+                <Link key={list.id} href={`/lists/${list.id}`} prefetch={true}>
+                  <Card variant="outlined" className="hover:border-primary transition-colors cursor-pointer">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center">
                         <ShoppingBag className="w-5 h-5 text-gray-500" />
@@ -130,10 +127,7 @@ export default async function Home() {
                 <ShoppingBag className="w-8 h-8 text-gray-400" />
               </div>
               <p className="text-gray-500 mb-4">No tienes listas todavia</p>
-              <Link
-                href="/lists/new"
-                className="inline-flex items-center gap-2 text-primary font-medium"
-              >
+              <Link href="/lists/new" className="inline-flex items-center gap-2 text-primary font-medium">
                 <Plus className="w-4 h-4" />
                 Crear tu primera lista
               </Link>
@@ -145,7 +139,7 @@ export default async function Home() {
         <section>
           <h3 className="font-semibold text-lg mb-3">Funcionalidades</h3>
           <div className="grid grid-cols-1 gap-3">
-            <Link href="/lists/shared">
+            <Link href="/lists/shared" prefetch={true}>
               <Card variant="outlined" className="hover:border-primary transition-colors cursor-pointer">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
@@ -153,16 +147,14 @@ export default async function Home() {
                   </div>
                   <div className="flex-1">
                     <p className="font-medium">Listas colaborativas</p>
-                    <p className="text-sm text-gray-500">
-                      Comparte y edita en tiempo real
-                    </p>
+                    <p className="text-sm text-gray-500">Comparte y edita en tiempo real</p>
                   </div>
                   <div className="text-gray-400">→</div>
                 </div>
               </Card>
             </Link>
 
-            <Link href="/compare">
+            <Link href="/compare" prefetch={true}>
               <Card variant="outlined" className="hover:border-primary transition-colors cursor-pointer">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
@@ -170,9 +162,7 @@ export default async function Home() {
                   </div>
                   <div className="flex-1">
                     <p className="font-medium">Compara precios</p>
-                    <p className="text-sm text-gray-500">
-                      Encuentra los mejores precios cerca
-                    </p>
+                    <p className="text-sm text-gray-500">Encuentra los mejores precios cerca</p>
                   </div>
                   <div className="text-gray-400">→</div>
                 </div>
