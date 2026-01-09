@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import {
   ShoppingBag, Users, Share2, MoreVertical,
   Trash2, Edit2, Copy, Check, QrCode, Link as LinkIcon,
-  ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, Undo2
+  ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, Undo2,
+  Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X, ShoppingCart
 } from 'lucide-react'
 import { ShoppingItem } from './ShoppingItem'
 import { AddItemForm } from './AddItemForm'
@@ -131,6 +132,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
   
   // ESTADOS NUEVOS
   const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [undoState, setUndoState] = useState<{
     isVisible: boolean
     message: string
@@ -161,9 +165,19 @@ export function ShoppingList({ list }: ShoppingListProps) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  const uncheckedItems = useMemo(() => items.filter((item) => !item.checked), [items])
-  const checkedItems = useMemo(() => items.filter((item) => item.checked), [items])
-  const progress = useMemo(() => items.length > 0 ? (checkedItems.length / items.length) * 100 : 0, [items.length, checkedItems.length])
+  // Filtrar items por búsqueda
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items
+    const query = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    return items.filter(item => {
+      const name = item.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      return name.includes(query)
+    })
+  }, [items, searchQuery])
+
+  const uncheckedItems = useMemo(() => filteredItems.filter((item) => !item.checked), [filteredItems])
+  const checkedItems = useMemo(() => filteredItems.filter((item) => item.checked), [filteredItems])
+  const progress = useMemo(() => items.length > 0 ? (items.filter(i => i.checked).length / items.length) * 100 : 0, [items])
 
   // Función para normalizar categoría (manejar legacy y autodetectar)
   const normalizeCategory = useCallback((item: ListItemWithImage): CategoryId => {
@@ -426,14 +440,130 @@ export function ShoppingList({ list }: ShoppingListProps) {
     await Promise.all(updates.map(u => supabase.from('list_items').update({ position: u.position }).eq('id', u.id)))
   }, [uncheckedItems, checkedItems, setItems, updateItemsPositions, supabase])
 
-  // ... (Funciones de Modales: copyLink, updateName, deleteList... se mantienen igual) ...
-  // Por brevedad, asumo que tienes las funciones handleCopyLink, handleUpdateName, handleDeleteList, handleDuplicateList, closeMenu, openShareModal... 
-  // Copia las de tu código anterior o pídemelas si las necesitas.
-  // Aquí pongo dummies para que compile si copias-pegas:
-  const handleCopyLink = () => { navigator.clipboard.writeText(shareUrl); setIsCopied(true); setTimeout(() => setIsCopied(false), 2000) }
-  const handleUpdateName = async () => { if(!newName.trim()) return; await supabase.from('shopping_lists').update({name: newName}).eq('id', list.id); closeModal(); router.refresh() }
-  const handleDeleteList = async () => { await supabase.from('shopping_lists').delete().eq('id', list.id); router.push('/lists') }
-  const handleDuplicateList = async () => {/* ...lógica anterior... */}
+  // --- FUNCIONES DE MODALES Y ACCIONES ---
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(shareUrl)
+    setIsCopied(true)
+    setTimeout(() => setIsCopied(false), 2000)
+  }
+
+  const handleUpdateName = async () => {
+    if (!newName.trim()) return
+    await supabase.from('shopping_lists').update({ name: newName }).eq('id', list.id)
+    closeModal()
+    router.refresh()
+  }
+
+  const handleDeleteList = async () => {
+    await supabase.from('shopping_lists').delete().eq('id', list.id)
+    router.push('/lists')
+  }
+
+  const handleArchiveList = async () => {
+    await supabase.from('shopping_lists').update({ is_archived: true }).eq('id', list.id)
+    router.push('/lists')
+  }
+
+  const handleDuplicateList = async () => {
+    if (isDuplicating) return
+    setIsDuplicating(true)
+
+    // Crear nueva lista
+    const { data: newList, error: listError } = await supabase
+      .from('shopping_lists')
+      .insert({
+        name: `${list.name} (copia)`,
+        owner_id: user?.id,
+        share_code: null
+      })
+      .select()
+      .single()
+
+    if (listError || !newList) {
+      setIsDuplicating(false)
+      return
+    }
+
+    // Copiar items
+    if (items.length > 0) {
+      const itemsCopy = items.map((item, index) => ({
+        list_id: newList.id,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        category: item.category,
+        checked: false,
+        added_by: user?.id,
+        position: index
+      }))
+
+      await supabase.from('list_items').insert(itemsCopy)
+    }
+
+    setIsDuplicating(false)
+    setShowMenu(false)
+    router.push(`/lists/${newList.id}`)
+  }
+
+  // --- ACCIONES MASIVAS ---
+  const handleMarkAllComplete = async () => {
+    if (!user) return
+
+    // Actualizar en store
+    const updates = uncheckedItems.map(item => ({
+      ...item,
+      checked: true,
+      checked_by: user.id
+    }))
+    setItems([...updates, ...checkedItems])
+
+    // Actualizar en DB
+    await supabase
+      .from('list_items')
+      .update({ checked: true, checked_by: user.id })
+      .eq('list_id', list.id)
+      .eq('checked', false)
+
+    setShowMenu(false)
+  }
+
+  const handleClearCompleted = async () => {
+    if (checkedItems.length === 0) return
+
+    // Guardar para undo
+    const itemsToDelete = [...checkedItems]
+
+    // Actualizar store
+    setItems(uncheckedItems)
+
+    // Mostrar undo
+    const undoAction = async () => {
+      // Restaurar items
+      const itemsToRestore = itemsToDelete.map(item => ({
+        list_id: item.list_id,
+        name: item.name,
+        quantity: item.quantity,
+        category: item.category,
+        added_by: item.added_by,
+        checked: true,
+        position: item.position
+      }))
+      const { data } = await supabase.from('list_items').insert(itemsToRestore).select()
+      if (data) setItems(prev => [...prev, ...(data as ListItemWithImage[])])
+    }
+
+    showUndoToast(`${itemsToDelete.length} items eliminados`, undoAction)
+
+    // Eliminar de DB
+    await supabase
+      .from('list_items')
+      .delete()
+      .eq('list_id', list.id)
+      .eq('checked', true)
+
+    setShowMenu(false)
+  }
+
   const closeModal = () => setActiveModal(null)
   const openShareModal = () => setActiveModal('share')
   const openCollaboratorsModal = () => setActiveModal('collaborators')
@@ -443,21 +573,60 @@ export function ShoppingList({ list }: ShoppingListProps) {
     <div className="flex flex-col h-full relative">
       {/* Header */}
       <header className="p-4 border-b border-gray-100 bg-background z-10 flex-shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center relative">
-              <ShoppingBag className="w-5 h-5 text-primary" />
-              <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-background ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+        {/* Barra de búsqueda expandible */}
+        {showSearch ? (
+          <div className="flex items-center gap-2 mb-3 animate-in slide-in-from-top-2">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar en la lista..."
+                className="w-full h-10 pl-10 pr-10 rounded-xl bg-secondary focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                autoFocus
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                >
+                  <X className="w-3 h-3 text-muted" />
+                </button>
+              )}
             </div>
-            <div>
-              <h1 className="font-bold text-lg">{list.name}</h1>
-              <div className="flex items-center gap-2">
-                <p className="text-sm text-gray-500">{items.length} productos</p>
+            <button
+              onClick={() => { setShowSearch(false); setSearchQuery('') }}
+              className="p-2 hover:bg-secondary rounded-lg text-muted"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center relative">
+                <ShoppingBag className="w-5 h-5 text-primary" />
+                <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-background ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+              </div>
+              <div>
+                <h1 className="font-bold text-lg">{list.name}</h1>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-gray-500">{items.length} productos</p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2 relative">
+            <div className="flex items-center gap-2 relative">
+              {/* Botón de búsqueda */}
+              <button
+                onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }}
+                className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"
+                title="Buscar"
+              >
+                <Search className="w-5 h-5" />
+              </button>
              {/* TOGGLE VIEW BUTTON */}
              <button 
                 onClick={() => setViewMode(prev => prev === 'list' ? 'grouped' : 'list')}
@@ -475,14 +644,64 @@ export function ShoppingList({ list }: ShoppingListProps) {
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                <div className="absolute top-12 right-0 w-48 bg-card border border-border rounded-xl shadow-xl z-20 py-2">
-                  <button onClick={() => {setActiveModal('edit'); setShowMenu(false)}} className="w-full px-4 py-2 text-left text-sm hover:bg-hover flex gap-2"><Edit2 className="w-4 h-4" /> Editar nombre</button>
-                  <button onClick={() => {setActiveModal('delete'); setShowMenu(false)}} className="w-full px-4 py-2 text-left text-sm text-danger hover:bg-danger/10 flex gap-2"><Trash2 className="w-4 h-4" /> Eliminar lista</button>
+                <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-20 py-2">
+                  {/* Acciones masivas */}
+                  {uncheckedItems.length > 0 && (
+                    <button onClick={handleMarkAllComplete} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
+                      <CheckCheck className="w-4 h-4 text-green-500" />
+                      Marcar todo completado
+                    </button>
+                  )}
+                  {checkedItems.length > 0 && (
+                    <button onClick={handleClearCompleted} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
+                      <Eraser className="w-4 h-4 text-orange-500" />
+                      Limpiar completados ({checkedItems.length})
+                    </button>
+                  )}
+                  {(uncheckedItems.length > 0 || checkedItems.length > 0) && <div className="border-t border-border my-1" />}
+
+                  {/* Acciones de lista */}
+                  <button onClick={handleDuplicateList} disabled={isDuplicating} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2 disabled:opacity-50">
+                    <CopyIcon className="w-4 h-4 text-blue-500" />
+                    {isDuplicating ? 'Duplicando...' : 'Duplicar lista'}
+                  </button>
+                  <button onClick={() => {setActiveModal('edit'); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
+                    <Edit2 className="w-4 h-4 text-muted" />
+                    Editar nombre
+                  </button>
+
+                  <div className="border-t border-border my-1" />
+
+                  {/* Zona peligrosa */}
+                  <button onClick={() => {handleArchiveList(); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
+                    <Archive className="w-4 h-4 text-gray-500" />
+                    Archivar lista
+                  </button>
+                  <button onClick={() => {setActiveModal('delete'); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2">
+                    <Trash2 className="w-4 h-4" />
+                    Eliminar lista
+                  </button>
                 </div>
               </>
             )}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Indicador de búsqueda activa */}
+        {searchQuery && (
+          <div className="flex items-center justify-between mb-2 px-1">
+            <span className="text-xs text-muted">
+              {filteredItems.length} resultados para "{searchQuery}"
+            </span>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="text-xs text-primary hover:underline"
+            >
+              Limpiar
+            </button>
+          </div>
+        )}
 
         <div className="h-2 bg-secondary rounded-full overflow-hidden">
           <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
