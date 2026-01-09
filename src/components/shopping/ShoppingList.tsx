@@ -657,7 +657,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
         position: item.position
       }))
       const { data } = await supabase.from('list_items').insert(itemsToRestore).select()
-      if (data) setItems(prev => [...prev, ...(data as ListItemWithImage[])])
+      if (data) setItems((prev: ListItemWithImage[]) => [...prev, ...(data as ListItemWithImage[])])
     }
 
     showUndoToast(`${itemsToDelete.length} items eliminados`, undoAction)
