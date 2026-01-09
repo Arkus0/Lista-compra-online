@@ -172,13 +172,13 @@ function ShoppingItemComponent({
           </button>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Action buttons - always visible on mobile, hover on desktop */}
+        <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           {onAddToFavorites && (
             <button
               onClick={handleAddToFavorites}
-              className="w-8 h-8 rounded-lg text-muted-light hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20
-                        flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-lg text-muted hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20
+                        flex items-center justify-center transition-colors active:scale-95"
               title="Añadir a favoritos"
             >
               <Star className="w-4 h-4" />
@@ -186,8 +186,9 @@ function ShoppingItemComponent({
           )}
           <button
             onClick={handleDelete}
-            className="w-8 h-8 rounded-lg text-muted-light hover:text-danger hover:bg-danger/10
-                      flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-lg text-muted hover:text-danger hover:bg-danger/10
+                      flex items-center justify-center transition-colors active:scale-95"
+            title="Eliminar"
           >
             <Trash2 className="w-4 h-4" />
           </button>
