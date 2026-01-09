@@ -15,20 +15,26 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('system');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+  const [mounted, setMounted] = useState(false);
 
+  // Cargar tema guardado al montar
   useEffect(() => {
-    // Cargar tema guardado
-    const savedTheme = localStorage.getItem('theme') as Theme;
-    if (savedTheme) {
+    setMounted(true);
+    const savedTheme = localStorage.getItem('theme') as Theme | null;
+    if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system')) {
       setTheme(savedTheme);
     }
   }, []);
 
+  // Aplicar tema cuando cambia
   useEffect(() => {
+    if (!mounted) return;
+
     const root = document.documentElement;
 
     // Función para obtener el tema del sistema
     const getSystemTheme = (): 'light' | 'dark' => {
+      if (typeof window === 'undefined') return 'light';
       return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     };
 
@@ -50,7 +56,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setResolvedTheme(appliedTheme);
 
     // Guardar en localStorage
-    localStorage.setItem('theme', theme);
+    try {
+      localStorage.setItem('theme', theme);
+    } catch (e) {
+      console.error('Error saving theme to localStorage:', e);
+    }
 
     // Listener para cambios en el tema del sistema
     if (theme === 'system') {
@@ -68,7 +78,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       mediaQuery.addEventListener('change', handleChange);
       return () => mediaQuery.removeEventListener('change', handleChange);
     }
-  }, [theme]);
+  }, [theme, mounted]);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
