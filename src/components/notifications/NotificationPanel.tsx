@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { Notification } from '@/lib/supabase/types'
-import { X, Check, CheckCheck, Trash2, ShoppingCart, UserPlus, StickyNote } from 'lucide-react'
+import { X, CheckCheck, Trash2, ShoppingCart, UserPlus, StickyNote } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
@@ -96,7 +96,7 @@ export function NotificationPanel({
   return (
     <div
       ref={panelRef}
-      className="absolute right-0 top-full mt-2 w-96 max-w-[calc(100vw-2rem)] bg-background border border-border-light rounded-xl shadow-xl overflow-hidden z-50"
+      className="fixed inset-x-4 top-[65px] sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 w-auto sm:w-96 bg-background border border-border-light rounded-xl shadow-xl overflow-hidden z-50"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border-light bg-secondary/30">
@@ -128,7 +128,7 @@ export function NotificationPanel({
       </div>
 
       {/* Content */}
-      <div className="max-h-[calc(100vh-12rem)] overflow-y-auto">
+      <div className="max-h-[60vh] sm:max-h-[calc(100vh-12rem)] overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
