@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ShoppingItem } from './ShoppingItem'
@@ -12,7 +13,7 @@ interface SortableShoppingItemProps {
   onUpdateQuantity: (id: string, quantity: number) => void
 }
 
-export function SortableShoppingItem({ item, onToggle, onDelete, onUpdateQuantity }: SortableShoppingItemProps) {
+function SortableShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuantity }: SortableShoppingItemProps) {
   const {
     attributes,
     listeners,
@@ -40,3 +41,20 @@ export function SortableShoppingItem({ item, onToggle, onDelete, onUpdateQuantit
     </div>
   )
 }
+
+// Memoización para evitar re-renders innecesarios
+export const SortableShoppingItem = memo(SortableShoppingItemComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.name === nextProps.item.name &&
+    prevProps.item.checked === nextProps.item.checked &&
+    prevProps.item.quantity === nextProps.item.quantity &&
+    prevProps.item.category === nextProps.item.category &&
+    prevProps.item.position === nextProps.item.position &&
+    prevProps.onToggle === nextProps.onToggle &&
+    prevProps.onDelete === nextProps.onDelete &&
+    prevProps.onUpdateQuantity === nextProps.onUpdateQuantity
+  )
+})
+
+SortableShoppingItem.displayName = 'SortableShoppingItem'

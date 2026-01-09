@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import { ShoppingList, ListItem, Profile } from '@/lib/supabase/types'
 
 interface AppState {
@@ -24,6 +25,8 @@ interface AppState {
   updateItem: (id: string, updates: Partial<ListItem>) => void
   removeItem: (id: string) => void
   toggleItemChecked: (id: string) => void
+  // Batch update para drag & drop - más eficiente
+  updateItemsPositions: (updates: { id: string; position: number }[]) => void
 
   // UI
   isLoading: boolean
@@ -36,6 +39,7 @@ interface AppState {
   setSelectedSupermarkets: (ids: string[]) => void
 }
 
+// Store principal
 export const useStore = create<AppState>((set) => ({
   // Usuario
   user: null,
@@ -58,7 +62,7 @@ export const useStore = create<AppState>((set) => ({
   currentList: null,
   setCurrentList: (list) => set({ currentList: list }),
 
-  // Items
+  // Items - optimizados
   items: [],
   setItems: (items) => set({ items }),
   addItem: (item) => set((state) => ({ items: [...state.items, item] })),
@@ -75,6 +79,16 @@ export const useStore = create<AppState>((set) => ({
       item.id === id ? { ...item, checked: !item.checked } : item
     ),
   })),
+  // Actualización batch de posiciones - evita múltiples re-renders
+  updateItemsPositions: (updates) => set((state) => {
+    const positionMap = new Map(updates.map(u => [u.id, u.position]))
+    return {
+      items: state.items.map((item) => {
+        const newPosition = positionMap.get(item.id)
+        return newPosition !== undefined ? { ...item, position: newPosition } : item
+      }),
+    }
+  }),
 
   // UI
   isLoading: false,
@@ -86,3 +100,85 @@ export const useStore = create<AppState>((set) => ({
   selectedSupermarkets: [],
   setSelectedSupermarkets: (ids) => set({ selectedSupermarkets: ids }),
 }))
+
+// ============================================
+// SELECTORES OPTIMIZADOS - Evitan re-renders innecesarios
+// ============================================
+
+// Selector para usuario
+export const useUser = () => useStore((state) => state.user)
+export const useSetUser = () => useStore((state) => state.setUser)
+
+// Selector para listas
+export const useLists = () => useStore((state) => state.lists)
+export const useListsActions = () => useStore(
+  useShallow((state) => ({
+    setLists: state.setLists,
+    addList: state.addList,
+    updateList: state.updateList,
+    removeList: state.removeList,
+  }))
+)
+
+// Selector para lista actual
+export const useCurrentList = () => useStore((state) => state.currentList)
+export const useSetCurrentList = () => useStore((state) => state.setCurrentList)
+
+// Tipos para las acciones de items
+interface ItemsActions {
+  setItems: (items: ListItem[]) => void
+  addItem: (item: ListItem) => void
+  updateItem: (id: string, updates: Partial<ListItem>) => void
+  removeItem: (id: string) => void
+  toggleItemChecked: (id: string) => void
+  updateItemsPositions: (updates: { id: string; position: number }[]) => void
+}
+
+// Selector para items - separados para mejor rendimiento
+export const useItems = () => useStore((state) => state.items)
+export const useItemsActions = (): ItemsActions => useStore(
+  useShallow((state) => ({
+    setItems: state.setItems,
+    addItem: state.addItem,
+    updateItem: state.updateItem,
+    removeItem: state.removeItem,
+    toggleItemChecked: state.toggleItemChecked,
+    updateItemsPositions: state.updateItemsPositions,
+  }))
+)
+
+// Items separados por estado (checked/unchecked) - memoizado
+export const useCheckedItems = () => useStore(
+  (state) => state.items.filter(item => item.checked)
+)
+export const useUncheckedItems = () => useStore(
+  (state) => state.items.filter(item => !item.checked)
+)
+
+// Selector para UI
+export const useIsLoading = () => useStore((state) => state.isLoading)
+export const useSetIsLoading = () => useStore((state) => state.setIsLoading)
+
+// Selector para comparador de precios
+export const usePriceComparison = () => useStore(
+  useShallow((state) => ({
+    showPriceComparison: state.showPriceComparison,
+    setShowPriceComparison: state.setShowPriceComparison,
+    selectedSupermarkets: state.selectedSupermarkets,
+    setSelectedSupermarkets: state.setSelectedSupermarkets,
+  }))
+)
+
+// Hook para obtener un item específico por ID - evita re-render si el item no cambia
+export const useItem = (id: string) => useStore(
+  (state) => state.items.find(item => item.id === id)
+)
+
+// Hook para contar items
+export const useItemsCount = () => useStore(
+  useShallow((state) => ({
+    total: state.items.length,
+    checked: state.items.filter(i => i.checked).length,
+    unchecked: state.items.filter(i => !i.checked).length,
+  }))
+)

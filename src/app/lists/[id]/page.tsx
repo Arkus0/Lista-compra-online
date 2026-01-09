@@ -9,20 +9,32 @@ interface Props {
 export default async function ListPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
+
+  // Ejecutar auth check primero
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
     redirect('/auth')
   }
 
-  // Obtener la lista
-  const { data: list, error } = await supabase
-    .from('shopping_lists')
-    .select('*')
-    .eq('id', id)
-    .single()
+  // Ejecutar queries en paralelo para mayor velocidad
+  const [listResult, profileResult] = await Promise.all([
+    supabase
+      .from('shopping_lists')
+      .select('*')
+      .eq('id', id)
+      .single(),
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+  ])
 
-  if (error || !list) {
+  const list = listResult.data
+  const profile = profileResult.data
+
+  if (listResult.error || !list) {
     notFound()
   }
 
@@ -31,7 +43,7 @@ export default async function ListPage({ params }: Props) {
   if (!isOwner) {
     const { data: collaborator } = await supabase
       .from('list_collaborators')
-      .select('*')
+      .select('id')
       .eq('list_id', id)
       .eq('user_id', user.id)
       .single()
@@ -40,13 +52,6 @@ export default async function ListPage({ params }: Props) {
       notFound()
     }
   }
-
-  // Obtener el perfil del usuario
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
 
   return <ShoppingListClient list={list} user={profile!} />
 }
