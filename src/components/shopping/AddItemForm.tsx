@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
-import { Plus, ChevronUp, Image as ImageIcon, X, Loader2 } from 'lucide-react'
+import { Plus, ChevronUp, Image as ImageIcon, X, Loader2, Mic, MicOff, ScanBarcode, Star, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { CATEGORIES, detectCategory, CategoryId } from '@/lib/constants'
+import { CATEGORIES, detectCategory, CategoryId, searchProducts, CommonProduct } from '@/lib/constants'
 import { useImageUpload } from '@/hooks/useImageUpload'
+import { useVoiceInput } from '@/hooks/useVoiceInput'
 import { UserFavoriteItem } from '@/lib/supabase/types'
+import { BarcodeScannerModal } from './BarcodeScannerModal'
 
 interface AddItemFormProps {
   onAdd: (name: string, category: string, imageUrl?: string) => void | Promise<void>
@@ -34,37 +36,99 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('other')
   const [showCategories, setShowCategories] = useState(false)
   const [manuallySelected, setManuallySelected] = useState(false)
-  
+
   // Estados para Imagen
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
-  // Estados para Sugerencias
-  const [suggestions, setSuggestions] = useState<UserFavoriteItem[]>([])
+
+  // Estados para Sugerencias - tipo unificado para favoritos y productos comunes
+  type Suggestion = {
+    id: string
+    name: string
+    category: CategoryId | string | null
+    source: 'favorite' | 'common'
+    quantity?: number
+  }
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+
+  // Estados para Escáner de código de barras
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
 
   const { upload, isUploading } = useImageUpload({ bucket: 'list-images' })
 
+  // Hook de reconocimiento de voz
+  const {
+    isListening,
+    transcript,
+    isSupported: voiceSupported,
+    startListening,
+    stopListening,
+    error: voiceError
+  } = useVoiceInput()
+
+  // Actualizar el nombre cuando se detecta voz
+  useEffect(() => {
+    if (transcript) {
+      setName(transcript)
+    }
+  }, [transcript])
+
   // Debounce del nombre para detección de categoría y sugerencias (300ms)
   const debouncedName = useDebounce(name, 300)
 
   // Autodetección de categoría y Filtrado de Sugerencias
   useEffect(() => {
-    // 1. Filtrar Sugerencias
-    if (name.trim().length > 0 && suggestionsSource.length > 0) {
-      const matches = suggestionsSource.filter(item => 
-        item.name.toLowerCase().includes(name.toLowerCase()) &&
-        item.name.toLowerCase() !== name.toLowerCase()
-      ).slice(0, 3) // Top 3
-      
-      setSuggestions(matches)
-      setShowSuggestions(matches.length > 0)
+    // 1. Filtrar Sugerencias combinando favoritos y productos comunes
+    if (name.trim().length >= 2) {
+      const normalizedName = name.toLowerCase()
+      const combinedSuggestions: Suggestion[] = []
+      const addedNames = new Set<string>()
+
+      // Primero añadir favoritos (tienen prioridad)
+      suggestionsSource
+        .filter(item =>
+          item.name.toLowerCase().includes(normalizedName) &&
+          item.name.toLowerCase() !== normalizedName
+        )
+        .slice(0, 3)
+        .forEach(fav => {
+          if (!addedNames.has(fav.name.toLowerCase())) {
+            combinedSuggestions.push({
+              id: fav.id,
+              name: fav.name,
+              category: fav.category,
+              source: 'favorite',
+              quantity: fav.quantity
+            })
+            addedNames.add(fav.name.toLowerCase())
+          }
+        })
+
+      // Luego añadir productos comunes que no estén ya
+      const commonMatches = searchProducts(name, 5)
+      commonMatches.forEach(product => {
+        if (!addedNames.has(product.name.toLowerCase())) {
+          combinedSuggestions.push({
+            id: `common-${product.name}`,
+            name: product.name,
+            category: product.category,
+            source: 'common'
+          })
+          addedNames.add(product.name.toLowerCase())
+        }
+      })
+
+      // Limitar a 5 sugerencias totales
+      setSuggestions(combinedSuggestions.slice(0, 5))
+      setShowSuggestions(combinedSuggestions.length > 0)
     } else {
       setShowSuggestions(false)
+      setSuggestions([])
     }
 
     // 2. Autodetectar categoría (si no es manual)
@@ -131,7 +195,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
     }
   }, [name, selectedCategory, imageFile, onAdd, upload, clearImage])
 
-  const handleSuggestionClick = (suggestion: UserFavoriteItem) => {
+  const handleSuggestionClick = (suggestion: Suggestion) => {
     setName(suggestion.name)
     if (suggestion.category) {
       setSelectedCategory(suggestion.category as CategoryId)
@@ -153,6 +217,25 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
     setShowSuggestions(false)
   }, [])
 
+  // Handler para cuando el escáner encuentra un producto
+  const handleBarcodeProductFound = useCallback((productName: string, category?: string) => {
+    setName(productName)
+    if (category) {
+      setSelectedCategory(category as CategoryId)
+      setManuallySelected(true)
+    }
+    inputRef.current?.focus()
+  }, [])
+
+  // Handler para el botón de voz
+  const handleVoiceButton = useCallback(() => {
+    if (isListening) {
+      stopListening()
+    } else {
+      startListening()
+    }
+  }, [isListening, startListening, stopListening])
+
   // Obtener la configuración visual de la categoría actual
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
@@ -161,20 +244,38 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
       {/* Sugerencias Flotantes */}
       {showSuggestions && (
         <div className="absolute bottom-full left-4 right-4 mb-2 bg-card rounded-xl shadow-lg border border-border overflow-hidden animate-in slide-in-from-bottom-2 z-20">
-          <div className="bg-secondary/50 px-4 py-1 text-xs text-muted font-medium">Sugerencias de favoritos</div>
-          {suggestions.map((suggestion) => (
-            <button
-              key={suggestion.id}
-              type="button"
-              onClick={() => handleSuggestionClick(suggestion)}
-              className="w-full text-left px-4 py-3 hover:bg-secondary flex items-center justify-between group transition-colors border-b border-border/50 last:border-0"
-            >
-              <span className="font-medium text-foreground">{suggestion.name}</span>
-              <span className="text-xs text-muted group-hover:text-primary transition-colors">
-                {CATEGORIES[suggestion.category as CategoryId]?.label || 'General'}
-              </span>
-            </button>
-          ))}
+          <div className="bg-secondary/50 px-4 py-1.5 text-xs text-muted font-medium flex items-center gap-1">
+            <Sparkles className="w-3 h-3" />
+            Sugerencias
+          </div>
+          {suggestions.map((suggestion) => {
+            const CategoryConfig = suggestion.category ? CATEGORIES[suggestion.category as CategoryId] : null
+            return (
+              <button
+                key={suggestion.id}
+                type="button"
+                onClick={() => handleSuggestionClick(suggestion)}
+                className="w-full text-left px-4 py-2.5 hover:bg-secondary flex items-center justify-between group transition-colors border-b border-border/50 last:border-0"
+              >
+                <div className="flex items-center gap-2">
+                  {suggestion.source === 'favorite' && (
+                    <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />
+                  )}
+                  <span className="font-medium text-foreground">{suggestion.name}</span>
+                  {suggestion.quantity && suggestion.quantity > 1 && (
+                    <span className="text-xs text-muted bg-secondary px-1.5 py-0.5 rounded">x{suggestion.quantity}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {CategoryConfig && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${CategoryConfig.color}`}>
+                      {CategoryConfig.label.split(' ')[0]}
+                    </span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -241,7 +342,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
             </div>
           </button>
 
-          {/* Input de Texto y Botón de Imagen */}
+          {/* Input de Texto */}
           <div className="flex-1 relative flex items-center">
             <input
               ref={inputRef}
@@ -254,28 +355,58 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
                   setSelectedCategory('other')
                 }
               }}
-              placeholder="Añadir producto..."
-              className="w-full h-12 rounded-xl bg-secondary pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-gray-400"
+              placeholder={isListening ? "Escuchando..." : "Añadir producto..."}
+              className={`w-full h-12 rounded-xl bg-secondary pl-4 pr-24 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-gray-400 ${isListening ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
               autoComplete="off"
             />
-             
-             {/* Input File oculto */}
-             <input 
-              type="file" 
+
+            {/* Input File oculto */}
+            <input
+              type="file"
               ref={fileInputRef}
               accept="image/*"
               className="hidden"
               onChange={handleImageSelect}
             />
-            
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className={`absolute right-2 p-2 rounded-lg transition-colors ${imageFile ? 'text-primary bg-primary/10' : 'text-gray-400 hover:text-gray-600'}`}
-              title="Añadir foto"
-            >
-              <ImageIcon className="w-5 h-5" />
-            </button>
+
+            {/* Botones dentro del input */}
+            <div className="absolute right-2 flex items-center gap-1">
+              {/* Botón de Voz */}
+              {voiceSupported && (
+                <button
+                  type="button"
+                  onClick={handleVoiceButton}
+                  className={`p-2 rounded-lg transition-all ${
+                    isListening
+                      ? 'text-red-500 bg-red-100 animate-pulse'
+                      : 'text-gray-400 hover:text-primary hover:bg-primary/10'
+                  }`}
+                  title={isListening ? "Detener grabación" : "Añadir por voz"}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              )}
+
+              {/* Botón de Escáner */}
+              <button
+                type="button"
+                onClick={() => setShowBarcodeScanner(true)}
+                className="p-2 rounded-lg text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors"
+                title="Escanear código de barras"
+              >
+                <ScanBarcode className="w-4 h-4" />
+              </button>
+
+              {/* Botón de Imagen */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className={`p-2 rounded-lg transition-colors ${imageFile ? 'text-primary bg-primary/10' : 'text-gray-400 hover:text-primary hover:bg-primary/10'}`}
+                title="Añadir foto"
+              >
+                <ImageIcon className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Botón Submit */}
@@ -284,7 +415,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
             disabled={!name.trim() || isUploading}
             className="w-12 h-12 rounded-xl p-0 flex items-center justify-center shrink-0"
           >
-             {isUploading ? (
+            {isUploading ? (
               <Loader2 className="w-6 h-6 animate-spin" />
             ) : (
               <Plus className="w-6 h-6" />
@@ -292,6 +423,13 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
           </Button>
         </div>
       </form>
+
+      {/* Modal del escáner de código de barras */}
+      <BarcodeScannerModal
+        isOpen={showBarcodeScanner}
+        onClose={() => setShowBarcodeScanner(false)}
+        onProductFound={handleBarcodeProductFound}
+      />
     </div>
   )
 }

@@ -41,7 +41,7 @@ import {
 } from '@dnd-kit/sortable'
 import { SortableShoppingItem } from './SortableShoppingItem'
 import { sendPushNotification } from '@/lib/notifications'
-import { CATEGORIES, CategoryId } from '@/lib/constants'
+import { CATEGORIES, CategoryId, detectCategory } from '@/lib/constants'
 
 // Definimos el tipo local extendido
 type ListItemWithImage = ListItem & { image_url?: string | null }
@@ -165,25 +165,57 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const checkedItems = useMemo(() => items.filter((item) => item.checked), [items])
   const progress = useMemo(() => items.length > 0 ? (checkedItems.length / items.length) * 100 : 0, [items.length, checkedItems.length])
 
-  // Agrupación de Items
+  // Función para normalizar categoría (manejar legacy y autodetectar)
+  const normalizeCategory = useCallback((item: ListItemWithImage): CategoryId => {
+    // Si tiene categoría válida del sistema, usarla
+    if (item.category && CATEGORIES[item.category as CategoryId]) {
+      return item.category as CategoryId
+    }
+
+    // Mapeo de categorías legacy a nuevas
+    const legacyMapping: Record<string, CategoryId> = {
+      'Frutas': 'fruits-veg',
+      'Verduras': 'fruits-veg',
+      'Carnes': 'meat-fish',
+      'Pescados': 'meat-fish',
+      'Lácteos': 'dairy',
+      'Panadería': 'pantry',
+      'Bebidas': 'beverages',
+      'Limpieza': 'household',
+      'Otros': 'other',
+    }
+
+    if (item.category && legacyMapping[item.category]) {
+      return legacyMapping[item.category]
+    }
+
+    // Autodetectar categoría basándose en el nombre del producto
+    return detectCategory(item.name)
+  }, [])
+
+  // Agrupación de Items mejorada
   const groupedItems = useMemo(() => {
     if (viewMode === 'list') return null
 
     // Orden definido en constants.ts
-    const groups: Record<string, ListItemWithImage[]> = {}
-    
+    const groups: Record<CategoryId, ListItemWithImage[]> = {} as Record<CategoryId, ListItemWithImage[]>
+
     // Inicializar grupos vacíos para mantener orden
-    Object.keys(CATEGORIES).forEach(key => { groups[key] = [] })
-    
+    Object.keys(CATEGORIES).forEach(key => { groups[key as CategoryId] = [] })
+
     uncheckedItems.forEach(item => {
-      const cat = item.category || 'other'
-      if (!groups[cat]) groups[cat] = [] // Por si acaso hay categorías desconocidas
+      const cat = normalizeCategory(item)
       groups[cat].push(item)
     })
 
-    // Limpiar grupos vacíos
-    return Object.entries(groups).filter(([_, items]) => items.length > 0)
-  }, [uncheckedItems, viewMode])
+    // Ordenar items dentro de cada grupo por posición
+    Object.keys(groups).forEach(key => {
+      groups[key as CategoryId].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    })
+
+    // Filtrar grupos vacíos y retornar
+    return Object.entries(groups).filter(([_, items]) => items.length > 0) as [CategoryId, ListItemWithImage[]][]
+  }, [uncheckedItems, viewMode, normalizeCategory])
 
   // Cargar items iniciales
   useEffect(() => {
@@ -470,22 +502,26 @@ export function ShoppingList({ list }: ShoppingListProps) {
           <>
             {/* VISTA POR CATEGORÍAS (Sin Drag&Drop entre grupos) */}
             {viewMode === 'grouped' && groupedItems ? (
-               <div className="space-y-6 pb-4">
+               <div className="space-y-4 pb-4">
                  {groupedItems.map(([catId, groupItems]) => {
-                   const CategoryConfig = CATEGORIES[catId as CategoryId] || CATEGORIES['other']
+                   const CategoryConfig = CATEGORIES[catId] || CATEGORIES['other']
                    return (
-                     <div key={catId} className="animate-in fade-in slide-in-from-bottom-2">
-                       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2 flex items-center gap-2 mb-1 border-b border-dashed border-gray-100">
-                         <div className={`p-1.5 rounded-lg ${CategoryConfig.color} bg-opacity-20`}>
-                           <CategoryConfig.icon className={`w-4 h-4 ${CategoryConfig.color.split(' ')[0]}`} />
+                     <div key={catId} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                       {/* Cabecera de categoría sticky */}
+                       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2 mb-2">
+                         <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${CategoryConfig.color}`}>
+                           <CategoryConfig.icon className="w-5 h-5" />
+                           <h3 className="font-semibold text-sm flex-1">{CategoryConfig.label}</h3>
+                           <span className="text-xs font-medium bg-white/50 dark:bg-black/20 px-2 py-0.5 rounded-full">
+                             {groupItems.length} {groupItems.length === 1 ? 'item' : 'items'}
+                           </span>
                          </div>
-                         <h3 className="font-semibold text-sm text-gray-700 capitalize">{CategoryConfig.label}</h3>
-                         <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{groupItems.length}</span>
                        </div>
-                       <div className="space-y-2 pl-2 border-l-2 border-gray-50">
+                       {/* Items de la categoría */}
+                       <div className="space-y-2 ml-1 pl-3 border-l-2 border-gray-100 dark:border-gray-800">
                           {groupItems.map(item => (
-                             <ShoppingItem 
-                               key={item.id} 
+                             <ShoppingItem
+                               key={item.id}
                                item={item}
                                onToggle={handleToggleItem}
                                onDelete={handleDeleteItem}
@@ -493,13 +529,20 @@ export function ShoppingList({ list }: ShoppingListProps) {
                                onAddToFavorites={handleAddToFavorites}
                                addedByProfile={profilesCache.get(item.added_by)}
                                checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null}
-                               isDragEnabled={false} // Desactivamos drag visualmente en modo grupo
+                               isDragEnabled={false}
                              />
                           ))}
                        </div>
                      </div>
                    )
                  })}
+
+                 {/* Mensaje si no hay items */}
+                 {groupedItems.length === 0 && (
+                   <div className="text-center py-12 text-muted">
+                     <p>No hay items pendientes</p>
+                   </div>
+                 )}
                </div>
             ) : (
               /* VISTA DE LISTA (Drag&Drop habilitado) */
