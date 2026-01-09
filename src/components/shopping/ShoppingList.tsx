@@ -6,9 +6,10 @@ import {
   ShoppingBag, Users, Share2, MoreVertical,
   Trash2, Edit2, Copy, Check, QrCode, Link as LinkIcon,
   ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, Undo2,
-  Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X, ShoppingCart
+  Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X, ShoppingCart,
+  FileText, UserPlus, Store
 } from 'lucide-react'
-import { ShoppingItem } from './ShoppingItem'
+import { ShoppingItem, AssignablePerson } from './ShoppingItem'
 import { AddItemForm } from './AddItemForm'
 import { PresenceIndicator } from './PresenceIndicator'
 import { ListNotes } from './ListNotes'
@@ -42,7 +43,7 @@ import {
 } from '@dnd-kit/sortable'
 import { SortableShoppingItem } from './SortableShoppingItem'
 import { sendPushNotification } from '@/lib/notifications'
-import { CATEGORIES, CategoryId, detectCategory } from '@/lib/constants'
+import { CATEGORIES, CategoryId, detectCategory, getSmartSuggestions, CommonProduct } from '@/lib/constants'
 
 // Definimos el tipo local extendido
 type ListItemWithImage = ListItem & { image_url?: string | null }
@@ -53,7 +54,9 @@ interface ShoppingListProps {
 
 interface Collaborator {
   role: string
+  user_id: string
   profiles: {
+    id: string
     email: string
     name: string
     avatar_url: string | null
@@ -231,6 +234,42 @@ export function ShoppingList({ list }: ShoppingListProps) {
     return Object.entries(groups).filter(([_, items]) => items.length > 0) as [CategoryId, ListItemWithImage[]][]
   }, [uncheckedItems, viewMode, normalizeCategory])
 
+  // Sugerencias inteligentes basadas en items de la lista
+  const smartSuggestions = useMemo(() => {
+    const itemNames = items.map(item => item.name)
+    return getSmartSuggestions(itemNames, 4)
+  }, [items])
+
+  // Lista de personas asignables (usuario actual + colaboradores)
+  const assignablePeople = useMemo((): AssignablePerson[] => {
+    const people: AssignablePerson[] = []
+    const addedIds = new Set<string>()
+
+    // Añadir usuario actual primero
+    if (user) {
+      people.push({
+        id: user.id,
+        name: user.name || 'Yo',
+        avatar_url: user.avatar_url || null
+      })
+      addedIds.add(user.id)
+    }
+
+    // Añadir colaboradores (evitando duplicados)
+    collaborators.forEach(collab => {
+      if (collab.profiles && collab.user_id && !addedIds.has(collab.user_id)) {
+        people.push({
+          id: collab.user_id,
+          name: collab.profiles.name || collab.profiles.email,
+          avatar_url: collab.profiles.avatar_url
+        })
+        addedIds.add(collab.user_id)
+      }
+    })
+
+    return people
+  }, [user, collaborators])
+
   // Cargar items iniciales
   useEffect(() => {
     let isMounted = true
@@ -252,15 +291,20 @@ export function ShoppingList({ list }: ShoppingListProps) {
   }, [list.id, setItems, supabase])
 
   // Cargar perfiles y colaboradores (se mantiene igual...)
+  // Cargar colaboradores al montar (para asignación de items)
   useEffect(() => {
-    if (activeModal === 'collaborators' && !collaboratorsLoaded) {
-      const loadCollaborators = async () => {
-        const { data } = await supabase.from('list_collaborators').select('role, profiles(email, name, avatar_url)').eq('list_id', list.id)
-        if (data) { setCollaborators(data as unknown as Collaborator[]); setCollaboratorsLoaded(true) }
+    const loadCollaborators = async () => {
+      const { data } = await supabase
+        .from('list_collaborators')
+        .select('role, user_id, profiles(id, email, name, avatar_url)')
+        .eq('list_id', list.id)
+      if (data) {
+        setCollaborators(data as unknown as Collaborator[])
+        setCollaboratorsLoaded(true)
       }
-      loadCollaborators()
     }
-  }, [activeModal, list.id, supabase, collaboratorsLoaded])
+    if (!collaboratorsLoaded) loadCollaborators()
+  }, [list.id, supabase, collaboratorsLoaded])
 
   useEffect(() => {
     const loadProfiles = async () => {
@@ -421,6 +465,31 @@ export function ShoppingList({ list }: ShoppingListProps) {
     }
   }, [addItemToListFromFavorite, list.id, addItem, updateItem])
 
+  // Añadir item desde sugerencia inteligente
+  const handleAddFromSuggestion = useCallback((suggestion: CommonProduct) => {
+    handleAddItem(suggestion.name, suggestion.category)
+  }, [handleAddItem])
+
+  // Asignar item a una persona
+  const handleAssignItem = useCallback(async (itemId: string, userId: string | null) => {
+    const item = items.find(i => i.id === itemId)
+    if (!item) return
+
+    // Actualizar en store
+    updateItem(itemId, { assigned_to: userId } as any)
+
+    // Actualizar en DB
+    const { error } = await supabase
+      .from('list_items')
+      .update({ assigned_to: userId })
+      .eq('id', itemId)
+
+    if (error) {
+      // Revertir en caso de error
+      updateItem(itemId, { assigned_to: item.assigned_to } as any)
+    }
+  }, [items, updateItem, supabase])
+
   // Drag and Drop
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event
@@ -503,6 +572,45 @@ export function ShoppingList({ list }: ShoppingListProps) {
     setIsDuplicating(false)
     setShowMenu(false)
     router.push(`/lists/${newList.id}`)
+  }
+
+  const handleSaveAsTemplate = async () => {
+    if (!user) return
+
+    // Crear lista como plantilla
+    const { data: newTemplate, error } = await supabase
+      .from('shopping_lists')
+      .insert({
+        name: `${list.name} (plantilla)`,
+        owner_id: user.id,
+        is_template: true
+      })
+      .select()
+      .single()
+
+    if (error || !newTemplate) return
+
+    // Copiar items
+    if (items.length > 0) {
+      const itemsCopy = items.map((item, index) => ({
+        list_id: newTemplate.id,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        category: item.category,
+        checked: false,
+        added_by: user.id,
+        position: index
+      }))
+
+      await supabase.from('list_items').insert(itemsCopy)
+    }
+
+    setShowMenu(false)
+    // Mostrar feedback
+    showUndoToast('Plantilla creada correctamente', () => {
+      router.push('/lists/templates')
+    })
   }
 
   // --- ACCIONES MASIVAS ---
@@ -665,9 +773,25 @@ export function ShoppingList({ list }: ShoppingListProps) {
                     <CopyIcon className="w-4 h-4 text-blue-500" />
                     {isDuplicating ? 'Duplicando...' : 'Duplicar lista'}
                   </button>
+                  <button onClick={handleSaveAsTemplate} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-purple-500" />
+                    Guardar como plantilla
+                  </button>
                   <button onClick={() => {setActiveModal('edit'); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
                     <Edit2 className="w-4 h-4 text-muted" />
                     Editar nombre
+                  </button>
+
+                  <div className="border-t border-border my-1" />
+
+                  {/* Modo Super (placeholder) */}
+                  <button
+                    onClick={() => { setShowMenu(false); alert('¡Próximamente! El modo super te permitirá organizar tu compra por pasillos del supermercado.') }}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2 opacity-60"
+                  >
+                    <Store className="w-4 h-4 text-emerald-500" />
+                    <span>Modo en el super</span>
+                    <span className="ml-auto text-[10px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded">Pronto</span>
                   </button>
 
                   <div className="border-t border-border my-1" />
@@ -746,6 +870,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
                                onDelete={handleDeleteItem}
                                onUpdateQuantity={handleUpdateQuantity}
                                onAddToFavorites={handleAddToFavorites}
+                               onAssign={handleAssignItem}
+                               assignablePeople={assignablePeople}
+                               assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
                                addedByProfile={profilesCache.get(item.added_by)}
                                checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null}
                                isDragEnabled={false}
@@ -775,6 +902,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
                       onDelete={handleDeleteItem}
                       onUpdateQuantity={handleUpdateQuantity}
                       onAddToFavorites={handleAddToFavorites}
+                      onAssign={handleAssignItem}
+                      assignablePeople={assignablePeople}
+                      assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
                       addedByProfile={profilesCache.get(item.added_by)}
                       checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null}
                     />
@@ -807,6 +937,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
                         onDelete={handleDeleteItem}
                         onUpdateQuantity={handleUpdateQuantity}
                         onAddToFavorites={handleAddToFavorites}
+                        onAssign={handleAssignItem}
+                        assignablePeople={assignablePeople}
+                        assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
                         addedByProfile={profilesCache.get(item.added_by)}
                         checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null}
                         isDragEnabled={false}
@@ -823,6 +956,26 @@ export function ShoppingList({ list }: ShoppingListProps) {
       <UndoToast message={undoState.message} isVisible={undoState.isVisible} onUndo={handleUndo} />
 
       <div className="fixed bottom-0 left-0 right-0 bg-background z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-border/50">
+        {/* Sugerencias inteligentes */}
+        {smartSuggestions.length > 0 && (
+          <div className="px-4 py-2 border-b border-border/30 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-900/10 dark:to-purple-900/10">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-medium text-muted">✨ Sugerido para ti</span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {smartSuggestions.map((suggestion, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleAddFromSuggestion(suggestion)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-full border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-sm whitespace-nowrap group"
+                >
+                  <span className="text-xs opacity-60 group-hover:opacity-100">+</span>
+                  <span>{suggestion.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <FavoriteItems favorites={favoriteItems} isLoading={favoritesLoading} onAddToList={handleAddFromFavorite} onRemove={removeFavoriteItem} />
         <AddItemForm onAdd={handleAddItem} suggestionsSource={favoriteItems} />
       </div>

@@ -269,3 +269,107 @@ export function searchProducts(query: string, maxResults: number = 5): CommonPro
   return matches.slice(0, maxResults)
 }
 
+// ============================================
+// SUGERENCIAS INTELIGENTES
+// ============================================
+
+// Mapa de productos relacionados (comprados frecuentemente juntos)
+const PRODUCT_ASSOCIATIONS: Record<string, string[]> = {
+  // Desayuno
+  'leche': ['cereales', 'café', 'cacao', 'galletas', 'tostadas'],
+  'cereales': ['leche', 'yogur', 'fruta'],
+  'café': ['leche', 'azúcar', 'galletas'],
+  'tostadas': ['mantequilla', 'mermelada', 'aceite de oliva'],
+  'pan': ['mantequilla', 'mermelada', 'embutido', 'queso'],
+
+  // Comidas principales
+  'pasta': ['tomate frito', 'queso rallado', 'carne picada', 'aceite de oliva'],
+  'arroz': ['pollo', 'verduras', 'aceite', 'sal'],
+  'pollo': ['arroz', 'patatas', 'ensalada', 'limón'],
+  'carne picada': ['pasta', 'tomate', 'cebolla', 'ajo'],
+  'huevos': ['bacon', 'patatas', 'aceite', 'sal'],
+  'patatas': ['huevos', 'cebolla', 'aceite', 'sal'],
+  'tomate': ['lechuga', 'cebolla', 'aceite de oliva', 'vinagre'],
+  'lechuga': ['tomate', 'aceitunas', 'atún', 'vinagre'],
+
+  // Snacks y meriendas
+  'galletas': ['leche', 'café', 'chocolate'],
+  'chocolate': ['leche', 'galletas', 'frutos secos'],
+  'patatas fritas': ['refrescos', 'cerveza', 'salsas'],
+  'refrescos': ['patatas fritas', 'pizza', 'snacks'],
+
+  // Higiene y limpieza
+  'papel higiénico': ['servilletas', 'papel de cocina', 'jabón'],
+  'jabón': ['champú', 'gel de ducha', 'crema'],
+  'detergente': ['suavizante', 'lejía', 'limpiador'],
+  'lavavajillas': ['estropajo', 'guantes', 'bayeta'],
+
+  // Bebidas
+  'cerveza': ['patatas fritas', 'aceitunas', 'frutos secos'],
+  'vino': ['queso', 'embutido', 'pan'],
+  'agua': ['refrescos', 'zumo'],
+}
+
+// Normalizar nombre para búsqueda
+function normalizeForSearch(text: string): string {
+  return text.toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/s$/, '') // Quitar plural simple
+}
+
+/**
+ * Obtiene sugerencias inteligentes basadas en los items ya en la lista
+ * @param currentItems - Nombres de items actuales en la lista
+ * @param maxSuggestions - Número máximo de sugerencias
+ * @returns Array de productos sugeridos
+ */
+export function getSmartSuggestions(
+  currentItems: string[],
+  maxSuggestions: number = 4
+): CommonProduct[] {
+  if (!currentItems.length) return []
+
+  const suggestions = new Map<string, number>() // producto -> puntuación
+  const currentItemsNormalized = new Set(currentItems.map(normalizeForSearch))
+
+  // Para cada item en la lista, buscar productos relacionados
+  currentItems.forEach(item => {
+    const normalizedItem = normalizeForSearch(item)
+
+    // Buscar en las asociaciones
+    Object.entries(PRODUCT_ASSOCIATIONS).forEach(([key, related]) => {
+      const normalizedKey = normalizeForSearch(key)
+
+      // Si el item de la lista coincide con una clave de asociación
+      if (normalizedItem.includes(normalizedKey) || normalizedKey.includes(normalizedItem)) {
+        related.forEach(relatedProduct => {
+          const normalizedRelated = normalizeForSearch(relatedProduct)
+          // No sugerir algo que ya está en la lista
+          if (!currentItemsNormalized.has(normalizedRelated)) {
+            const currentScore = suggestions.get(relatedProduct) || 0
+            suggestions.set(relatedProduct, currentScore + 1)
+          }
+        })
+      }
+    })
+  })
+
+  // Ordenar por puntuación y convertir a CommonProduct
+  const sortedSuggestions = Array.from(suggestions.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, maxSuggestions)
+    .map(([name]) => {
+      // Buscar en COMMON_PRODUCTS para obtener la categoría
+      const found = COMMON_PRODUCTS.find(p =>
+        normalizeForSearch(p.name).includes(normalizeForSearch(name))
+      )
+      return {
+        name: found?.name || name.charAt(0).toUpperCase() + name.slice(1),
+        category: found?.category || detectCategory(name)
+      }
+    })
+
+  return sortedSuggestions
+}
+

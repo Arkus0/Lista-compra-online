@@ -3,7 +3,7 @@
 import { memo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ShoppingItem } from './ShoppingItem'
+import { ShoppingItem, AssignablePerson } from './ShoppingItem'
 import { ListItem, Profile } from '@/lib/supabase/types'
 
 // Type extendido localmente
@@ -15,6 +15,9 @@ interface SortableShoppingItemProps {
   onDelete: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
   onAddToFavorites?: (item: ListItem) => void
+  onAssign?: (itemId: string, userId: string | null) => void
+  assignablePeople?: AssignablePerson[]
+  assignedToProfile?: Profile | null
   addedByProfile?: Profile | null
   checkedByProfile?: Profile | null
 }
@@ -25,6 +28,9 @@ function SortableShoppingItemComponent({
   onDelete,
   onUpdateQuantity,
   onAddToFavorites,
+  onAssign,
+  assignablePeople,
+  assignedToProfile,
   addedByProfile,
   checkedByProfile,
 }: SortableShoppingItemProps) {
@@ -53,6 +59,9 @@ function SortableShoppingItemComponent({
         onDelete={onDelete}
         onUpdateQuantity={onUpdateQuantity}
         onAddToFavorites={onAddToFavorites}
+        onAssign={onAssign}
+        assignablePeople={assignablePeople}
+        assignedToProfile={assignedToProfile}
         dragHandleProps={listeners}
         addedByProfile={addedByProfile}
         checkedByProfile={checkedByProfile}
@@ -70,15 +79,19 @@ export const SortableShoppingItem = memo(SortableShoppingItemComponent, (prevPro
     prevProps.item.checked === nextProps.item.checked &&
     prevProps.item.quantity === nextProps.item.quantity &&
     prevProps.item.category === nextProps.item.category &&
-    prevProps.item.image_url === nextProps.item.image_url && // Nueva comparación
+    prevProps.item.image_url === nextProps.item.image_url &&
     prevProps.item.position === nextProps.item.position &&
     prevProps.item.checked_by === nextProps.item.checked_by &&
+    prevProps.item.assigned_to === nextProps.item.assigned_to &&
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onDelete === nextProps.onDelete &&
     prevProps.onUpdateQuantity === nextProps.onUpdateQuantity &&
     prevProps.onAddToFavorites === nextProps.onAddToFavorites &&
+    prevProps.onAssign === nextProps.onAssign &&
     prevProps.addedByProfile?.id === nextProps.addedByProfile?.id &&
-    prevProps.checkedByProfile?.id === nextProps.checkedByProfile?.id
+    prevProps.checkedByProfile?.id === nextProps.checkedByProfile?.id &&
+    prevProps.assignedToProfile?.id === nextProps.assignedToProfile?.id &&
+    prevProps.assignablePeople?.length === nextProps.assignablePeople?.length
   )
 })
 

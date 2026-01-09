@@ -1,12 +1,18 @@
 'use client'
 
-import { useState, memo, useCallback } from 'react'
-import { Check, Trash2, GripVertical, Minus, Plus, User, Star, Image as ImageIcon, ExternalLink } from 'lucide-react'
+import { useState, memo, useCallback, useRef, useEffect } from 'react'
+import { Check, Trash2, GripVertical, Minus, Plus, User, Star, Image as ImageIcon, ExternalLink, UserPlus, X } from 'lucide-react'
 import { ListItem, Profile } from '@/lib/supabase/types'
 
-// Extendemos el tipo ListItem para incluir image_url temporalmente
-// hasta que actualices tus tipos de Supabase generados
+// Extendemos el tipo ListItem para incluir image_url y assigned_to
 type ListItemWithImage = ListItem & { image_url?: string | null }
+
+// Tipo simple para personas asignables
+export interface AssignablePerson {
+  id: string
+  name: string
+  avatar_url: string | null
+}
 
 interface ShoppingItemProps {
   item: ListItemWithImage
@@ -14,10 +20,13 @@ interface ShoppingItemProps {
   onDelete: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
   onAddToFavorites?: (item: ListItem) => void
+  onAssign?: (itemId: string, userId: string | null) => void
+  assignablePeople?: AssignablePerson[]
+  assignedToProfile?: Profile | null
   dragHandleProps?: any
   addedByProfile?: Profile | null
   checkedByProfile?: Profile | null
-  isDragEnabled?: boolean // Nueva prop para ocultar el asa de arrastre
+  isDragEnabled?: boolean
 }
 
 // Colores de categoría
@@ -39,6 +48,9 @@ function ShoppingItemComponent({
   onDelete,
   onUpdateQuantity,
   onAddToFavorites,
+  onAssign,
+  assignablePeople = [],
+  assignedToProfile,
   dragHandleProps,
   addedByProfile,
   checkedByProfile,
@@ -46,6 +58,31 @@ function ShoppingItemComponent({
 }: ShoppingItemProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showImageModal, setShowImageModal] = useState(false)
+  const [showAssignMenu, setShowAssignMenu] = useState(false)
+  const assignMenuRef = useRef<HTMLDivElement>(null)
+
+  // Cerrar menú al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (assignMenuRef.current && !assignMenuRef.current.contains(e.target as Node)) {
+        setShowAssignMenu(false)
+      }
+    }
+    if (showAssignMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showAssignMenu])
+
+  const handleAssign = useCallback((userId: string | null) => {
+    onAssign?.(item.id, userId)
+    setShowAssignMenu(false)
+  }, [item.id, onAssign])
+
+  // Obtener iniciales para avatar
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  }
 
   const handleDelete = useCallback(() => {
     setIsDeleting(true)
@@ -149,6 +186,78 @@ function ShoppingItemComponent({
           </div>
         </div>
 
+        {/* Asignación de persona - Botón sutil */}
+        {onAssign && assignablePeople.length > 0 && (
+          <div className="relative" ref={assignMenuRef}>
+            <button
+              onClick={() => setShowAssignMenu(!showAssignMenu)}
+              className={`
+                flex items-center justify-center rounded-full transition-all
+                ${assignedToProfile
+                  ? 'w-7 h-7 bg-blue-100 dark:bg-blue-900/30 hover:ring-2 hover:ring-blue-300'
+                  : 'w-7 h-7 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 opacity-50 hover:opacity-100'
+                }
+              `}
+              title={assignedToProfile ? `Asignado a ${assignedToProfile.name}` : 'Asignar a alguien'}
+            >
+              {assignedToProfile ? (
+                assignedToProfile.avatar_url ? (
+                  <img src={assignedToProfile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                    {getInitials(assignedToProfile.name || 'U')}
+                  </span>
+                )
+              ) : (
+                <UserPlus className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+
+            {/* Menú de asignación */}
+            {showAssignMenu && (
+              <div className="absolute top-full right-0 mt-1 w-48 bg-card border border-border rounded-xl shadow-xl z-30 py-1 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-3 py-2 border-b border-border">
+                  <p className="text-xs font-medium text-muted">Asignar a...</p>
+                </div>
+
+                {/* Opción para quitar asignación */}
+                {assignedToProfile && (
+                  <button
+                    onClick={() => handleAssign(null)}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 text-red-500"
+                  >
+                    <X className="w-4 h-4" />
+                    Quitar asignación
+                  </button>
+                )}
+
+                {/* Lista de personas */}
+                {assignablePeople.map(person => (
+                  <button
+                    key={person.id}
+                    onClick={() => handleAssign(person.id)}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 ${
+                      item.assigned_to === person.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    }`}
+                  >
+                    {person.avatar_url ? (
+                      <img src={person.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                        <span className="text-[9px] font-bold">{getInitials(person.name)}</span>
+                      </div>
+                    )}
+                    <span className="truncate">{person.name}</span>
+                    {item.assigned_to === person.id && (
+                      <Check className="w-4 h-4 ml-auto text-blue-500" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Quantity controls */}
         <div className="flex items-center gap-1">
           <button
@@ -219,16 +328,20 @@ export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) =
     prevProps.item.checked === nextProps.item.checked &&
     prevProps.item.quantity === nextProps.item.quantity &&
     prevProps.item.category === nextProps.item.category &&
-    prevProps.item.image_url === nextProps.item.image_url && // Importante: comparar imagen
+    prevProps.item.image_url === nextProps.item.image_url &&
     prevProps.item.unit === nextProps.item.unit &&
     prevProps.item.checked_by === nextProps.item.checked_by &&
+    prevProps.item.assigned_to === nextProps.item.assigned_to &&
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onDelete === nextProps.onDelete &&
     prevProps.onUpdateQuantity === nextProps.onUpdateQuantity &&
     prevProps.onAddToFavorites === nextProps.onAddToFavorites &&
+    prevProps.onAssign === nextProps.onAssign &&
     prevProps.addedByProfile?.id === nextProps.addedByProfile?.id &&
     prevProps.checkedByProfile?.id === nextProps.checkedByProfile?.id &&
-    prevProps.isDragEnabled === nextProps.isDragEnabled
+    prevProps.assignedToProfile?.id === nextProps.assignedToProfile?.id &&
+    prevProps.isDragEnabled === nextProps.isDragEnabled &&
+    prevProps.assignablePeople?.length === nextProps.assignablePeople?.length
   )
 })
 
