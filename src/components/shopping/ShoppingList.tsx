@@ -392,12 +392,20 @@ export function ShoppingList({ list }: ShoppingListProps) {
     if (!item || !user) return
 
     const newChecked = !item.checked
-    toggleItemChecked(id) 
+    toggleItemChecked(id)
 
     // Definir UNDO
     const undoAction = async () => {
-       toggleItemChecked(id) 
+       toggleItemChecked(id)
        await supabase.from('list_items').update({ checked: !newChecked, checked_by: !newChecked ? null : user.id }).eq('id', id)
+       // Si se desmarca, borrar del historial
+       if (newChecked) {
+         await supabase.from('purchase_history').delete()
+           .eq('user_id', user.id)
+           .eq('list_id', item.list_id)
+           .eq('item_name', item.name)
+           .gte('purchased_at', new Date(Date.now() - 60000).toISOString()) // Últimos 60 segundos
+       }
     }
 
     if (newChecked) showUndoToast(`Completado: ${item.name}`, undoAction)
@@ -408,6 +416,18 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
     if (error) toggleItemChecked(id)
     else if (newChecked) {
+      // Guardar en historial de compras
+      await supabase.from('purchase_history').insert({
+        user_id: user.id,
+        list_id: item.list_id,
+        list_name: list.name,
+        item_name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        category: item.category,
+        purchased_at: new Date().toISOString()
+      })
+
       sendPushNotification({
         listId: list.id, listName: list.name, action: 'item_checked',
         actorName: user.name || 'Alguien', itemName: item.name, excludeUserId: user.id,

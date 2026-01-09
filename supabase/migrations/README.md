@@ -1,25 +1,48 @@
-# Database Migrations
+# Migraciones de Base de Datos
 
-## How to apply migrations
+## Aplicar migración de Purchase History
 
-### Option 1: Using Supabase Dashboard (Recommended)
-1. Go to your Supabase project dashboard
-2. Navigate to SQL Editor
-3. Copy the content of the migration file
-4. Paste and run the SQL
+La migración `20260109_create_purchase_history.sql` crea la tabla de historial de compras.
 
-### Option 2: Using Supabase CLI
+### Opción 1: Desde Supabase Dashboard (Recomendado para producción)
+
+1. Ve a tu proyecto en https://supabase.com
+2. Navega a **SQL Editor**
+3. Copia el contenido de `20260109_create_purchase_history.sql`
+4. Pégalo en el editor y ejecuta
+
+### Opción 2: Desde CLI de Supabase (Desarrollo local)
+
 ```bash
+# Si tienes Supabase CLI instalado
 supabase db push
+
+# O aplicar manualmente
+supabase db execute -f supabase/migrations/20260109_create_purchase_history.sql
 ```
 
-## Migrations
+### Opción 3: Verificación manual
 
-### 20260108_add_position_to_list_items.sql
-Adds a `position` field to the `list_items` table to support drag and drop functionality.
-This allows users to reorder items in their shopping lists manually.
+Ejecuta esta query para verificar que la tabla existe:
 
-**What it does:**
-- Adds `position` column (integer, default 0)
-- Sets initial positions based on creation date
-- Creates index for better query performance
+```sql
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+AND table_name = 'purchase_history';
+```
+
+## ¿Qué hace esta migración?
+
+- Crea la tabla `purchase_history` para guardar el historial de productos comprados
+- Añade índices para optimizar las consultas
+- Configura Row Level Security (RLS) para proteger los datos de cada usuario
+- Permite a los usuarios ver solo su propio historial de compras
+
+## Rollback (Si necesitas revertir)
+
+```sql
+DROP TABLE IF EXISTS purchase_history CASCADE;
+```
+
+⚠️ **Advertencia**: Esto borrará todos los datos del historial de compras permanentemente.

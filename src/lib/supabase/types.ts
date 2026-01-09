@@ -324,6 +324,41 @@ export interface Database {
           is_read?: boolean
         }
       }
+      purchase_history: {
+        Row: {
+          id: string
+          user_id: string
+          list_id: string | null
+          list_name: string
+          item_name: string
+          quantity: number
+          unit: string | null
+          category: string | null
+          price: number | null
+          purchased_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          list_id?: string | null
+          list_name: string
+          item_name: string
+          quantity?: number
+          unit?: string | null
+          category?: string | null
+          price?: number | null
+          purchased_at?: string
+          created_at?: string
+        }
+        Update: {
+          item_name?: string
+          quantity?: number
+          unit?: string | null
+          category?: string | null
+          price?: number | null
+        }
+      }
     }
     Functions: {
       join_list_by_code: {
@@ -353,6 +388,7 @@ export type UserFavoriteList = Database['public']['Tables']['user_favorite_lists
 export type ListNote = Database['public']['Tables']['list_notes']['Row']
 export type NotificationPreferences = Database['public']['Tables']['notification_preferences']['Row']
 export type Notification = Database['public']['Tables']['notifications']['Row']
+export type PurchaseHistory = Database['public']['Tables']['purchase_history']['Row']
 
 // Tipos extendidos
 export type ShoppingListWithItems = ShoppingList & {
