@@ -4,16 +4,27 @@ import { memo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ShoppingItem } from './ShoppingItem'
-import { ListItem } from '@/lib/supabase/types'
+import { ListItem, Profile } from '@/lib/supabase/types'
 
 interface SortableShoppingItemProps {
   item: ListItem
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
+  onAddToFavorites?: (item: ListItem) => void
+  addedByProfile?: Profile | null
+  checkedByProfile?: Profile | null
 }
 
-function SortableShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuantity }: SortableShoppingItemProps) {
+function SortableShoppingItemComponent({
+  item,
+  onToggle,
+  onDelete,
+  onUpdateQuantity,
+  onAddToFavorites,
+  addedByProfile,
+  checkedByProfile,
+}: SortableShoppingItemProps) {
   const {
     attributes,
     listeners,
@@ -36,7 +47,10 @@ function SortableShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuant
         onToggle={onToggle}
         onDelete={onDelete}
         onUpdateQuantity={onUpdateQuantity}
+        onAddToFavorites={onAddToFavorites}
         dragHandleProps={listeners}
+        addedByProfile={addedByProfile}
+        checkedByProfile={checkedByProfile}
       />
     </div>
   )
@@ -51,9 +65,13 @@ export const SortableShoppingItem = memo(SortableShoppingItemComponent, (prevPro
     prevProps.item.quantity === nextProps.item.quantity &&
     prevProps.item.category === nextProps.item.category &&
     prevProps.item.position === nextProps.item.position &&
+    prevProps.item.checked_by === nextProps.item.checked_by &&
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onDelete === nextProps.onDelete &&
-    prevProps.onUpdateQuantity === nextProps.onUpdateQuantity
+    prevProps.onUpdateQuantity === nextProps.onUpdateQuantity &&
+    prevProps.onAddToFavorites === nextProps.onAddToFavorites &&
+    prevProps.addedByProfile?.id === nextProps.addedByProfile?.id &&
+    prevProps.checkedByProfile?.id === nextProps.checkedByProfile?.id
   )
 })
 

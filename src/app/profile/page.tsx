@@ -6,15 +6,15 @@ import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { ProfileEditor } from '@/components/profile/ProfileEditor'
+import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import {
-  User,
   Mail,
   LogOut,
-  Settings,
   Bell,
-  Shield,
-  HelpCircle,
-  ChevronRight,
+  Star,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Profile } from '@/lib/supabase/types'
@@ -22,7 +22,8 @@ import { Profile } from '@/lib/supabase/types'
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [stats, setStats] = useState({ lists: 0, items: 0 })
+  const [stats, setStats] = useState({ lists: 0, items: 0, favorites: 0 })
+  const [showNotifications, setShowNotifications] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -43,19 +44,23 @@ export default function ProfilePage() {
       setProfile(data)
 
       // Cargar estadísticas
-      // Contar listas propias
       const { count: ownListsCount } = await supabase
         .from('shopping_lists')
         .select('*', { count: 'exact', head: true })
         .eq('owner_id', user.id)
 
-      // Contar listas compartidas
       const { count: sharedListsCount } = await supabase
         .from('list_collaborators')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
 
       const totalLists = (ownListsCount || 0) + (sharedListsCount || 0)
+
+      // Contar items favoritos
+      const { count: favoritesCount } = await supabase
+        .from('user_favorite_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
 
       // Contar items en listas propias
       const { data: ownLists } = await supabase
@@ -73,7 +78,11 @@ export default function ProfilePage() {
         totalItems = itemsCount || 0
       }
 
-      setStats({ lists: totalLists, items: totalItems })
+      setStats({
+        lists: totalLists,
+        items: totalItems,
+        favorites: favoritesCount || 0,
+      })
       setIsLoading(false)
     }
 
@@ -85,12 +94,9 @@ export default function ProfilePage() {
     router.push('/auth')
   }
 
-  const menuItems = [
-    { icon: Settings, label: 'Configuracion', href: '/settings' },
-    { icon: Bell, label: 'Notificaciones', href: '/notifications' },
-    { icon: Shield, label: 'Privacidad', href: '/privacy' },
-    { icon: HelpCircle, label: 'Ayuda', href: '/help' },
-  ]
+  const handleProfileUpdate = (updatedProfile: Profile) => {
+    setProfile(updatedProfile)
+  }
 
   if (isLoading) {
     return (
@@ -105,25 +111,20 @@ export default function ProfilePage() {
       <Header title="Perfil" />
 
       <main className="p-4 space-y-6">
-        {/* Profile card */}
+        {/* Profile card con editor */}
         <Card variant="elevated">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.name || 'Avatar'}
-                  className="w-16 h-16 rounded-full object-cover"
-                />
-              ) : (
-                <User className="w-8 h-8 text-primary" />
-              )}
-            </div>
+            {profile && (
+              <ProfileEditor profile={profile} onUpdate={handleProfileUpdate} />
+            )}
             <div className="flex-1">
               <h2 className="font-bold text-lg">{profile?.name || 'Usuario'}</h2>
               <p className="text-sm text-gray-500 flex items-center gap-1">
                 <Mail className="w-4 h-4" />
                 {profile?.email}
+              </p>
+              <p className="text-xs text-muted mt-1">
+                Toca la foto para editar tu perfil
               </p>
             </div>
           </div>
@@ -140,32 +141,60 @@ export default function ProfilePage() {
             <p className="text-xs text-gray-500">Productos</p>
           </Card>
           <Card variant="outlined" className="text-center">
-            <p className="text-2xl font-bold text-primary">0</p>
-            <p className="text-xs text-gray-500">Ahorrado</p>
+            <p className="text-2xl font-bold text-primary">{stats.favorites}</p>
+            <p className="text-xs text-gray-500">Favoritos</p>
           </Card>
         </div>
 
-        {/* Menu */}
+        {/* Accesos rápidos */}
         <section>
-          <h3 className="font-semibold text-lg mb-3">Ajustes</h3>
-          <Card variant="outlined" padding="none">
-            {menuItems.map((item, index) => {
-              const Icon = item.icon
-              return (
-                <button
-                  key={item.label}
-                  className={`
-                    w-full flex items-center gap-3 p-4 hover:bg-secondary transition-colors
-                    ${index < menuItems.length - 1 ? 'border-b border-gray-100' : ''}
-                  `}
-                >
-                  <Icon className="w-5 h-5 text-gray-500" />
-                  <span className="flex-1 text-left">{item.label}</span>
-                  <ChevronRight className="w-5 h-5 text-gray-400" />
-                </button>
-              )
-            })}
-          </Card>
+          <h3 className="font-semibold text-lg mb-3">Accesos rápidos</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => router.push('/lists?tab=favorites')}
+              className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl flex items-center gap-3 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+            >
+              <Star className="w-6 h-6 text-amber-500" />
+              <div className="text-left">
+                <p className="font-medium">Favoritos</p>
+                <p className="text-xs text-muted">{stats.favorites} items</p>
+              </div>
+            </button>
+            <button
+              onClick={() => router.push('/lists/shared')}
+              className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center gap-3 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+            >
+              <Mail className="w-6 h-6 text-blue-500" />
+              <div className="text-left">
+                <p className="font-medium">Compartidas</p>
+                <p className="text-xs text-muted">Ver listas</p>
+              </div>
+            </button>
+          </div>
+        </section>
+
+        {/* Notificaciones (desplegable) */}
+        <section>
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="w-full flex items-center justify-between p-4 bg-secondary rounded-xl hover:bg-secondary/80 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Bell className="w-5 h-5 text-muted" />
+              <span className="font-medium">Notificaciones</span>
+            </div>
+            {showNotifications ? (
+              <ChevronUp className="w-5 h-5 text-muted" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-muted" />
+            )}
+          </button>
+
+          {showNotifications && profile && (
+            <div className="mt-3 p-4 border border-gray-200 dark:border-gray-700 rounded-xl">
+              <NotificationSettings userId={profile.id} />
+            </div>
+          )}
         </section>
 
         {/* Logout */}
@@ -180,7 +209,7 @@ export default function ProfilePage() {
 
         {/* Version */}
         <p className="text-center text-xs text-gray-400">
-          ShoppyJuan v0.1.0
+          ShoppyJuan v0.2.0
         </p>
       </main>
 

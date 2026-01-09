@@ -67,6 +67,7 @@ export interface Database {
           category: string | null
           checked: boolean
           added_by: string
+          checked_by: string | null
           position?: number
           created_at: string
           updated_at: string
@@ -80,6 +81,7 @@ export interface Database {
           category?: string | null
           checked?: boolean
           added_by: string
+          checked_by?: string | null
           position?: number
           created_at?: string
           updated_at?: string
@@ -90,6 +92,7 @@ export interface Database {
           unit?: string | null
           category?: string | null
           checked?: boolean
+          checked_by?: string | null
           position?: number
           updated_at?: string
         }
@@ -166,6 +169,129 @@ export interface Database {
           last_updated?: string
         }
       }
+      push_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          updated_at?: string
+        }
+      }
+      user_favorite_items: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          quantity: number
+          unit: string | null
+          category: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          quantity?: number
+          unit?: string | null
+          category?: string | null
+          created_at?: string
+        }
+        Update: {
+          name?: string
+          quantity?: number
+          unit?: string | null
+          category?: string | null
+        }
+      }
+      user_favorite_lists: {
+        Row: {
+          id: string
+          user_id: string
+          list_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          list_id: string
+          created_at?: string
+        }
+        Update: {
+          // No hay campos actualizables
+        }
+      }
+      list_notes: {
+        Row: {
+          id: string
+          list_id: string
+          user_id: string
+          content: string
+          is_pinned: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          list_id: string
+          user_id: string
+          content: string
+          is_pinned?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          is_pinned?: boolean
+          updated_at?: string
+        }
+      }
+      notification_preferences: {
+        Row: {
+          id: string
+          user_id: string
+          items_added: boolean
+          items_removed: boolean
+          items_checked: boolean
+          notes_added: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          items_added?: boolean
+          items_removed?: boolean
+          items_checked?: boolean
+          notes_added?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          items_added?: boolean
+          items_removed?: boolean
+          items_checked?: boolean
+          notes_added?: boolean
+          updated_at?: string
+        }
+      }
     }
     Functions: {
       join_list_by_code: {
@@ -176,7 +302,7 @@ export interface Database {
       }
     }
     Enums: {
-      // Aquí irían enums si los tuvieras definidos en Postgres, 
+      // Aquí irían enums si los tuvieras definidos en Postgres,
       // por ahora el role se maneja como string literal en las tablas.
     }
   }
@@ -189,6 +315,11 @@ export type ListItem = Database['public']['Tables']['list_items']['Row']
 export type ListCollaborator = Database['public']['Tables']['list_collaborators']['Row']
 export type Supermarket = Database['public']['Tables']['supermarkets']['Row']
 export type ProductPrice = Database['public']['Tables']['product_prices']['Row']
+export type PushSubscription = Database['public']['Tables']['push_subscriptions']['Row']
+export type UserFavoriteItem = Database['public']['Tables']['user_favorite_items']['Row']
+export type UserFavoriteList = Database['public']['Tables']['user_favorite_lists']['Row']
+export type ListNote = Database['public']['Tables']['list_notes']['Row']
+export type NotificationPreferences = Database['public']['Tables']['notification_preferences']['Row']
 
 // Tipos extendidos
 export type ShoppingListWithItems = ShoppingList & {
@@ -198,4 +329,22 @@ export type ShoppingListWithItems = ShoppingList & {
 
 export type ListItemWithPrices = ListItem & {
   prices: (ProductPrice & { supermarket: Supermarket })[]
+}
+
+export type ListNoteWithProfile = ListNote & {
+  profile: Profile
+}
+
+export type ListItemWithProfile = ListItem & {
+  added_by_profile?: Profile
+  checked_by_profile?: Profile
+}
+
+// Tipos para Realtime Presence
+export type PresenceState = {
+  id: string
+  email: string
+  name: string | null
+  avatar_url: string | null
+  online_at: string
 }
