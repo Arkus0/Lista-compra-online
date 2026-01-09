@@ -7,8 +7,9 @@ import { BottomNav } from '@/components/layout/BottomNav'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { Input } from '@/components/ui/Input' // Nuevo import
 import { ListCardSkeleton } from '@/components/ui/Skeleton'
-import { Users, ShoppingBag, Share2, Check, Link as LinkIcon, QrCode } from 'lucide-react'
+import { Users, ShoppingBag, Share2, Check, Link as LinkIcon, QrCode, UserPlus } from 'lucide-react' // UserPlus añadido
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -29,9 +30,15 @@ export default function SharedListsPage() {
   const [sharedLists, setSharedLists] = useState<SharedList[]>([])
   const [ownLists, setOwnLists] = useState<OwnList[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  
+  // Estados para compartir
   const [showShareModal, setShowShareModal] = useState(false)
   const [selectedList, setSelectedList] = useState<OwnList | null>(null)
   const [isCopied, setIsCopied] = useState(false)
+
+  // Estados para unirse manualmente (NUEVOS)
+  const [showJoinModal, setShowJoinModal] = useState(false)
+  const [joinCode, setJoinCode] = useState('')
 
   const router = useRouter()
   // Usar ref para evitar recreación del cliente
@@ -96,6 +103,14 @@ export default function SharedListsPage() {
     setShowShareModal(true)
   }, [])
 
+  // NUEVO: Manejador para unirse con código
+  const handleJoinWithCode = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (joinCode.trim().length > 0) {
+      router.push(`/join/${joinCode.trim()}`)
+    }
+  }
+
   // Memoizar shareUrl para evitar recálculos
   const shareUrl = useMemo(() =>
     typeof window !== 'undefined' && selectedList?.share_code
@@ -157,7 +172,7 @@ export default function SharedListsPage() {
         </section>
 
         {/* Banner para compartir */}
-        <section>
+        <section className="space-y-3">
           <Card
             variant="elevated"
             className="bg-gradient-to-r from-blue-500 to-blue-600 text-white cursor-pointer hover:scale-[1.02] transition-transform"
@@ -178,6 +193,23 @@ export default function SharedListsPage() {
                 </p>
               </div>
               <div className="text-white/80">→</div>
+            </div>
+          </Card>
+
+          {/* NUEVO: Tarjeta para unirse con código */}
+          <Card
+            variant="outlined"
+            className="hover:border-primary transition-colors cursor-pointer border-dashed"
+            onClick={() => setShowJoinModal(true)}
+          >
+            <div className="flex items-center gap-4 text-gray-500">
+              <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                <UserPlus className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-foreground">¿Tienes un código?</p>
+                <p className="text-sm">Únete manualmente a una lista</p>
+              </div>
             </div>
           </Card>
         </section>
@@ -260,6 +292,30 @@ export default function SharedListsPage() {
             <span>Código de lista: <strong>{selectedList?.share_code || 'Cargando...'}</strong></span>
           </div>
         </div>
+      </Modal>
+
+      {/* NUEVO: Modal Unirse con código */}
+      <Modal
+        isOpen={showJoinModal}
+        onClose={() => setShowJoinModal(false)}
+        title="Unirse a una lista"
+      >
+        <form onSubmit={handleJoinWithCode} className="space-y-4">
+          <div>
+            <p className="text-sm text-gray-500 mb-2">
+              Introduce el código que te han compartido (ej. a3f9-2b1c)
+            </p>
+            <Input
+              placeholder="Introduce el código aquí"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <Button className="w-full" type="submit" disabled={!joinCode.trim()}>
+            Unirse a la lista
+          </Button>
+        </form>
       </Modal>
     </div>
   )
