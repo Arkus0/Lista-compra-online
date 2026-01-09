@@ -652,7 +652,15 @@ export function ShoppingList({ list }: ShoppingListProps) {
         )}
       </div>
 
-      {/* Notas de la lista */}
+      {/* Favoritos */}
+      <FavoriteItems
+        favorites={favoriteItems}
+        isLoading={favoritesLoading}
+        onAddToList={handleAddFromFavorite}
+        onRemove={removeFavoriteItem}
+      />
+
+      {/* Notas de la lista - justo encima del formulario de añadir */}
       {user && (
         <ListNotes
           listId={list.id}
@@ -661,14 +669,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
           isCollaborative={collaborators.length > 0 || list.share_code !== null}
         />
       )}
-
-      {/* Favoritos */}
-      <FavoriteItems
-        favorites={favoriteItems}
-        isLoading={favoritesLoading}
-        onAddToList={handleAddFromFavorite}
-        onRemove={removeFavoriteItem}
-      />
 
       <AddItemForm onAdd={handleAddItem} />
 
