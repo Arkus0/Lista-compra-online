@@ -1,8 +1,14 @@
 'use client'
 
-import { Bell, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import Link from 'next/link'
 import ThemeToggle from '@/components/ui/ThemeToggle'
+import dynamic from 'next/dynamic'
+
+const NotificationButton = dynamic(
+  () => import('@/components/notifications/NotificationButton').then(mod => ({ default: mod.NotificationButton })),
+  { ssr: false }
+)
 
 interface HeaderProps {
   title?: string
@@ -24,10 +30,7 @@ export function Header({ title = 'ShoppyJuan', showSearch = false }: HeaderProps
               <Search className="w-5 h-5 text-muted" />
             </button>
           )}
-          <button className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors relative">
-            <Bell className="w-5 h-5 text-muted" />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full" />
-          </button>
+          <NotificationButton />
           <ThemeToggle />
         </div>
       </div>

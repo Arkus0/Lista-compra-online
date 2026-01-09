@@ -292,6 +292,35 @@ export interface Database {
           updated_at?: string
         }
       }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          list_id: string
+          type: 'item_added' | 'item_removed' | 'item_checked' | 'note_added' | 'collaborator_joined'
+          actor_id: string | null
+          actor_name: string
+          list_name: string
+          item_name: string | null
+          is_read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          list_id: string
+          type: 'item_added' | 'item_removed' | 'item_checked' | 'note_added' | 'collaborator_joined'
+          actor_id?: string | null
+          actor_name: string
+          list_name: string
+          item_name?: string | null
+          is_read?: boolean
+          created_at?: string
+        }
+        Update: {
+          is_read?: boolean
+        }
+      }
     }
     Functions: {
       join_list_by_code: {
@@ -320,6 +349,7 @@ export type UserFavoriteItem = Database['public']['Tables']['user_favorite_items
 export type UserFavoriteList = Database['public']['Tables']['user_favorite_lists']['Row']
 export type ListNote = Database['public']['Tables']['list_notes']['Row']
 export type NotificationPreferences = Database['public']['Tables']['notification_preferences']['Row']
+export type Notification = Database['public']['Tables']['notifications']['Row']
 
 // Tipos extendidos
 export type ShoppingListWithItems = ShoppingList & {
