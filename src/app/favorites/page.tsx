@@ -3,12 +3,11 @@
 import { Header } from '@/components/layout/Header'
 import { useFavorites } from '@/hooks/useFavorites'
 import { useUser } from '@/store/useStore'
-import { Star, Plus, Trash2, Loader2, ShoppingBag, Edit2, X } from 'lucide-react'
+import { Star, Plus, Trash2, Loader2, Edit2, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useState } from 'react'
-import Link from 'next/link'
 import { UserFavoriteItem } from '@/lib/supabase/types'
 import { CATEGORIES, CategoryId } from '@/lib/constants'
 
@@ -204,18 +203,10 @@ export default function FavoritesPage() {
             <p className="text-muted mb-6">
               Puedes añadir favoritos desde tus listas o crear uno nuevo aquí
             </p>
-            <div className="flex gap-3 justify-center">
-              <Button onClick={handleAdd} variant="primary">
-                <Plus className="w-4 h-4 mr-2" />
-                Crear favorito
-              </Button>
-              <Link href="/lists">
-                <Button variant="secondary">
-                  <ShoppingBag className="w-4 h-4 mr-2" />
-                  Ver mis listas
-                </Button>
-              </Link>
-            </div>
+            <Button onClick={handleAdd} variant="primary">
+              <Plus className="w-4 h-4 mr-2" />
+              Crear favorito
+            </Button>
           </Card>
         ) : (
           <>

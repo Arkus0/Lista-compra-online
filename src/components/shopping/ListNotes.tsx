@@ -316,20 +316,21 @@ function NoteCard({ note, isOwner, onTogglePin, onDelete }: NoteCardProps) {
 
         {/* Acciones */}
         <div className="flex items-center gap-1 shrink-0">
-          {note.is_pinned && (
-            <Pin className="w-3 h-3 text-amber-500" />
-          )}
-          {isOwner && (
+          {isOwner ? (
             <>
               <button
                 onClick={onTogglePin}
-                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                className={`p-1 rounded transition-colors ${
+                  note.is_pinned
+                    ? 'text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30'
+                    : 'text-muted hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
                 title={note.is_pinned ? 'Desfijar' : 'Fijar'}
               >
                 {note.is_pinned ? (
-                  <PinOff className="w-3.5 h-3.5 text-muted" />
+                  <PinOff className="w-3.5 h-3.5" />
                 ) : (
-                  <Pin className="w-3.5 h-3.5 text-muted" />
+                  <Pin className="w-3.5 h-3.5" />
                 )}
               </button>
               <button
@@ -340,7 +341,9 @@ function NoteCard({ note, isOwner, onTogglePin, onDelete }: NoteCardProps) {
                 <Trash2 className="w-3.5 h-3.5 text-red-500" />
               </button>
             </>
-          )}
+          ) : note.is_pinned ? (
+            <Pin className="w-3 h-3 text-amber-500" />
+          ) : null}
         </div>
       </div>
 
