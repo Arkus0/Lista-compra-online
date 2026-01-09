@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo, useCallback } from 'react'
 import { Check, Trash2, GripVertical, Minus, Plus } from 'lucide-react'
 import { ListItem } from '@/lib/supabase/types'
 
@@ -12,25 +12,40 @@ interface ShoppingItemProps {
   dragHandleProps?: any
 }
 
-export function ShoppingItem({ item, onToggle, onDelete, onUpdateQuantity, dragHandleProps }: ShoppingItemProps) {
+// Colores de categoría - extraído fuera del componente para evitar recreación
+const categoryColors: Record<string, string> = {
+  frutas: 'bg-green-100 text-green-700',
+  verduras: 'bg-emerald-100 text-emerald-700',
+  carnes: 'bg-red-100 text-red-700',
+  pescados: 'bg-blue-100 text-blue-700',
+  lacteos: 'bg-yellow-100 text-yellow-700',
+  panaderia: 'bg-amber-100 text-amber-700',
+  bebidas: 'bg-cyan-100 text-cyan-700',
+  limpieza: 'bg-purple-100 text-purple-700',
+  otros: 'bg-gray-100 text-gray-700',
+}
+
+function ShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuantity, dragHandleProps }: ShoppingItemProps) {
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     setIsDeleting(true)
     setTimeout(() => onDelete(item.id), 200)
-  }
+  }, [item.id, onDelete])
 
-  const categoryColors: Record<string, string> = {
-    frutas: 'bg-green-100 text-green-700',
-    verduras: 'bg-emerald-100 text-emerald-700',
-    carnes: 'bg-red-100 text-red-700',
-    pescados: 'bg-blue-100 text-blue-700',
-    lacteos: 'bg-yellow-100 text-yellow-700',
-    panaderia: 'bg-amber-100 text-amber-700',
-    bebidas: 'bg-cyan-100 text-cyan-700',
-    limpieza: 'bg-purple-100 text-purple-700',
-    otros: 'bg-gray-100 text-gray-700',
-  }
+  const handleToggle = useCallback(() => {
+    onToggle(item.id)
+  }, [item.id, onToggle])
+
+  const handleDecrement = useCallback(() => {
+    if (item.quantity > 1) {
+      onUpdateQuantity(item.id, item.quantity - 1)
+    }
+  }, [item.id, item.quantity, onUpdateQuantity])
+
+  const handleIncrement = useCallback(() => {
+    onUpdateQuantity(item.id, item.quantity + 1)
+  }, [item.id, item.quantity, onUpdateQuantity])
 
   const categoryColor = item.category
     ? categoryColors[item.category.toLowerCase()] || categoryColors.otros
@@ -52,7 +67,7 @@ export function ShoppingItem({ item, onToggle, onDelete, onUpdateQuantity, dragH
 
       {/* Checkbox */}
       <button
-        onClick={() => onToggle(item.id)}
+        onClick={handleToggle}
         className={`
           w-6 h-6 rounded-lg border-2 flex items-center justify-center
           transition-all duration-200 shrink-0
@@ -80,7 +95,7 @@ export function ShoppingItem({ item, onToggle, onDelete, onUpdateQuantity, dragH
       {/* Quantity controls */}
       <div className="flex items-center gap-1">
         <button
-          onClick={() => item.quantity > 1 && onUpdateQuantity(item.id, item.quantity - 1)}
+          onClick={handleDecrement}
           className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center
                      hover:bg-secondary/80 transition-colors disabled:opacity-50"
           disabled={item.quantity <= 1}
@@ -92,7 +107,7 @@ export function ShoppingItem({ item, onToggle, onDelete, onUpdateQuantity, dragH
           {item.unit && <span className="text-xs text-gray-400 ml-0.5">{item.unit}</span>}
         </span>
         <button
-          onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+          onClick={handleIncrement}
           className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center
                      hover:bg-secondary/80 transition-colors"
         >
@@ -111,3 +126,20 @@ export function ShoppingItem({ item, onToggle, onDelete, onUpdateQuantity, dragH
     </div>
   )
 }
+
+// Memoización con comparación profunda de props
+export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.name === nextProps.item.name &&
+    prevProps.item.checked === nextProps.item.checked &&
+    prevProps.item.quantity === nextProps.item.quantity &&
+    prevProps.item.category === nextProps.item.category &&
+    prevProps.item.unit === nextProps.item.unit &&
+    prevProps.onToggle === nextProps.onToggle &&
+    prevProps.onDelete === nextProps.onDelete &&
+    prevProps.onUpdateQuantity === nextProps.onUpdateQuantity
+  )
+})
+
+ShoppingItem.displayName = 'ShoppingItem'

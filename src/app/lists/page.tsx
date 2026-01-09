@@ -1,33 +1,35 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Plus, ShoppingBag, Users } from 'lucide-react'
 import Link from 'next/link'
-import { ListMenuButton } from '@/components/shopping/ListMenuButton' // <--- Importamos el componente potente
+import { ListMenuButton } from '@/components/shopping/ListMenuButton'
 
 export default async function ListsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+
+  // El middleware ya verificó la autenticación
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
 
   if (!user) {
-    redirect('/auth')
+    return null
   }
 
-  // Obtener todas las listas del usuario (propias)
-  const { data: ownLists } = await supabase
-    .from('shopping_lists')
-    .select('*, list_items(count)')
-    .eq('owner_id', user.id)
-    .order('updated_at', { ascending: false })
-
-  // Obtener listas compartidas
-  const { data: sharedLists } = await supabase
-    .from('list_collaborators')
-    .select('shopping_lists(*, list_items(count))')
-    .eq('user_id', user.id)
+  // Ejecutar queries en PARALELO
+  const [ownListsResult, sharedListsResult] = await Promise.all([
+    supabase
+      .from('shopping_lists')
+      .select('id, name, updated_at, list_items(count)')
+      .eq('owner_id', user.id)
+      .order('updated_at', { ascending: false }),
+    supabase
+      .from('list_collaborators')
+      .select('shopping_lists(id, name, updated_at, list_items(count))')
+      .eq('user_id', user.id)
+  ])
 
   interface SharedList {
     id: string
@@ -35,7 +37,9 @@ export default async function ListsPage() {
     updated_at: string
     list_items: { count: number }[]
   }
-  const allSharedLists = (sharedLists?.map(s => s.shopping_lists).filter(Boolean) || []) as unknown as SharedList[]
+
+  const ownLists = ownListsResult.data || []
+  const allSharedLists = (sharedListsResult.data?.map(s => s.shopping_lists).filter(Boolean) || []) as unknown as SharedList[]
 
   return (
     <div className="min-h-screen pb-20">
@@ -43,7 +47,7 @@ export default async function ListsPage() {
 
       <main className="p-4 space-y-6">
         {/* Botón Crear nueva lista */}
-        <Link href="/lists/new">
+        <Link href="/lists/new" prefetch={true}>
           <Button className="w-full" size="lg">
             <Plus className="w-5 h-5" />
             Nueva lista
@@ -53,19 +57,16 @@ export default async function ListsPage() {
         {/* Sección: Mis listas (Propias) */}
         <section>
           <h3 className="font-semibold text-lg mb-3">Mis listas</h3>
-          {ownLists && ownLists.length > 0 ? (
+          {ownLists.length > 0 ? (
             <div className="space-y-3">
               {ownLists.map((list) => (
-                <Link key={list.id} href={`/lists/${list.id}`}>
-                  <Card
-                    variant="outlined"
-                    className="hover:border-primary transition-colors cursor-pointer"
-                  >
+                <Link key={list.id} href={`/lists/${list.id}`} prefetch={true}>
+                  <Card variant="outlined" className="hover:border-primary transition-colors cursor-pointer">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
                         <ShoppingBag className="w-6 h-6 text-primary" />
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{list.name}</p>
                         <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -75,10 +76,7 @@ export default async function ListsPage() {
                         </div>
                       </div>
 
-                      {/* AQUÍ ESTÁ EL CAMBIO PRINCIPAL */}
-                      {/* Pasamos ID y Nombre para que funcionen los modales de editar/borrar */}
                       <ListMenuButton listId={list.id} listName={list.name} />
-                      
                     </div>
                   </Card>
                 </Link>
@@ -100,11 +98,8 @@ export default async function ListsPage() {
             </h3>
             <div className="space-y-3">
               {allSharedLists.map((list) => (
-                <Link key={list.id} href={`/lists/${list.id}`}>
-                  <Card
-                    variant="outlined"
-                    className="hover:border-primary transition-colors cursor-pointer"
-                  >
+                <Link key={list.id} href={`/lists/${list.id}`} prefetch={true}>
+                  <Card variant="outlined" className="hover:border-primary transition-colors cursor-pointer">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
                         <Users className="w-6 h-6 text-blue-500" />
@@ -117,8 +112,6 @@ export default async function ListsPage() {
                           <span>Compartida</span>
                         </div>
                       </div>
-                      {/* Nota: En listas compartidas normalmente no mostramos el menú de borrar/editar 
-                          a menos que seamos dueños, por eso aquí no pongo el ListMenuButton */}
                     </div>
                   </Card>
                 </Link>

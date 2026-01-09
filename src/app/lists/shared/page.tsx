@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { ListCardSkeleton } from '@/components/ui/Skeleton'
 import { Users, ShoppingBag, Share2, Check, Link as LinkIcon, QrCode } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -31,10 +32,15 @@ export default function SharedListsPage() {
   const [showShareModal, setShowShareModal] = useState(false)
   const [selectedList, setSelectedList] = useState<OwnList | null>(null)
   const [isCopied, setIsCopied] = useState(false)
+
   const router = useRouter()
-  const supabase = createClient()
+  // Usar ref para evitar recreación del cliente
+  const supabaseRef = useRef(createClient())
+  const supabase = supabaseRef.current
 
   useEffect(() => {
+    let isMounted = true
+
     const loadData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -42,52 +48,61 @@ export default function SharedListsPage() {
         return
       }
 
-      // Obtener listas compartidas
-      const { data: sharedData } = await supabase
-        .from('list_collaborators')
-        .select('shopping_lists(*, list_items(count))')
-        .eq('user_id', user.id)
+      // Cargar ambas queries en paralelo para mayor velocidad
+      const [sharedResult, ownResult] = await Promise.all([
+        supabase
+          .from('list_collaborators')
+          .select('shopping_lists(*, list_items(count))')
+          .eq('user_id', user.id),
+        supabase
+          .from('shopping_lists')
+          .select('id, name, share_code')
+          .eq('owner_id', user.id)
+          .order('updated_at', { ascending: false })
+      ])
 
-      const allSharedLists = (sharedData?.map((s: any) => s.shopping_lists).filter(Boolean) || []) as SharedList[]
-      setSharedLists(allSharedLists)
-
-      // Obtener listas propias para compartir
-      const { data: ownData } = await supabase
-        .from('shopping_lists')
-        .select('id, name, share_code')
-        .eq('owner_id', user.id)
-        .order('updated_at', { ascending: false })
-
-      setOwnLists(ownData || [])
-      setIsLoading(false)
+      if (isMounted) {
+        const allSharedLists = (sharedResult.data?.map((s: any) => s.shopping_lists).filter(Boolean) || []) as SharedList[]
+        setSharedLists(allSharedLists)
+        setOwnLists(ownResult.data || [])
+        setIsLoading(false)
+      }
     }
 
     loadData()
+
+    return () => { isMounted = false }
   }, [supabase, router])
 
-  const handleSelectListToShare = (list: OwnList) => {
+  const handleSelectListToShare = useCallback((list: OwnList) => {
     setSelectedList(list)
-  }
+  }, [])
 
-  const handleCopyLink = () => {
+  const handleCopyLink = useCallback(() => {
     if (!selectedList?.share_code) return
     const url = `${window.location.origin}/join/${selectedList.share_code}`
     navigator.clipboard.writeText(url)
     setIsCopied(true)
     setTimeout(() => setIsCopied(false), 2000)
-  }
+  }, [selectedList?.share_code])
 
-  const shareUrl = typeof window !== 'undefined' && selectedList?.share_code
-    ? `${window.location.origin}/join/${selectedList.share_code}`
-    : ''
+  const closeModal = useCallback(() => {
+    setSelectedList(null)
+    setShowShareModal(false)
+    setIsCopied(false)
+  }, [])
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  const openShareModal = useCallback(() => {
+    setShowShareModal(true)
+  }, [])
+
+  // Memoizar shareUrl para evitar recálculos
+  const shareUrl = useMemo(() =>
+    typeof window !== 'undefined' && selectedList?.share_code
+      ? `${window.location.origin}/join/${selectedList.share_code}`
+      : '',
+    [selectedList?.share_code]
+  )
 
   return (
     <div className="min-h-screen pb-20">
@@ -101,7 +116,12 @@ export default function SharedListsPage() {
             Compartidas conmigo
           </h3>
 
-          {sharedLists.length > 0 ? (
+          {isLoading ? (
+            <div className="space-y-3">
+              <ListCardSkeleton />
+              <ListCardSkeleton />
+            </div>
+          ) : sharedLists.length > 0 ? (
             <div className="space-y-3">
               {sharedLists.map((list) => (
                 <Link key={list.id} href={`/lists/${list.id}`}>
@@ -141,7 +161,7 @@ export default function SharedListsPage() {
           <Card
             variant="elevated"
             className="bg-gradient-to-r from-blue-500 to-blue-600 text-white cursor-pointer hover:scale-[1.02] transition-transform"
-            onClick={() => setShowShareModal(true)}
+            onClick={openShareModal}
           >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -172,7 +192,12 @@ export default function SharedListsPage() {
         title="Selecciona la lista a compartir"
       >
         <div className="space-y-3">
-          {ownLists.length > 0 ? (
+          {isLoading ? (
+            <>
+              <ListCardSkeleton />
+              <ListCardSkeleton />
+            </>
+          ) : ownLists.length > 0 ? (
             ownLists.map((list) => (
               <Card
                 key={list.id}
@@ -205,20 +230,17 @@ export default function SharedListsPage() {
       {/* Modal: Mostrar QR y código para compartir */}
       <Modal
         isOpen={!!selectedList}
-        onClose={() => {
-          setSelectedList(null)
-          setShowShareModal(false)
-          setIsCopied(false)
-        }}
+        onClose={closeModal}
         title={`Compartir: ${selectedList?.name}`}
       >
         <div className="space-y-6 flex flex-col items-center">
           <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-200">
             {shareUrl && (
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${shareUrl}`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shareUrl)}`}
                 alt="QR Code"
                 className="w-40 h-40 mix-blend-multiply"
+                loading="lazy"
               />
             )}
           </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { Plus, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { CATEGORIES, detectCategory, CategoryId } from '@/lib/constants'
@@ -9,60 +9,103 @@ interface AddItemFormProps {
   onAdd: (name: string, category: string) => void | Promise<void>
 }
 
-export function AddItemForm({ onAdd }: AddItemFormProps) {
+// Hook personalizado para debounce
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+
+function AddItemFormComponent({ onAdd }: AddItemFormProps) {
   const [name, setName] = useState('')
-  // Por defecto 'other' en lugar de string vacío
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('other')
   const [showCategories, setShowCategories] = useState(false)
+  const [manuallySelected, setManuallySelected] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
 
-  // 1. Efecto: Autodetección de categoría al escribir
+  // Debounce del nombre para detección de categoría (300ms)
+  const debouncedName = useDebounce(name, 300)
+
+  // Autodetección de categoría con debounce
   useEffect(() => {
-    // Solo autodetectar si el usuario no ha abierto el menú manualmente para forzar una categoría
-    if (!showCategories && name.trim().length > 2) {
-      const detected = detectCategory(name)
-      // Si encontramos una categoría específica (que no sea 'other'), la seleccionamos
+    // Solo autodetectar si no se ha seleccionado manualmente y hay texto suficiente
+    if (!manuallySelected && debouncedName.trim().length > 2) {
+      const detected = detectCategory(debouncedName)
       if (detected !== 'other') {
         setSelectedCategory(detected)
       }
     }
-  }, [name, showCategories])
+  }, [debouncedName, manuallySelected])
 
-  // 2. Efecto: Cerrar menú al hacer click fuera
+  // Cerrar menú al hacer click fuera
   useEffect(() => {
+    if (!showCategories) return
+
     const handleClickOutside = (e: MouseEvent) => {
-      if (showCategories && formRef.current && !formRef.current.contains(e.target as Node)) {
+      if (formRef.current && !formRef.current.contains(e.target as Node)) {
         setShowCategories(false)
       }
     }
+
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
   }, [showCategories])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     if (name.trim()) {
       onAdd(name.trim(), selectedCategory)
-      
+
       // Resetear estados
       setName('')
       setSelectedCategory('other')
       setShowCategories(false)
-      
+      setManuallySelected(false)
+
       // Mantener foco para añadir productos rápido
       inputRef.current?.focus()
     }
-  }
+  }, [name, selectedCategory, onAdd])
+
+  const handleCategorySelect = useCallback((categoryId: CategoryId) => {
+    setSelectedCategory(categoryId)
+    setShowCategories(false)
+    setManuallySelected(true)
+    inputRef.current?.focus()
+  }, [])
+
+  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value)
+    // Si el usuario borra todo, resetear la selección manual
+    if (e.target.value.trim() === '') {
+      setManuallySelected(false)
+      setSelectedCategory('other')
+    }
+  }, [])
+
+  const toggleCategories = useCallback(() => {
+    setShowCategories(prev => !prev)
+  }, [])
 
   // Obtener la configuración visual de la categoría actual
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
   return (
     <div className="sticky bottom-0 bg-background border-t border-gray-100 z-30 pb-safe">
-      <form 
+      <form
         ref={formRef}
-        onSubmit={handleSubmit} 
+        onSubmit={handleSubmit}
         className="p-4 max-w-md mx-auto relative"
       >
         {/* Selector de Categorías (Pop-up) */}
@@ -72,15 +115,11 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
               <button
                 key={cat.id}
                 type="button"
-                onClick={() => {
-                  setSelectedCategory(cat.id)
-                  setShowCategories(false)
-                  inputRef.current?.focus()
-                }}
+                onClick={() => handleCategorySelect(cat.id)}
                 className={`
                   flex flex-col items-center justify-center p-2 rounded-lg transition-all
-                  ${selectedCategory === cat.id 
-                    ? 'bg-primary/10 text-primary ring-2 ring-primary/20 scale-105' 
+                  ${selectedCategory === cat.id
+                    ? 'bg-primary/10 text-primary ring-2 ring-primary/20 scale-105'
                     : 'hover:bg-gray-50 text-gray-500'
                   }
                 `}
@@ -98,15 +137,15 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
           {/* Botón Trigger de Categoría */}
           <button
             type="button"
-            onClick={() => setShowCategories(!showCategories)}
+            onClick={toggleCategories}
             className={`
               flex-shrink-0 w-12 h-12 rounded-xl border flex items-center justify-center transition-all duration-300 relative
               ${showCategories ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200 hover:border-primary/50'}
-              ${CurrentCategoryConfig.color} /* Aplica el color de fondo/texto definido en constants */
+              ${CurrentCategoryConfig.color}
             `}
           >
             <CurrentCategoryConfig.icon className="w-6 h-6" />
-            
+
             {/* Indicador pequeño de que es un menú */}
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full shadow border border-gray-100 flex items-center justify-center">
               <ChevronUp className="w-2.5 h-2.5 text-gray-400" />
@@ -119,7 +158,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
               ref={inputRef}
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={handleNameChange}
               placeholder="Añadir producto..."
               className="w-full h-12 rounded-xl bg-secondary pl-4 pr-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-gray-400"
               autoComplete="off"
@@ -127,8 +166,8 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
           </div>
 
           {/* Botón Submit */}
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={!name.trim()}
             className="w-12 h-12 rounded-xl p-0 flex items-center justify-center shrink-0"
           >
@@ -139,3 +178,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
     </div>
   )
 }
+
+// Memoizar el componente
+export const AddItemForm = memo(AddItemFormComponent)
+AddItemForm.displayName = 'AddItemForm'

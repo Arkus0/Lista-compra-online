@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ShoppingBag, Users, Share2, MoreVertical,
@@ -13,7 +13,11 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { ListItem, ShoppingList as ShoppingListType } from '@/lib/supabase/types'
 import { createClient } from '@/lib/supabase/client'
-import { useStore } from '@/store/useStore'
+import {
+  useItems,
+  useItemsActions,
+  useUser,
+} from '@/store/useStore'
 import {
   DndContext,
   closestCenter,
@@ -44,22 +48,53 @@ interface Collaborator {
   }
 }
 
+// Skeleton loader para items
+const ItemSkeleton = () => (
+  <div className="flex items-center gap-3 p-3 bg-background rounded-xl border border-gray-100 animate-pulse">
+    <div className="w-5 h-5 bg-gray-200 rounded" />
+    <div className="w-6 h-6 bg-gray-200 rounded-lg" />
+    <div className="flex-1 space-y-2">
+      <div className="h-4 bg-gray-200 rounded w-3/4" />
+      <div className="h-3 bg-gray-200 rounded w-1/4" />
+    </div>
+    <div className="flex gap-1">
+      <div className="w-7 h-7 bg-gray-200 rounded-lg" />
+      <div className="w-8 h-7 bg-gray-200 rounded" />
+      <div className="w-7 h-7 bg-gray-200 rounded-lg" />
+    </div>
+  </div>
+)
+
 export function ShoppingList({ list }: ShoppingListProps) {
-  const { items, setItems, addItem, updateItem, removeItem, toggleItemChecked, user } = useStore()
+  // Usar selectores optimizados del store
+  const items = useItems()
+  const { setItems, addItem, updateItem, removeItem, toggleItemChecked, updateItemsPositions } = useItemsActions()
+  const user = useUser()
+
   const [isLoading, setIsLoading] = useState(true)
   const [activeModal, setActiveModal] = useState<'share' | 'collaborators' | 'edit' | 'delete' | null>(null)
   const [showMenu, setShowMenu] = useState(false)
-  
+
   // Estados para funcionalidades especificas
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
+  const [collaboratorsLoaded, setCollaboratorsLoaded] = useState(false) // Cache flag
   const [newName, setNewName] = useState(list.name)
   const [isCopied, setIsCopied] = useState(false)
   const [isDuplicating, setIsDuplicating] = useState(false)
 
-  const supabase = createClient()
+  // Ref para el cliente de supabase - evita recreación
+  const supabaseRef = useRef(createClient())
+  const supabase = supabaseRef.current
+
   const router = useRouter()
 
-  // Configure drag and drop sensors
+  // QR URL memoizada - solo se recalcula si cambia share_code
+  const shareUrl = useMemo(() =>
+    typeof window !== 'undefined' ? `${window.location.origin}/join/${list.share_code}` : '',
+    [list.share_code]
+  )
+
+  // Configure drag and drop sensors - memoizado
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -71,115 +106,165 @@ export function ShoppingList({ list }: ShoppingListProps) {
     })
   )
 
+  // Items separados - memoizados
+  const uncheckedItems = useMemo(() =>
+    items.filter((item) => !item.checked),
+    [items]
+  )
+
+  const checkedItems = useMemo(() =>
+    items.filter((item) => item.checked),
+    [items]
+  )
+
+  // Progress memoizado
+  const progress = useMemo(() =>
+    items.length > 0 ? (checkedItems.length / items.length) * 100 : 0,
+    [items.length, checkedItems.length]
+  )
+
   // Cargar items iniciales
   useEffect(() => {
+    let isMounted = true
+
     const loadItems = async () => {
       const { data, error } = await supabase
         .from('list_items')
         .select('*')
         .eq('list_id', list.id)
+        .order('position', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true })
 
-      if (!error && data) {
-        // Sort by position if it exists, otherwise keep order by created_at
-        const sortedData = data.sort((a, b) => {
-          if (a.position !== undefined && b.position !== undefined) {
-            return a.position - b.position
-          }
-          return 0
-        })
-        setItems(sortedData)
+      if (!error && data && isMounted) {
+        setItems(data)
       }
-      setIsLoading(false)
+      if (isMounted) {
+        setIsLoading(false)
+      }
     }
 
     loadItems()
+
+    return () => { isMounted = false }
   }, [list.id, setItems, supabase])
 
-  // Cargar colaboradores cuando se abre el modal
+  // Cargar colaboradores - con caché
   useEffect(() => {
-    if (activeModal === 'collaborators') {
+    if (activeModal === 'collaborators' && !collaboratorsLoaded) {
       const loadCollaborators = async () => {
         const { data } = await supabase
           .from('list_collaborators')
           .select('role, profiles(email, name, avatar_url)')
           .eq('list_id', list.id)
-        
+
         if (data) {
           setCollaborators(data as unknown as Collaborator[])
+          setCollaboratorsLoaded(true)
         }
       }
       loadCollaborators()
     }
-  }, [activeModal, list.id, supabase])
+  }, [activeModal, list.id, supabase, collaboratorsLoaded])
 
-  // Suscripción en tiempo real
+  // Suscripción en tiempo real - con cleanup correcto
   useEffect(() => {
     const channel = supabase
       .channel(`list-${list.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'list_items', filter: `list_id=eq.${list.id}` },
-        (payload) => {
-          if (payload.eventType === 'INSERT') addItem(payload.new as ListItem)
-          else if (payload.eventType === 'UPDATE') updateItem(payload.new.id, payload.new as Partial<ListItem>)
-          else if (payload.eventType === 'DELETE') removeItem(payload.old.id)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'list_items',
+        filter: `list_id=eq.${list.id}`
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          addItem(payload.new as ListItem)
+        } else if (payload.eventType === 'UPDATE') {
+          updateItem(payload.new.id, payload.new as Partial<ListItem>)
+        } else if (payload.eventType === 'DELETE') {
+          removeItem(payload.old.id)
         }
-      )
+      })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      channel.unsubscribe()
+      supabase.removeChannel(channel)
+    }
   }, [list.id, supabase, addItem, updateItem, removeItem])
 
-  // --- Handlers de Items ---
+  // --- Handlers de Items - memoizados ---
 
-  const handleAddItem = async (name: string, category?: string) => {
+  const handleAddItem = useCallback(async (name: string, category?: string) => {
     if (!user) return
-    // Get max position to add new item at the end (if position field exists)
-    const maxPosition = items.length > 0 ? Math.max(...items.map(i => i.position || 0)) : -1
 
-    const itemData: any = {
+    const maxPosition = items.length > 0
+      ? Math.max(...items.map(i => i.position ?? 0))
+      : -1
+
+    const itemData = {
       list_id: list.id,
       name,
       category,
       added_by: user.id,
-    }
-
-    // Only add position if the field exists in the first item
-    if (items.length === 0 || items[0].position !== undefined) {
-      itemData.position = maxPosition + 1
+      position: maxPosition + 1
     }
 
     const { error } = await supabase.from('list_items').insert(itemData)
     if (error) console.error('Error adding item:', error)
-  }
+  }, [user, items, list.id, supabase])
 
-  const handleToggleItem = async (id: string) => {
+  const handleToggleItem = useCallback(async (id: string) => {
     const item = items.find((i) => i.id === id)
     if (!item) return
+
+    // Optimistic update
     toggleItemChecked(id)
-    const { error } = await supabase.from('list_items').update({ checked: !item.checked }).eq('id', id)
-    if (error) toggleItemChecked(id)
-  }
 
-  const handleDeleteItem = async (id: string) => {
+    const { error } = await supabase
+      .from('list_items')
+      .update({ checked: !item.checked })
+      .eq('id', id)
+
+    // Rollback on error
+    if (error) toggleItemChecked(id)
+  }, [items, toggleItemChecked, supabase])
+
+  const handleDeleteItem = useCallback(async (id: string) => {
     const item = items.find((i) => i.id === id)
     if (!item) return
+
+    // Optimistic update
     removeItem(id)
-    const { error } = await supabase.from('list_items').delete().eq('id', id)
+
+    const { error } = await supabase
+      .from('list_items')
+      .delete()
+      .eq('id', id)
+
+    // Rollback on error
     if (error) addItem(item)
-  }
+  }, [items, removeItem, addItem, supabase])
 
-  const handleUpdateQuantity = async (id: string, quantity: number) => {
+  const handleUpdateQuantity = useCallback(async (id: string, quantity: number) => {
+    const item = items.find((i) => i.id === id)
+    if (!item) return
+
+    const oldQuantity = item.quantity
+
+    // Optimistic update
     updateItem(id, { quantity })
-    const { error } = await supabase.from('list_items').update({ quantity }).eq('id', id)
-    if (error) {
-      const item = items.find((i) => i.id === id)
-      if (item) updateItem(id, { quantity: item.quantity })
-    }
-  }
 
-  // --- Drag and Drop ---
+    const { error } = await supabase
+      .from('list_items')
+      .update({ quantity })
+      .eq('id', id)
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+    // Rollback on error
+    if (error) updateItem(id, { quantity: oldQuantity })
+  }, [items, updateItem, supabase])
+
+  // --- Drag and Drop - OPTIMIZADO con batch updates ---
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event
 
     if (!over || active.id === over.id) return
@@ -192,99 +277,136 @@ export function ShoppingList({ list }: ShoppingListProps) {
     // Reorder items locally
     const reorderedUnchecked = arrayMove(uncheckedItems, oldIndex, newIndex)
 
-    // Merge with checked items
+    // Merge with checked items and update state
     const allItems = [...reorderedUnchecked, ...checkedItems]
     setItems(allItems)
 
-    // Only update positions if position field exists
-    if (uncheckedItems[0]?.position !== undefined) {
-      // Update positions in database
-      const updates = reorderedUnchecked.map((item, index) => ({
-        id: item.id,
-        position: index,
-      }))
+    // Preparar updates con nuevas posiciones
+    const updates = reorderedUnchecked.map((item, index) => ({
+      id: item.id,
+      position: index,
+    }))
 
-      // Update all positions in batch
-      for (const update of updates) {
-        await supabase
-          .from('list_items')
-          .update({ position: update.position })
-          .eq('id', update.id)
-      }
+    // Update state batch
+    updateItemsPositions(updates)
+
+    // BATCH UPDATE en BD - todas las actualizaciones en paralelo
+    try {
+      await Promise.all(
+        updates.map(update =>
+          supabase
+            .from('list_items')
+            .update({ position: update.position })
+            .eq('id', update.id)
+        )
+      )
+    } catch (error) {
+      console.error('Error updating positions:', error)
+      // En caso de error, recargar items desde BD
+      const { data } = await supabase
+        .from('list_items')
+        .select('*')
+        .eq('list_id', list.id)
+        .order('position', { ascending: true })
+
+      if (data) setItems(data)
     }
-  }
+  }, [uncheckedItems, checkedItems, setItems, updateItemsPositions, supabase, list.id])
 
-  // --- Funcionalidades Nuevas ---
+  // --- Funcionalidades Modales - memoizadas ---
 
-  const handleCopyLink = () => {
-    const url = `${window.location.origin}/join/${list.share_code}`
-    navigator.clipboard.writeText(url)
+  const handleCopyLink = useCallback(() => {
+    navigator.clipboard.writeText(shareUrl)
     setIsCopied(true)
     setTimeout(() => setIsCopied(false), 2000)
-  }
+  }, [shareUrl])
 
-  const handleUpdateName = async () => {
+  const handleUpdateName = useCallback(async () => {
     if (!newName.trim() || newName === list.name) return
-    const { error } = await supabase.from('shopping_lists').update({ name: newName }).eq('id', list.id)
+
+    const { error } = await supabase
+      .from('shopping_lists')
+      .update({ name: newName })
+      .eq('id', list.id)
+
     if (!error) {
       router.refresh()
       setActiveModal(null)
     }
-  }
+  }, [newName, list.name, list.id, supabase, router])
 
-  const handleDeleteList = async () => {
-    const { error } = await supabase.from('shopping_lists').delete().eq('id', list.id)
+  const handleDeleteList = useCallback(async () => {
+    const { error } = await supabase
+      .from('shopping_lists')
+      .delete()
+      .eq('id', list.id)
+
     if (!error) {
       router.push('/lists')
       router.refresh()
     }
-  }
+  }, [list.id, supabase, router])
 
-  const handleDuplicateList = async () => {
+  const handleDuplicateList = useCallback(async () => {
     if (!user) return
     setIsDuplicating(true)
-    
-    // 1. Crear nueva lista
-    const { data: newList, error: listError } = await supabase
-      .from('shopping_lists')
-      .insert({
-        name: `${list.name} (Copia)`,
-        owner_id: user.id,
-        share_code: Math.random().toString(36).substring(2, 8).toUpperCase()
-      })
-      .select()
-      .single()
 
-    if (listError || !newList) {
+    try {
+      // 1. Crear nueva lista
+      const { data: newList, error: listError } = await supabase
+        .from('shopping_lists')
+        .insert({
+          name: `${list.name} (Copia)`,
+          owner_id: user.id,
+          share_code: Math.random().toString(36).substring(2, 8).toUpperCase()
+        })
+        .select()
+        .single()
+
+      if (listError || !newList) {
+        throw listError
+      }
+
+      // 2. Copiar items en batch
+      if (items.length > 0) {
+        const itemsToInsert = items.map((item, index) => ({
+          list_id: newList.id,
+          name: item.name,
+          category: item.category,
+          quantity: item.quantity,
+          unit: item.unit,
+          checked: false,
+          added_by: user.id,
+          position: index
+        }))
+
+        await supabase.from('list_items').insert(itemsToInsert)
+      }
+
+      setShowMenu(false)
+      router.push(`/lists/${newList.id}`)
+    } catch (error) {
+      console.error('Error duplicating list:', error)
+    } finally {
       setIsDuplicating(false)
-      return
     }
+  }, [user, list.name, items, supabase, router])
 
-    // 2. Copiar items
-    if (items.length > 0) {
-      const itemsToInsert = items.map(item => ({
-        list_id: newList.id,
-        name: item.name,
-        category: item.category,
-        quantity: item.quantity,
-        unit: item.unit,
-        checked: false, // Empezar desmarcados
-        added_by: user.id
-      }))
+  const closeMenu = useCallback(() => setShowMenu(false), [])
+  const openShareModal = useCallback(() => setActiveModal('share'), [])
+  const openCollaboratorsModal = useCallback(() => setActiveModal('collaborators'), [])
+  const closeModal = useCallback(() => setActiveModal(null), [])
+  const toggleMenu = useCallback(() => setShowMenu(prev => !prev), [])
 
-      await supabase.from('list_items').insert(itemsToInsert)
-    }
-
-    setIsDuplicating(false)
+  const openEditModal = useCallback(() => {
+    setActiveModal('edit')
     setShowMenu(false)
-    router.push(`/lists/${newList.id}`)
-  }
+  }, [])
 
-  // UI Calculations
-  const uncheckedItems = items.filter((item) => !item.checked)
-  const checkedItems = items.filter((item) => item.checked)
-  const progress = items.length > 0 ? (checkedItems.length / items.length) * 100 : 0
-  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/join/${list.share_code}` : ''
+  const openDeleteModal = useCallback(() => {
+    setActiveModal('delete')
+    setShowMenu(false)
+  }, [])
 
   return (
     <div className="flex flex-col h-full relative">
@@ -300,22 +422,22 @@ export function ShoppingList({ list }: ShoppingListProps) {
               <p className="text-sm text-gray-500">{items.length} productos</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 relative">
-            <button 
-              onClick={() => setActiveModal('collaborators')}
+            <button
+              onClick={openCollaboratorsModal}
               className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors"
             >
               <Users className="w-5 h-5 text-gray-500" />
             </button>
-            <button 
-              onClick={() => setActiveModal('share')}
+            <button
+              onClick={openShareModal}
               className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors"
             >
               <Share2 className="w-5 h-5 text-gray-500" />
             </button>
-            <button 
-              onClick={() => setShowMenu(!showMenu)}
+            <button
+              onClick={toggleMenu}
               className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors"
             >
               <MoreVertical className="w-5 h-5 text-gray-500" />
@@ -324,24 +446,24 @@ export function ShoppingList({ list }: ShoppingListProps) {
             {/* Menú Desplegable */}
             {showMenu && (
               <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
+                <div className="fixed inset-0 z-10" onClick={closeMenu} />
                 <div className="absolute top-12 right-0 w-48 bg-white border border-gray-100 rounded-xl shadow-xl z-20 py-2 animate-in fade-in zoom-in-95 duration-100">
-                  <button 
-                    onClick={() => { setActiveModal('edit'); setShowMenu(false) }}
+                  <button
+                    onClick={openEditModal}
                     className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
                   >
                     <Edit2 className="w-4 h-4" /> Editar nombre
                   </button>
-                  <button 
+                  <button
                     onClick={handleDuplicateList}
                     disabled={isDuplicating}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
                   >
                     <Copy className="w-4 h-4" /> {isDuplicating ? 'Duplicando...' : 'Duplicar lista'}
                   </button>
                   <div className="h-px bg-gray-100 my-1" />
-                  <button 
-                    onClick={() => { setActiveModal('delete'); setShowMenu(false) }}
+                  <button
+                    onClick={openDeleteModal}
                     className="w-full px-4 py-2 text-left text-sm text-danger hover:bg-red-50 flex items-center gap-2"
                   >
                     <Trash2 className="w-4 h-4" /> Eliminar lista
@@ -354,7 +476,10 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
         {/* Progress bar */}
         <div className="h-2 bg-secondary rounded-full overflow-hidden">
-          <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
+          <div
+            className="h-full bg-primary transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
         </div>
         <p className="text-xs text-gray-500 mt-1">
           {checkedItems.length} de {items.length} completados
@@ -364,8 +489,10 @@ export function ShoppingList({ list }: ShoppingListProps) {
       {/* Items List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {isLoading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="space-y-2">
+            <ItemSkeleton />
+            <ItemSkeleton />
+            <ItemSkeleton />
           </div>
         ) : (
           <>
@@ -388,7 +515,13 @@ export function ShoppingList({ list }: ShoppingListProps) {
                 <p className="text-sm font-medium text-gray-400 mb-2">Completados ({checkedItems.length})</p>
                 <div className="space-y-2 opacity-60">
                   {checkedItems.map((item) => (
-                    <ShoppingItem key={item.id} item={item} onToggle={handleToggleItem} onDelete={handleDeleteItem} onUpdateQuantity={handleUpdateQuantity} />
+                    <ShoppingItem
+                      key={item.id}
+                      item={item}
+                      onToggle={handleToggleItem}
+                      onDelete={handleDeleteItem}
+                      onUpdateQuantity={handleUpdateQuantity}
+                    />
                   ))}
                 </div>
               </div>
@@ -411,14 +544,14 @@ export function ShoppingList({ list }: ShoppingListProps) {
       {/* --- MODALES --- */}
 
       {/* Modal Compartir */}
-      <Modal isOpen={activeModal === 'share'} onClose={() => setActiveModal(null)} title="Compartir lista">
+      <Modal isOpen={activeModal === 'share'} onClose={closeModal} title="Compartir lista">
         <div className="space-y-6 flex flex-col items-center">
           <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-200">
-             {/* QR Placeholder: Usando una API pública simple para no instalar librerías extra por ahora */}
-            <img 
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${shareUrl}`} 
-              alt="QR Code" 
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shareUrl)}`}
+              alt="QR Code"
               className="w-40 h-40 mix-blend-multiply"
+              loading="lazy"
             />
           </div>
           <div className="w-full space-y-2">
@@ -440,12 +573,12 @@ export function ShoppingList({ list }: ShoppingListProps) {
       </Modal>
 
       {/* Modal Colaboradores */}
-      <Modal isOpen={activeModal === 'collaborators'} onClose={() => setActiveModal(null)} title="Colaboradores">
+      <Modal isOpen={activeModal === 'collaborators'} onClose={closeModal} title="Colaboradores">
         <div className="space-y-4">
           <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                {user?.name?.[0].toUpperCase()}
+                {user?.name?.[0]?.toUpperCase() ?? '?'}
               </div>
               <div>
                 <p className="font-medium">Tú</p>
@@ -460,7 +593,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
               <div key={idx} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold">
-                    {collab.profiles.name?.[0].toUpperCase() || '?'}
+                    {collab.profiles.name?.[0]?.toUpperCase() ?? '?'}
                   </div>
                   <div>
                     <p className="font-medium">{collab.profiles.name || 'Usuario'}</p>
@@ -477,22 +610,22 @@ export function ShoppingList({ list }: ShoppingListProps) {
       </Modal>
 
       {/* Modal Editar */}
-      <Modal isOpen={activeModal === 'edit'} onClose={() => setActiveModal(null)} title="Editar lista">
+      <Modal isOpen={activeModal === 'edit'} onClose={closeModal} title="Editar lista">
         <div className="space-y-4">
-          <Input 
+          <Input
             label="Nombre de la lista"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
           />
           <div className="flex gap-3 justify-end mt-4">
-            <Button variant="ghost" onClick={() => setActiveModal(null)}>Cancelar</Button>
+            <Button variant="ghost" onClick={closeModal}>Cancelar</Button>
             <Button onClick={handleUpdateName}>Guardar</Button>
           </div>
         </div>
       </Modal>
 
       {/* Modal Eliminar */}
-      <Modal isOpen={activeModal === 'delete'} onClose={() => setActiveModal(null)} title="¿Eliminar lista?">
+      <Modal isOpen={activeModal === 'delete'} onClose={closeModal} title="¿Eliminar lista?">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto text-danger">
             <Trash2 className="w-6 h-6" />
@@ -501,7 +634,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
             Esta acción no se puede deshacer. Se perderán todos los productos.
           </p>
           <div className="flex gap-3 justify-center mt-6">
-            <Button variant="secondary" onClick={() => setActiveModal(null)}>Cancelar</Button>
+            <Button variant="secondary" onClick={closeModal}>Cancelar</Button>
             <Button variant="danger" onClick={handleDeleteList}>Sí, eliminar</Button>
           </div>
         </div>
