@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ShoppingBag, Users, Share2, MoreVertical,
-  Trash2, Edit2, Copy, Check, X, QrCode, Link as LinkIcon, Wifi, WifiOff
+  Trash2, Edit2, Copy, Check, QrCode, Link as LinkIcon
 } from 'lucide-react'
 import { ShoppingItem } from './ShoppingItem'
 import { AddItemForm } from './AddItemForm'
@@ -39,7 +39,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { SortableShoppingItem } from './SortableShoppingItem'
-import { sendPushNotification, cancelPendingNotifications } from '@/lib/notifications'
+import { sendPushNotification } from '@/lib/notifications'
 
 interface ShoppingListProps {
   list: ShoppingListType
@@ -187,8 +187,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
       loadCollaborators()
     }
   }, [activeModal, list.id, supabase, collaboratorsLoaded])
-
-  // La suscripción en tiempo real ahora se maneja en useRealtimeList hook
 
   // Cargar perfiles de usuarios que añadieron/compraron items
   useEffect(() => {
@@ -499,7 +497,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   return (
     <div className="flex flex-col h-full relative">
       {/* Header */}
-      <header className="p-4 border-b border-gray-100 bg-background z-10">
+      <header className="p-4 border-b border-gray-100 bg-background z-10 flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center relative">
@@ -595,15 +593,17 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
       {/* Notas de la lista - siempre visibles después del header */}
       {user && (
-        <ListNotes
-          listId={list.id}
-          listName={list.name}
-          currentUser={user}
-          isCollaborative={collaborators.length > 0 || list.share_code !== null}
-        />
+        <div className="flex-shrink-0">
+          <ListNotes
+            listId={list.id}
+            listName={list.name}
+            currentUser={user}
+            isCollaborative={collaborators.length > 0 || list.share_code !== null}
+          />
+        </div>
       )}
 
-      {/* Items List */}
+      {/* Items List (Scrollable Area) */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {isLoading ? (
           <div className="space-y-2">
@@ -662,15 +662,17 @@ export function ShoppingList({ list }: ShoppingListProps) {
         )}
       </div>
 
-      {/* Favoritos */}
-      <FavoriteItems
-        favorites={favoriteItems}
-        isLoading={favoritesLoading}
-        onAddToList={handleAddFromFavorite}
-        onRemove={removeFavoriteItem}
-      />
-
-      <AddItemForm onAdd={handleAddItem} />
+      {/* FIXED BOTTOM AREA: Favoritos + Formulario */}
+      {/* Al envolverlos en este div fuera del área de scroll, se quedan fijos abajo */}
+      <div className="flex-shrink-0 bg-background z-20 shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
+        <FavoriteItems
+          favorites={favoriteItems}
+          isLoading={favoritesLoading}
+          onAddToList={handleAddFromFavorite}
+          onRemove={removeFavoriteItem}
+        />
+        <AddItemForm onAdd={handleAddItem} />
+      </div>
 
       {/* --- MODALES --- */}
 
