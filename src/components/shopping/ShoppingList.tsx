@@ -434,37 +434,37 @@ export function ShoppingList({ list }: ShoppingListProps) {
               onClick={openShareModal}
               className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors"
             >
-              <Share2 className="w-5 h-5 text-gray-500" />
+              <Share2 className="w-5 h-5 text-muted" />
             </button>
             <button
               onClick={toggleMenu}
               className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors"
             >
-              <MoreVertical className="w-5 h-5 text-gray-500" />
+              <MoreVertical className="w-5 h-5 text-muted" />
             </button>
 
             {/* Menú Desplegable */}
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={closeMenu} />
-                <div className="absolute top-12 right-0 w-48 bg-white border border-gray-100 rounded-xl shadow-xl z-20 py-2 animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute top-12 right-0 w-48 bg-card border border-border rounded-xl shadow-xl z-20 py-2 animate-in fade-in zoom-in-95 duration-100">
                   <button
                     onClick={openEditModal}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-hover flex items-center gap-2 transition-colors"
                   >
-                    <Edit2 className="w-4 h-4" /> Editar nombre
+                    <Edit2 className="w-4 h-4 text-muted" /> Editar nombre
                   </button>
                   <button
                     onClick={handleDuplicateList}
                     disabled={isDuplicating}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
+                    className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-hover flex items-center gap-2 transition-colors disabled:opacity-50"
                   >
-                    <Copy className="w-4 h-4" /> {isDuplicating ? 'Duplicando...' : 'Duplicar lista'}
+                    <Copy className="w-4 h-4 text-muted" /> {isDuplicating ? 'Duplicando...' : 'Duplicar lista'}
                   </button>
-                  <div className="h-px bg-gray-100 my-1" />
+                  <div className="h-px bg-border-light my-1" />
                   <button
                     onClick={openDeleteModal}
-                    className="w-full px-4 py-2 text-left text-sm text-danger hover:bg-red-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" /> Eliminar lista
                   </button>
@@ -546,18 +546,18 @@ export function ShoppingList({ list }: ShoppingListProps) {
       {/* Modal Compartir */}
       <Modal isOpen={activeModal === 'share'} onClose={closeModal} title="Compartir lista">
         <div className="space-y-6 flex flex-col items-center">
-          <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-200">
+          <div className="bg-card p-4 rounded-xl border-2 border-dashed border-border">
             <img
               src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shareUrl)}`}
               alt="QR Code"
-              className="w-40 h-40 mix-blend-multiply"
+              className="w-40 h-40"
               loading="lazy"
             />
           </div>
           <div className="w-full space-y-2">
-            <p className="text-sm font-medium text-gray-500">Enlace de invitación</p>
+            <p className="text-sm font-medium text-muted">Enlace de invitación</p>
             <div className="flex gap-2">
-              <div className="flex-1 bg-secondary px-3 py-2 rounded-lg text-sm text-gray-600 truncate font-mono">
+              <div className="flex-1 bg-secondary px-3 py-2 rounded-lg text-sm text-muted truncate font-mono">
                 {shareUrl}
               </div>
               <Button onClick={handleCopyLink} variant={isCopied ? 'primary' : 'secondary'} size="sm">
@@ -565,7 +565,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
               </Button>
             </div>
           </div>
-          <div className="w-full p-3 bg-blue-50 text-blue-700 rounded-lg text-sm flex items-center gap-2">
+          <div className="w-full p-3 bg-primary/10 text-primary rounded-lg text-sm flex items-center gap-2">
             <QrCode className="w-4 h-4" />
             <span>Código de lista: <strong>{list.share_code}</strong></span>
           </div>
@@ -582,7 +582,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
               </div>
               <div>
                 <p className="font-medium">Tú</p>
-                <p className="text-xs text-gray-500">Propietario</p>
+                <p className="text-xs text-muted-light">Propietario</p>
               </div>
             </div>
             <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">Owner</span>
@@ -590,21 +590,21 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
           {collaborators.length > 0 ? (
             collaborators.map((collab, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl">
+              <div key={idx} className="flex items-center justify-between p-3 border border-border rounded-xl">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold">
+                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted font-bold">
                     {collab.profiles.name?.[0]?.toUpperCase() ?? '?'}
                   </div>
                   <div>
                     <p className="font-medium">{collab.profiles.name || 'Usuario'}</p>
-                    <p className="text-xs text-gray-500">{collab.profiles.email}</p>
+                    <p className="text-xs text-muted-light">{collab.profiles.email}</p>
                   </div>
                 </div>
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full capitalize">{collab.role}</span>
+                <span className="text-xs bg-secondary text-muted px-2 py-1 rounded-full capitalize">{collab.role}</span>
               </div>
             ))
           ) : (
-            <p className="text-center text-gray-500 text-sm py-4">No hay otros colaboradores</p>
+            <p className="text-center text-muted text-sm py-4">No hay otros colaboradores</p>
           )}
         </div>
       </Modal>

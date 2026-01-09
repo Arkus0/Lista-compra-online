@@ -8,6 +8,15 @@
   --secondary: #f3f4f6;
   --accent: #fbbf24;
   --danger: #ef4444;
+
+  /* Grises para light mode */
+  --border: #e5e7eb;
+  --border-light: #f3f4f6;
+  --hover: #f9fafb;
+  --muted: #6b7280;
+  --muted-light: #9ca3af;
+  --card: #ffffff;
+  --input-bg: #ffffff;
 }
 
 @theme inline {
@@ -18,13 +27,44 @@
   --color-secondary: var(--secondary);
   --color-accent: var(--accent);
   --color-danger: var(--danger);
+  --color-border: var(--border);
+  --color-border-light: var(--border-light);
+  --color-hover: var(--hover);
+  --color-muted: var(--muted);
+  --color-muted-light: var(--muted-light);
+  --color-card: var(--card);
+  --color-input-bg: var(--input-bg);
 }
 
+/* Dark mode - usando clase .dark en lugar de media query */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --secondary: #1f2937;
+
+  /* Grises para dark mode con mejor contraste */
+  --border: #374151;
+  --border-light: #1f2937;
+  --hover: #1f2937;
+  --muted: #d1d5db;
+  --muted-light: #9ca3af;
+  --card: #111827;
+  --input-bg: #111827;
+}
+
+/* Fallback para navegadores que usen prefers-color-scheme */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.dark):not(.light) {
     --background: #0a0a0a;
     --foreground: #ededed;
     --secondary: #1f2937;
+    --border: #374151;
+    --border-light: #1f2937;
+    --hover: #1f2937;
+    --muted: #d1d5db;
+    --muted-light: #9ca3af;
+    --card: #111827;
+    --input-bg: #111827;
   }
 }
 
