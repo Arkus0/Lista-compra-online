@@ -6,8 +6,11 @@ import { CSS } from '@dnd-kit/utilities'
 import { ShoppingItem } from './ShoppingItem'
 import { ListItem, Profile } from '@/lib/supabase/types'
 
+// Type extendido localmente
+type ListItemWithImage = ListItem & { image_url?: string | null }
+
 interface SortableShoppingItemProps {
-  item: ListItem
+  item: ListItemWithImage
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
@@ -38,6 +41,8 @@ function SortableShoppingItemComponent({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : 'auto',
+    position: 'relative' as const,
   }
 
   return (
@@ -51,12 +56,13 @@ function SortableShoppingItemComponent({
         dragHandleProps={listeners}
         addedByProfile={addedByProfile}
         checkedByProfile={checkedByProfile}
+        isDragEnabled={true}
       />
     </div>
   )
 }
 
-// Memoización para evitar re-renders innecesarios
+// Memoización actualizada
 export const SortableShoppingItem = memo(SortableShoppingItemComponent, (prevProps, nextProps) => {
   return (
     prevProps.item.id === nextProps.item.id &&
@@ -64,6 +70,7 @@ export const SortableShoppingItem = memo(SortableShoppingItemComponent, (prevPro
     prevProps.item.checked === nextProps.item.checked &&
     prevProps.item.quantity === nextProps.item.quantity &&
     prevProps.item.category === nextProps.item.category &&
+    prevProps.item.image_url === nextProps.item.image_url && // Nueva comparación
     prevProps.item.position === nextProps.item.position &&
     prevProps.item.checked_by === nextProps.item.checked_by &&
     prevProps.onToggle === nextProps.onToggle &&
