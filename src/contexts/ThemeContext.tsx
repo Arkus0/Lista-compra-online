@@ -2,12 +2,35 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-// ... (resto de tipos e interfaces igual)
+// Exportamos los tipos para que puedan usarse fuera si es necesario
+export type Theme = 'light' | 'dark' | 'system';
+
+export interface ThemeContextType {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  resolvedTheme: 'light' | 'dark';
+}
+
+// Inicializamos con undefined pero especificando el tipo genérico
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // ... (estados igual)
+  const [theme, setTheme] = useState<Theme>('system');
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+  const [mounted, setMounted] = useState(false);
 
-  // ... (primer useEffect igual)
+  // Cargar tema guardado al montar
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const savedTheme = localStorage.getItem('theme') as Theme | null;
+      if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
+        setTheme(savedTheme);
+      }
+    } catch (e) {
+      // Ignorar error si localStorage no está disponible
+    }
+  }, []);
 
   // Aplicar tema cuando cambia
   useEffect(() => {
@@ -27,11 +50,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       appliedTheme = theme;
     }
 
-    // --- CORRECCIÓN AQUÍ ---
-    // Limpiamos ambas clases y añadimos la que corresponda explícitamente
+    // CORRECCIÓN IMPORTANTE: Limpiamos ambas clases y forzamos la correcta
+    // Esto es crucial para que el móvil no fuerce el modo oscuro del sistema
     root.classList.remove('light', 'dark');
     root.classList.add(appliedTheme);
-    // -----------------------
 
     setResolvedTheme(appliedTheme);
 
@@ -45,7 +67,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
       const handleChange = () => {
         const newSystemTheme = getSystemTheme();
-        // También actualizamos aquí
         root.classList.remove('light', 'dark');
         root.classList.add(newSystemTheme);
         setResolvedTheme(newSystemTheme);
@@ -63,7 +84,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useTheme() {
+// Forzamos el tipo de retorno para evitar inferencias incorrectas como '{} | null'
+export function useTheme(): ThemeContextType {
   const context = useContext(ThemeContext);
   if (context === undefined) {
     throw new Error('useTheme must be used within a ThemeProvider');
