@@ -57,6 +57,7 @@ export function useVoiceInput(): UseVoiceInputReturn {
   const [isSupported, setIsSupported] = useState(false)
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const finalTranscriptRef = useRef<string>('')
 
   useEffect(() => {
     // Verificar soporte del navegador
@@ -71,10 +72,25 @@ export function useVoiceInput(): UseVoiceInputReturn {
       recognition.lang = 'es-ES'
 
       recognition.onresult = (event: SpeechRecognitionEventType) => {
-        const current = event.resultIndex
-        const result = event.results[current]
-        const transcriptResult = result[0].transcript
-        setTranscript(transcriptResult)
+        let interimTranscript = ''
+        let finalTranscript = ''
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i]
+          if (result[0].confidence === undefined || result[0].confidence > 0) {
+            const transcriptPart = result[0].transcript
+            if (result.item(0) === result[0]) {
+              if (i === event.results.length - 1) {
+                interimTranscript += transcriptPart
+              } else {
+                finalTranscript += transcriptPart
+              }
+            }
+          }
+        }
+
+        finalTranscriptRef.current = finalTranscript || interimTranscript
+        setTranscript(finalTranscript || interimTranscript)
       }
 
       recognition.onerror = (event: SpeechRecognitionErrorEventType) => {
@@ -82,8 +98,9 @@ export function useVoiceInput(): UseVoiceInputReturn {
         if (event.error === 'not-allowed') {
           setError('Permiso de micrófono denegado')
         } else if (event.error === 'no-speech') {
-          setError('No se detectó voz')
-        } else {
+          // No mostramos error si no se detectó voz, simplemente paramos
+          setIsListening(false)
+        } else if (event.error !== 'aborted') {
           setError('Error de reconocimiento de voz')
         }
         setIsListening(false)

@@ -3,6 +3,7 @@
 import { useState, memo, useCallback, useRef, useEffect } from 'react'
 import { Check, Trash2, GripVertical, Minus, Plus, User, Star, Image as ImageIcon, ExternalLink, UserPlus, X } from 'lucide-react'
 import { ListItem, Profile } from '@/lib/supabase/types'
+import { CATEGORIES, CategoryId } from '@/lib/constants'
 
 // Extendemos el tipo ListItem para incluir image_url y assigned_to
 type ListItemWithImage = ListItem & { image_url?: string | null }
@@ -111,6 +112,11 @@ function ShoppingItemComponent({
     ? categoryColors[item.category.toLowerCase()] || categoryColors.otros
     : categoryColors.otros
 
+  // Obtener la etiqueta en español de la categoría
+  const categoryLabel = item.category && CATEGORIES[item.category as CategoryId]
+    ? CATEGORIES[item.category as CategoryId].label
+    : item.category
+
   const profileToShow = item.checked ? checkedByProfile : addedByProfile
   const actionText = item.checked ? 'comprado por' : 'añadido por'
 
@@ -165,7 +171,7 @@ function ShoppingItemComponent({
           <div className="flex items-center gap-2 flex-wrap">
             {item.category && (
               <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColor}`}>
-                {item.category}
+                {categoryLabel}
               </span>
             )}
             {profileToShow && (

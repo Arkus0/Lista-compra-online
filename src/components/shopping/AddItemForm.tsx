@@ -195,13 +195,18 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
     }
   }, [name, selectedCategory, imageFile, onAdd, upload, clearImage])
 
-  const handleSuggestionClick = (suggestion: Suggestion) => {
-    setName(suggestion.name)
-    if (suggestion.category) {
-      setSelectedCategory(suggestion.category as CategoryId)
-      setManuallySelected(true)
-    }
+  const handleSuggestionClick = async (suggestion: Suggestion) => {
+    // Añadir el item automáticamente en lugar de solo rellenar el input
+    const category = suggestion.category ? (suggestion.category as CategoryId) : 'other'
+    await onAdd(suggestion.name, category)
+
+    // Resetear estados
+    setName('')
+    setSelectedCategory('other')
     setShowSuggestions(false)
+    setManuallySelected(false)
+
+    // Mantener foco
     inputRef.current?.focus()
   }
 
@@ -227,14 +232,50 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
     inputRef.current?.focus()
   }, [])
 
-  // Handler para el botón de voz
-  const handleVoiceButton = useCallback(() => {
-    if (isListening) {
-      stopListening()
-    } else {
+  // Handler para abrir el escáner de código de barras
+  const handleOpenBarcodeScanner = useCallback(() => {
+    // Blur del input para ocultar el teclado
+    inputRef.current?.blur()
+    setShowBarcodeScanner(true)
+  }, [])
+
+  // Handler para el botón de voz (push-to-talk)
+  const handleVoiceMouseDown = useCallback(() => {
+    if (!isListening) {
+      // Blur del input para ocultar el teclado
+      inputRef.current?.blur()
       startListening()
     }
-  }, [isListening, startListening, stopListening])
+  }, [isListening, startListening])
+
+  const handleVoiceMouseUp = useCallback(() => {
+    if (isListening) {
+      stopListening()
+      // Volver a enfocar el input después de soltar
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 100)
+    }
+  }, [isListening, stopListening])
+
+  // Handler para touch devices
+  const handleVoiceTouchStart = useCallback((e: React.TouchEvent) => {
+    e.preventDefault()
+    if (!isListening) {
+      inputRef.current?.blur()
+      startListening()
+    }
+  }, [isListening, startListening])
+
+  const handleVoiceTouchEnd = useCallback((e: React.TouchEvent) => {
+    e.preventDefault()
+    if (isListening) {
+      stopListening()
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 100)
+    }
+  }, [isListening, stopListening])
 
   // Obtener la configuración visual de la categoría actual
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
@@ -371,17 +412,21 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
 
             {/* Botones dentro del input */}
             <div className="absolute right-2 flex items-center gap-1">
-              {/* Botón de Voz */}
+              {/* Botón de Voz (Push-to-Talk) */}
               {voiceSupported && (
                 <button
                   type="button"
-                  onClick={handleVoiceButton}
+                  onMouseDown={handleVoiceMouseDown}
+                  onMouseUp={handleVoiceMouseUp}
+                  onMouseLeave={handleVoiceMouseUp}
+                  onTouchStart={handleVoiceTouchStart}
+                  onTouchEnd={handleVoiceTouchEnd}
                   className={`p-2 rounded-lg transition-all ${
                     isListening
                       ? 'text-red-500 bg-red-100 animate-pulse'
                       : 'text-gray-400 hover:text-primary hover:bg-primary/10'
                   }`}
-                  title={isListening ? "Detener grabación" : "Añadir por voz"}
+                  title={isListening ? "Suelta para detener" : "Mantén presionado para hablar"}
                 >
                   {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </button>
@@ -390,7 +435,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
               {/* Botón de Escáner */}
               <button
                 type="button"
-                onClick={() => setShowBarcodeScanner(true)}
+                onClick={handleOpenBarcodeScanner}
                 className="p-2 rounded-lg text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors"
                 title="Escanear código de barras"
               >
