@@ -11,6 +11,7 @@ interface SortableShoppingItemProps {
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
+  onAddToFavorites?: (item: ListItem) => void
   addedByProfile?: Profile | null
   checkedByProfile?: Profile | null
 }
@@ -20,6 +21,7 @@ function SortableShoppingItemComponent({
   onToggle,
   onDelete,
   onUpdateQuantity,
+  onAddToFavorites,
   addedByProfile,
   checkedByProfile,
 }: SortableShoppingItemProps) {
@@ -45,6 +47,7 @@ function SortableShoppingItemComponent({
         onToggle={onToggle}
         onDelete={onDelete}
         onUpdateQuantity={onUpdateQuantity}
+        onAddToFavorites={onAddToFavorites}
         dragHandleProps={listeners}
         addedByProfile={addedByProfile}
         checkedByProfile={checkedByProfile}
@@ -66,6 +69,7 @@ export const SortableShoppingItem = memo(SortableShoppingItemComponent, (prevPro
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onDelete === nextProps.onDelete &&
     prevProps.onUpdateQuantity === nextProps.onUpdateQuantity &&
+    prevProps.onAddToFavorites === nextProps.onAddToFavorites &&
     prevProps.addedByProfile?.id === nextProps.addedByProfile?.id &&
     prevProps.checkedByProfile?.id === nextProps.checkedByProfile?.id
   )

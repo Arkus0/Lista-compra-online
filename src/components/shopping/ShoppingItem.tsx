@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, memo, useCallback } from 'react'
-import { Check, Trash2, GripVertical, Minus, Plus, User } from 'lucide-react'
+import { Check, Trash2, GripVertical, Minus, Plus, User, Star } from 'lucide-react'
 import { ListItem, Profile } from '@/lib/supabase/types'
 
 interface ShoppingItemProps {
@@ -9,6 +9,7 @@ interface ShoppingItemProps {
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
+  onAddToFavorites?: (item: ListItem) => void
   dragHandleProps?: any
   addedByProfile?: Profile | null
   checkedByProfile?: Profile | null
@@ -32,6 +33,7 @@ function ShoppingItemComponent({
   onToggle,
   onDelete,
   onUpdateQuantity,
+  onAddToFavorites,
   dragHandleProps,
   addedByProfile,
   checkedByProfile,
@@ -56,6 +58,10 @@ function ShoppingItemComponent({
   const handleIncrement = useCallback(() => {
     onUpdateQuantity(item.id, item.quantity + 1)
   }, [item.id, item.quantity, onUpdateQuantity])
+
+  const handleAddToFavorites = useCallback(() => {
+    onAddToFavorites?.(item)
+  }, [item, onAddToFavorites])
 
   const categoryColor = item.category
     ? categoryColors[item.category.toLowerCase()] || categoryColors.otros
@@ -147,14 +153,26 @@ function ShoppingItemComponent({
         </button>
       </div>
 
-      {/* Delete button */}
-      <button
-        onClick={handleDelete}
-        className="w-8 h-8 rounded-lg text-muted-light hover:text-danger hover:bg-danger/10
-                   flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      {/* Action buttons */}
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {onAddToFavorites && (
+          <button
+            onClick={handleAddToFavorites}
+            className="w-8 h-8 rounded-lg text-muted-light hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20
+                       flex items-center justify-center transition-colors"
+            title="Añadir a favoritos"
+          >
+            <Star className="w-4 h-4" />
+          </button>
+        )}
+        <button
+          onClick={handleDelete}
+          className="w-8 h-8 rounded-lg text-muted-light hover:text-danger hover:bg-danger/10
+                     flex items-center justify-center transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   )
 }
@@ -172,6 +190,7 @@ export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) =
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onDelete === nextProps.onDelete &&
     prevProps.onUpdateQuantity === nextProps.onUpdateQuantity &&
+    prevProps.onAddToFavorites === nextProps.onAddToFavorites &&
     prevProps.addedByProfile?.id === nextProps.addedByProfile?.id &&
     prevProps.checkedByProfile?.id === nextProps.checkedByProfile?.id
   )

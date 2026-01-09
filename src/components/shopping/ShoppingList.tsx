@@ -9,6 +9,9 @@ import {
 import { ShoppingItem } from './ShoppingItem'
 import { AddItemForm } from './AddItemForm'
 import { PresenceIndicator } from './PresenceIndicator'
+import { ListNotes } from './ListNotes'
+import { FavoriteItems } from './FavoriteItems'
+import { useFavorites } from '@/hooks/useFavorites'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -79,6 +82,15 @@ export function ShoppingList({ list }: ShoppingListProps) {
     listId: list.id,
     user,
   })
+
+  // Hook de favoritos
+  const {
+    favoriteItems,
+    isLoading: favoritesLoading,
+    addFavoriteItem,
+    removeFavoriteItem,
+    addItemToListFromFavorite,
+  } = useFavorites(user?.id)
 
   const [isLoading, setIsLoading] = useState(true)
   const [activeModal, setActiveModal] = useState<'share' | 'collaborators' | 'edit' | 'delete' | null>(null)
@@ -323,6 +335,21 @@ export function ShoppingList({ list }: ShoppingListProps) {
     // Rollback on error
     if (error) updateItem(id, { quantity: oldQuantity })
   }, [items, updateItem, supabase])
+
+  // Añadir item a favoritos
+  const handleAddToFavorites = useCallback(async (item: ListItem) => {
+    await addFavoriteItem({
+      name: item.name,
+      quantity: item.quantity,
+      unit: item.unit,
+      category: item.category,
+    })
+  }, [addFavoriteItem])
+
+  // Añadir item desde favoritos a la lista actual
+  const handleAddFromFavorite = useCallback(async (favorite: typeof favoriteItems[0]) => {
+    await addItemToListFromFavorite(favorite, list.id)
+  }, [addItemToListFromFavorite, list.id])
 
   // --- Drag and Drop - OPTIMIZADO con batch updates ---
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
@@ -585,6 +612,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
                     onToggle={handleToggleItem}
                     onDelete={handleDeleteItem}
                     onUpdateQuantity={handleUpdateQuantity}
+                    onAddToFavorites={handleAddToFavorites}
                     addedByProfile={profilesCache.get(item.added_by) || null}
                     checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) || null : null}
                   />
@@ -603,6 +631,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
                       onToggle={handleToggleItem}
                       onDelete={handleDeleteItem}
                       onUpdateQuantity={handleUpdateQuantity}
+                      onAddToFavorites={handleAddToFavorites}
                       addedByProfile={profilesCache.get(item.added_by) || null}
                       checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) || null : null}
                     />
@@ -622,6 +651,24 @@ export function ShoppingList({ list }: ShoppingListProps) {
           </>
         )}
       </div>
+
+      {/* Notas de la lista */}
+      {user && (
+        <ListNotes
+          listId={list.id}
+          listName={list.name}
+          currentUser={user}
+          isCollaborative={collaborators.length > 0 || list.share_code !== null}
+        />
+      )}
+
+      {/* Favoritos */}
+      <FavoriteItems
+        favorites={favoriteItems}
+        isLoading={favoritesLoading}
+        onAddToList={handleAddFromFavorite}
+        onRemove={removeFavoriteItem}
+      />
 
       <AddItemForm onAdd={handleAddItem} />
 
