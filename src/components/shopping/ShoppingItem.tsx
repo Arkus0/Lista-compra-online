@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, memo, useCallback } from 'react'
-import { Check, Trash2, GripVertical, Minus, Plus } from 'lucide-react'
-import { ListItem } from '@/lib/supabase/types'
+import { Check, Trash2, GripVertical, Minus, Plus, User } from 'lucide-react'
+import { ListItem, Profile } from '@/lib/supabase/types'
 
 interface ShoppingItemProps {
   item: ListItem
@@ -10,6 +10,8 @@ interface ShoppingItemProps {
   onDelete: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
   dragHandleProps?: any
+  addedByProfile?: Profile | null
+  checkedByProfile?: Profile | null
 }
 
 // Colores de categoría - extraído fuera del componente para evitar recreación
@@ -25,7 +27,15 @@ const categoryColors: Record<string, string> = {
   otros: 'bg-gray-100 text-gray-700',
 }
 
-function ShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuantity, dragHandleProps }: ShoppingItemProps) {
+function ShoppingItemComponent({
+  item,
+  onToggle,
+  onDelete,
+  onUpdateQuantity,
+  dragHandleProps,
+  addedByProfile,
+  checkedByProfile,
+}: ShoppingItemProps) {
   const [isDeleting, setIsDeleting] = useState(false)
 
   const handleDelete = useCallback(() => {
@@ -50,6 +60,10 @@ function ShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuantity, dra
   const categoryColor = item.category
     ? categoryColors[item.category.toLowerCase()] || categoryColors.otros
     : categoryColors.otros
+
+  // Determinar qué perfil mostrar
+  const profileToShow = item.checked ? checkedByProfile : addedByProfile
+  const actionText = item.checked ? 'comprado por' : 'añadido por'
 
   return (
     <div
@@ -85,11 +99,29 @@ function ShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuantity, dra
         <p className={`font-medium truncate ${item.checked ? 'line-through text-muted-light' : ''}`}>
           {item.name}
         </p>
-        {item.category && (
-          <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColor}`}>
-            {item.category}
-          </span>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {item.category && (
+            <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColor}`}>
+              {item.category}
+            </span>
+          )}
+          {/* Mostrar quién añadió/compró */}
+          {profileToShow && (
+            <span className="text-xs text-muted flex items-center gap-1">
+              {profileToShow.avatar_url ? (
+                <img
+                  src={profileToShow.avatar_url}
+                  alt=""
+                  className="w-4 h-4 rounded-full object-cover"
+                />
+              ) : (
+                <User className="w-3 h-3" />
+              )}
+              <span className="hidden sm:inline">{actionText}</span>
+              <span className="font-medium">{profileToShow.name || 'Usuario'}</span>
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Quantity controls */}
@@ -136,9 +168,12 @@ export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) =
     prevProps.item.quantity === nextProps.item.quantity &&
     prevProps.item.category === nextProps.item.category &&
     prevProps.item.unit === nextProps.item.unit &&
+    prevProps.item.checked_by === nextProps.item.checked_by &&
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onDelete === nextProps.onDelete &&
-    prevProps.onUpdateQuantity === nextProps.onUpdateQuantity
+    prevProps.onUpdateQuantity === nextProps.onUpdateQuantity &&
+    prevProps.addedByProfile?.id === nextProps.addedByProfile?.id &&
+    prevProps.checkedByProfile?.id === nextProps.checkedByProfile?.id
   )
 })
 

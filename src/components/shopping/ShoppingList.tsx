@@ -4,20 +4,22 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ShoppingBag, Users, Share2, MoreVertical,
-  Trash2, Edit2, Copy, Check, X, QrCode, Link as LinkIcon
+  Trash2, Edit2, Copy, Check, X, QrCode, Link as LinkIcon, Wifi, WifiOff
 } from 'lucide-react'
 import { ShoppingItem } from './ShoppingItem'
 import { AddItemForm } from './AddItemForm'
+import { PresenceIndicator } from './PresenceIndicator'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { ListItem, ShoppingList as ShoppingListType } from '@/lib/supabase/types'
+import { ListItem, ShoppingList as ShoppingListType, Profile } from '@/lib/supabase/types'
 import { createClient } from '@/lib/supabase/client'
 import {
   useItems,
   useItemsActions,
   useUser,
 } from '@/store/useStore'
+import { useRealtimeList } from '@/hooks/useRealtimeList'
 import {
   DndContext,
   closestCenter,
@@ -34,6 +36,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { SortableShoppingItem } from './SortableShoppingItem'
+import { sendPushNotification, cancelPendingNotifications } from '@/lib/notifications'
 
 interface ShoppingListProps {
   list: ShoppingListType
@@ -71,6 +74,12 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const { setItems, addItem, updateItem, removeItem, toggleItemChecked, updateItemsPositions } = useItemsActions()
   const user = useUser()
 
+  // Hook de realtime y presencia
+  const { presenceUsers, isConnected } = useRealtimeList({
+    listId: list.id,
+    user,
+  })
+
   const [isLoading, setIsLoading] = useState(true)
   const [activeModal, setActiveModal] = useState<'share' | 'collaborators' | 'edit' | 'delete' | null>(null)
   const [showMenu, setShowMenu] = useState(false)
@@ -81,6 +90,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const [newName, setNewName] = useState(list.name)
   const [isCopied, setIsCopied] = useState(false)
   const [isDuplicating, setIsDuplicating] = useState(false)
+  const [profilesCache, setProfilesCache] = useState<Map<string, Profile>>(new Map())
 
   // Ref para el cliente de supabase - evita recreación
   const supabaseRef = useRef(createClient())
@@ -166,31 +176,41 @@ export function ShoppingList({ list }: ShoppingListProps) {
     }
   }, [activeModal, list.id, supabase, collaboratorsLoaded])
 
-  // Suscripción en tiempo real - con cleanup correcto
-  useEffect(() => {
-    const channel = supabase
-      .channel(`list-${list.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'list_items',
-        filter: `list_id=eq.${list.id}`
-      }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          addItem(payload.new as ListItem)
-        } else if (payload.eventType === 'UPDATE') {
-          updateItem(payload.new.id, payload.new as Partial<ListItem>)
-        } else if (payload.eventType === 'DELETE') {
-          removeItem(payload.old.id)
-        }
-      })
-      .subscribe()
+  // La suscripción en tiempo real ahora se maneja en useRealtimeList hook
 
-    return () => {
-      channel.unsubscribe()
-      supabase.removeChannel(channel)
+  // Cargar perfiles de usuarios que añadieron/compraron items
+  useEffect(() => {
+    const loadProfiles = async () => {
+      // Recopilar IDs únicos de usuarios
+      const userIds = new Set<string>()
+      items.forEach((item) => {
+        if (item.added_by) userIds.add(item.added_by)
+        if (item.checked_by) userIds.add(item.checked_by)
+      })
+
+      // Filtrar los que ya tenemos en caché
+      const missingIds = Array.from(userIds).filter((id) => !profilesCache.has(id))
+
+      if (missingIds.length === 0) return
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', missingIds)
+
+      if (data) {
+        setProfilesCache((prev) => {
+          const newCache = new Map(prev)
+          data.forEach((profile) => newCache.set(profile.id, profile))
+          return newCache
+        })
+      }
     }
-  }, [list.id, supabase, addItem, updateItem, removeItem])
+
+    if (items.length > 0) {
+      loadProfiles()
+    }
+  }, [items, supabase, profilesCache])
 
   // --- Handlers de Items - memoizados ---
 
@@ -210,28 +230,57 @@ export function ShoppingList({ list }: ShoppingListProps) {
     }
 
     const { error } = await supabase.from('list_items').insert(itemData)
-    if (error) console.error('Error adding item:', error)
-  }, [user, items, list.id, supabase])
+    if (error) {
+      console.error('Error adding item:', error)
+    } else {
+      // Enviar notificación push a colaboradores
+      sendPushNotification({
+        listId: list.id,
+        listName: list.name,
+        action: 'item_added',
+        actorName: user.name || 'Alguien',
+        itemName: name,
+        excludeUserId: user.id,
+      })
+    }
+  }, [user, items, list.id, list.name, supabase])
 
   const handleToggleItem = useCallback(async (id: string) => {
     const item = items.find((i) => i.id === id)
-    if (!item) return
+    if (!item || !user) return
+
+    const newChecked = !item.checked
 
     // Optimistic update
     toggleItemChecked(id)
 
     const { error } = await supabase
       .from('list_items')
-      .update({ checked: !item.checked })
+      .update({
+        checked: newChecked,
+        checked_by: newChecked ? user.id : null,
+      })
       .eq('id', id)
 
-    // Rollback on error
-    if (error) toggleItemChecked(id)
-  }, [items, toggleItemChecked, supabase])
+    if (error) {
+      // Rollback on error
+      toggleItemChecked(id)
+    } else if (newChecked) {
+      // Solo notificar cuando se marca como comprado
+      sendPushNotification({
+        listId: list.id,
+        listName: list.name,
+        action: 'item_checked',
+        actorName: user.name || 'Alguien',
+        itemName: item.name,
+        excludeUserId: user.id,
+      })
+    }
+  }, [items, user, toggleItemChecked, supabase, list.id, list.name])
 
   const handleDeleteItem = useCallback(async (id: string) => {
     const item = items.find((i) => i.id === id)
-    if (!item) return
+    if (!item || !user) return
 
     // Optimistic update
     removeItem(id)
@@ -241,9 +290,21 @@ export function ShoppingList({ list }: ShoppingListProps) {
       .delete()
       .eq('id', id)
 
-    // Rollback on error
-    if (error) addItem(item)
-  }, [items, removeItem, addItem, supabase])
+    if (error) {
+      // Rollback on error
+      addItem(item)
+    } else {
+      // Enviar notificación push a colaboradores
+      sendPushNotification({
+        listId: list.id,
+        listName: list.name,
+        action: 'item_removed',
+        actorName: user.name || 'Alguien',
+        itemName: item.name,
+        excludeUserId: user.id,
+      })
+    }
+  }, [items, user, removeItem, addItem, supabase, list.id, list.name])
 
   const handleUpdateQuantity = useCallback(async (id: string, quantity: number) => {
     const item = items.find((i) => i.id === id)
@@ -414,16 +475,35 @@ export function ShoppingList({ list }: ShoppingListProps) {
       <header className="p-4 border-b border-gray-100 bg-background z-10">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center relative">
               <ShoppingBag className="w-5 h-5 text-primary" />
+              {/* Indicador de conexión */}
+              <span
+                className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-background ${
+                  isConnected ? 'bg-green-500' : 'bg-gray-400'
+                }`}
+                title={isConnected ? 'Sincronizado' : 'Desconectado'}
+              />
             </div>
             <div>
               <h1 className="font-bold text-lg">{list.name}</h1>
-              <p className="text-sm text-gray-500">{items.length} productos</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-gray-500">{items.length} productos</p>
+                {presenceUsers.length > 0 && (
+                  <span className="text-xs text-muted">
+                    · {presenceUsers.length} {presenceUsers.length === 1 ? 'persona' : 'personas'} viendo
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2 relative">
+            {/* Mostrar usuarios presentes */}
+            {presenceUsers.length > 0 && (
+              <PresenceIndicator users={presenceUsers} maxVisible={3} />
+            )}
+
             <button
               onClick={openCollaboratorsModal}
               className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors"
@@ -505,6 +585,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
                     onToggle={handleToggleItem}
                     onDelete={handleDeleteItem}
                     onUpdateQuantity={handleUpdateQuantity}
+                    addedByProfile={profilesCache.get(item.added_by) || null}
+                    checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) || null : null}
                   />
                 ))}
               </SortableContext>
@@ -521,6 +603,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
                       onToggle={handleToggleItem}
                       onDelete={handleDeleteItem}
                       onUpdateQuantity={handleUpdateQuantity}
+                      addedByProfile={profilesCache.get(item.added_by) || null}
+                      checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) || null : null}
                     />
                   ))}
                 </div>
