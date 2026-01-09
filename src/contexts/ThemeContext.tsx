@@ -2,29 +2,12 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'light' | 'dark' | 'system';
-
-interface ThemeContextType {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-  resolvedTheme: 'light' | 'dark';
-}
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+// ... (resto de tipos e interfaces igual)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
-  const [mounted, setMounted] = useState(false);
+  // ... (estados igual)
 
-  // Cargar tema guardado al montar
-  useEffect(() => {
-    setMounted(true);
-    const savedTheme = localStorage.getItem('theme') as Theme | null;
-    if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system')) {
-      setTheme(savedTheme);
-    }
-  }, []);
+  // ... (primer useEffect igual)
 
   // Aplicar tema cuando cambia
   useEffect(() => {
@@ -32,13 +15,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     const root = document.documentElement;
 
-    // Función para obtener el tema del sistema
     const getSystemTheme = (): 'light' | 'dark' => {
       if (typeof window === 'undefined') return 'light';
       return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     };
 
-    // Determinar el tema a aplicar
     let appliedTheme: 'light' | 'dark';
     if (theme === 'system') {
       appliedTheme = getSystemTheme();
@@ -46,32 +27,27 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       appliedTheme = theme;
     }
 
-    // Aplicar el tema
-    if (appliedTheme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
+    // --- CORRECCIÓN AQUÍ ---
+    // Limpiamos ambas clases y añadimos la que corresponda explícitamente
+    root.classList.remove('light', 'dark');
+    root.classList.add(appliedTheme);
+    // -----------------------
 
     setResolvedTheme(appliedTheme);
 
-    // Guardar en localStorage
     try {
       localStorage.setItem('theme', theme);
     } catch (e) {
       console.error('Error saving theme to localStorage:', e);
     }
 
-    // Listener para cambios en el tema del sistema
     if (theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
       const handleChange = () => {
         const newSystemTheme = getSystemTheme();
-        if (newSystemTheme === 'dark') {
-          root.classList.add('dark');
-        } else {
-          root.classList.remove('dark');
-        }
+        // También actualizamos aquí
+        root.classList.remove('light', 'dark');
+        root.classList.add(newSystemTheme);
         setResolvedTheme(newSystemTheme);
       };
 
