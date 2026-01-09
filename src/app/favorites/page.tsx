@@ -2,31 +2,32 @@
 
 import { Header } from '@/components/layout/Header'
 import { useFavorites } from '@/hooks/useFavorites'
-import { Star, Plus, Trash2, Loader2, ShoppingBag, Edit2, X } from 'lucide-react'
+import { useUser } from '@/store/useStore'
+import { Star, Plus, Trash2, Loader2, Edit2, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useState } from 'react'
-import Link from 'next/link'
 import { UserFavoriteItem } from '@/lib/supabase/types'
+import { CATEGORIES, CategoryId } from '@/lib/constants'
 
 export default function FavoritesPage() {
-  const { favoriteItems, isLoading, addFavoriteItem, removeFavoriteItem } = useFavorites()
+  const user = useUser()
+  const { favoriteItems, isLoading, addFavoriteItem, removeFavoriteItem } = useFavorites(user?.id)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [editingItem, setEditingItem] = useState<UserFavoriteItem | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Form state
+  // Form state - sin unidad, solo nombre, cantidad y categoría
   const [formData, setFormData] = useState({
     name: '',
     quantity: 1,
-    unit: '',
-    category: '',
+    category: '' as CategoryId | '',
   })
 
   const resetForm = () => {
-    setFormData({ name: '', quantity: 1, unit: '', category: '' })
+    setFormData({ name: '', quantity: 1, category: '' })
     setEditingItem(null)
     setIsAdding(false)
   }
@@ -35,15 +36,14 @@ export default function FavoritesPage() {
     setFormData({
       name: favorite.name,
       quantity: favorite.quantity,
-      unit: favorite.unit || '',
-      category: favorite.category || '',
+      category: (favorite.category || '') as CategoryId | '',
     })
     setEditingItem(favorite)
     setIsAdding(false)
   }
 
   const handleAdd = () => {
-    setFormData({ name: '', quantity: 1, unit: '', category: '' })
+    setFormData({ name: '', quantity: 1, category: '' })
     setEditingItem(null)
     setIsAdding(true)
   }
@@ -62,8 +62,8 @@ export default function FavoritesPage() {
     const success = await addFavoriteItem({
       name: formData.name.trim(),
       quantity: formData.quantity,
-      unit: formData.unit.trim() || null,
-      category: formData.category.trim() || null,
+      unit: null,
+      category: formData.category || null,
     })
 
     setIsSaving(false)
@@ -79,7 +79,8 @@ export default function FavoritesPage() {
     setRemovingId(null)
   }
 
-  const categories = ['Frutas', 'Verduras', 'Carnes', 'Pescados', 'Lácteos', 'Panadería', 'Bebidas', 'Limpieza', 'Otros']
+  // Usar las categorías del sistema
+  const categoryList = Object.values(CATEGORIES)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20">
@@ -135,40 +136,33 @@ export default function FavoritesPage() {
                   required
                   autoFocus
                 />
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    label="Cantidad"
-                    type="number"
-                    min="1"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
-                  />
-                  <Input
-                    label="Unidad"
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    placeholder="kg, L..."
-                  />
-                </div>
+                <Input
+                  label="Cantidad"
+                  type="number"
+                  min="1"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2 text-foreground">
                   Categoría
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {categories.map((cat) => (
+                <div className="grid grid-cols-5 gap-2">
+                  {categoryList.map((cat) => (
                     <button
-                      key={cat}
+                      key={cat.id}
                       type="button"
-                      onClick={() => setFormData({ ...formData, category: cat })}
-                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                        formData.category === cat
-                          ? 'bg-primary text-white'
+                      onClick={() => setFormData({ ...formData, category: cat.id })}
+                      className={`flex flex-col items-center p-2 rounded-lg text-xs transition-all ${
+                        formData.category === cat.id
+                          ? 'bg-primary/10 text-primary ring-2 ring-primary/30 scale-105'
                           : 'bg-secondary text-muted hover:bg-secondary/80'
                       }`}
                     >
-                      {cat}
+                      <cat.icon className="w-5 h-5 mb-1" />
+                      <span className="truncate w-full text-center">{cat.label.split(' ')[0]}</span>
                     </button>
                   ))}
                 </div>
@@ -209,18 +203,10 @@ export default function FavoritesPage() {
             <p className="text-muted mb-6">
               Puedes añadir favoritos desde tus listas o crear uno nuevo aquí
             </p>
-            <div className="flex gap-3 justify-center">
-              <Button onClick={handleAdd} variant="primary">
-                <Plus className="w-4 h-4 mr-2" />
-                Crear favorito
-              </Button>
-              <Link href="/lists">
-                <Button variant="secondary">
-                  <ShoppingBag className="w-4 h-4 mr-2" />
-                  Ver mis listas
-                </Button>
-              </Link>
-            </div>
+            <Button onClick={handleAdd} variant="primary">
+              <Plus className="w-4 h-4 mr-2" />
+              Crear favorito
+            </Button>
           </Card>
         ) : (
           <>
@@ -248,15 +234,18 @@ export default function FavoritesPage() {
 
                       <div className="flex items-center gap-2 text-sm text-muted">
                         {favorite.quantity > 1 && (
-                          <span>
-                            {favorite.quantity}
-                            {favorite.unit && ` ${favorite.unit}`}
-                          </span>
+                          <span>x{favorite.quantity}</span>
                         )}
-                        {favorite.category && (
+                        {favorite.category && CATEGORIES[favorite.category as CategoryId] && (
                           <>
                             {favorite.quantity > 1 && <span>•</span>}
-                            <span className="truncate">{favorite.category}</span>
+                            <div className="flex items-center gap-1">
+                              {(() => {
+                                const Cat = CATEGORIES[favorite.category as CategoryId]
+                                return Cat ? <Cat.icon className="w-3 h-3" /> : null
+                              })()}
+                              <span className="truncate">{CATEGORIES[favorite.category as CategoryId]?.label}</span>
+                            </div>
                           </>
                         )}
                       </div>

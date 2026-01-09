@@ -1,7 +1,8 @@
 'use client'
 
-import { Search } from 'lucide-react'
+import { Search, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import dynamic from 'next/dynamic'
 
@@ -13,16 +14,31 @@ const NotificationButton = dynamic(
 interface HeaderProps {
   title?: string
   showSearch?: boolean
+  showBack?: boolean
 }
 
-export function Header({ title = 'ShoppyJuan', showSearch = false }: HeaderProps) {
+export function Header({ title = 'ShoppyJuan', showSearch = false, showBack = false }: HeaderProps) {
+  const router = useRouter()
+
   return (
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border-light">
       <div className="flex items-center justify-between px-4 h-14">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="text-2xl">🛒</span>
-          <h1 className="font-bold text-lg">{title}</h1>
-        </Link>
+        {showBack ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.back()}
+              className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-muted" />
+            </button>
+            <h1 className="font-bold text-lg">{title}</h1>
+          </div>
+        ) : (
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-2xl">🛒</span>
+            <h1 className="font-bold text-lg">{title}</h1>
+          </Link>
+        )}
 
         <div className="flex items-center gap-1">
           {showSearch && (
