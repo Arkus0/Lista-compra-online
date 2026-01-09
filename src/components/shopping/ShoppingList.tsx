@@ -604,7 +604,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
       )}
 
       {/* Items List (Scrollable Area) */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      {/* Aumentamos el padding bottom (pb-40) para que el contenido no quede oculto tras el formulario fijo */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-40">
         {isLoading ? (
           <div className="space-y-2">
             <ItemSkeleton />
@@ -663,8 +664,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
       </div>
 
       {/* FIXED BOTTOM AREA: Favoritos + Formulario */}
-      {/* Al envolverlos en este div fuera del área de scroll, se quedan fijos abajo */}
-      <div className="flex-shrink-0 bg-background z-20 shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
+      {/* Usamos fixed bottom-0 para garantizar que siempre esté visible y encima del contenido */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-border/50">
         <FavoriteItems
           favorites={favoriteItems}
           isLoading={favoritesLoading}
