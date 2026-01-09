@@ -61,7 +61,7 @@ function ShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuantity, dra
       `}
     >
       {/* Drag handle */}
-      <div {...dragHandleProps} className="text-gray-300 cursor-grab active:cursor-grabbing touch-none">
+      <div {...dragHandleProps} className="text-muted-light cursor-grab active:cursor-grabbing touch-none">
         <GripVertical className="w-5 h-5" />
       </div>
 
@@ -73,7 +73,7 @@ function ShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuantity, dra
           transition-all duration-200 shrink-0
           ${item.checked
             ? 'bg-primary border-primary'
-            : 'border-gray-300 hover:border-primary'
+            : 'border-muted-light hover:border-primary'
           }
         `}
       >
@@ -82,7 +82,7 @@ function ShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuantity, dra
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className={`font-medium truncate ${item.checked ? 'line-through text-gray-400' : ''}`}>
+        <p className={`font-medium truncate ${item.checked ? 'line-through text-muted-light' : ''}`}>
           {item.name}
         </p>
         {item.category && (
@@ -104,7 +104,7 @@ function ShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuantity, dra
         </button>
         <span className="w-8 text-center font-medium">
           {item.quantity}
-          {item.unit && <span className="text-xs text-gray-400 ml-0.5">{item.unit}</span>}
+          {item.unit && <span className="text-xs text-muted-light ml-0.5">{item.unit}</span>}
         </span>
         <button
           onClick={handleIncrement}
@@ -118,7 +118,7 @@ function ShoppingItemComponent({ item, onToggle, onDelete, onUpdateQuantity, dra
       {/* Delete button */}
       <button
         onClick={handleDelete}
-        className="w-8 h-8 rounded-lg text-gray-400 hover:text-danger hover:bg-danger/10
+        className="w-8 h-8 rounded-lg text-muted-light hover:text-danger hover:bg-danger/10
                    flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
       >
         <Trash2 className="w-4 h-4" />

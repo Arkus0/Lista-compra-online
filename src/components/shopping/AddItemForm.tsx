@@ -102,7 +102,7 @@ function AddItemFormComponent({ onAdd }: AddItemFormProps) {
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
   return (
-    <div className="sticky bottom-0 bg-background border-t border-gray-100 z-30 pb-safe">
+    <div className="sticky bottom-0 bg-background border-t border-border-light z-30 pb-safe">
       <form
         ref={formRef}
         onSubmit={handleSubmit}
@@ -110,7 +110,7 @@ function AddItemFormComponent({ onAdd }: AddItemFormProps) {
       >
         {/* Selector de Categorías (Pop-up) */}
         {showCategories && (
-          <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-xl shadow-xl border border-gray-100 p-3 grid grid-cols-5 gap-2 animate-in slide-in-from-bottom-2 z-40">
+          <div className="absolute bottom-full left-4 right-4 mb-2 bg-card rounded-xl shadow-xl border border-border p-3 grid grid-cols-5 gap-2 animate-in slide-in-from-bottom-2 z-40">
             {Object.values(CATEGORIES).map((cat) => (
               <button
                 key={cat.id}
@@ -120,7 +120,7 @@ function AddItemFormComponent({ onAdd }: AddItemFormProps) {
                   flex flex-col items-center justify-center p-2 rounded-lg transition-all
                   ${selectedCategory === cat.id
                     ? 'bg-primary/10 text-primary ring-2 ring-primary/20 scale-105'
-                    : 'hover:bg-gray-50 text-gray-500'
+                    : 'hover:bg-hover text-muted'
                   }
                 `}
               >

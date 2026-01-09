@@ -164,36 +164,36 @@ export function ListMenuButton({ listId, listName }: Props) {
         {showMenu && (
           <>
             <div className="fixed inset-0 z-30" onClick={(e) => handleClick(e, () => setShowMenu(false))} />
-            <div className="absolute right-0 top-full mt-1 w-48 bg-background border border-gray-100 rounded-xl shadow-xl z-40 py-1 animate-in fade-in zoom-in-95 duration-100">
+            <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-xl shadow-xl z-40 py-1 animate-in fade-in zoom-in-95 duration-100">
               <button
                 onClick={(e) => handleClick(e, () => { setShowMenu(false); setActiveModal('share') })}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-hover flex items-center gap-2 transition-colors"
               >
-                <Share2 className="w-4 h-4 text-gray-500" />
+                <Share2 className="w-4 h-4 text-muted" />
                 Compartir lista
               </button>
 
               <button
                 onClick={(e) => handleClick(e, () => { setShowMenu(false); setActiveModal('edit'); setNewName(listName) })}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-hover flex items-center gap-2 transition-colors"
               >
-                <Edit2 className="w-4 h-4 text-gray-500" />
+                <Edit2 className="w-4 h-4 text-muted" />
                 Editar nombre
               </button>
 
               <button
                 onClick={(e) => handleClick(e, handleDuplicate)}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-hover flex items-center gap-2 transition-colors"
               >
-                <Copy className="w-4 h-4 text-gray-500" />
+                <Copy className="w-4 h-4 text-muted" />
                 Duplicar lista
               </button>
 
-              <div className="h-px bg-gray-100 my-1" />
+              <div className="h-px bg-border-light my-1" />
 
               <button
                 onClick={(e) => handleClick(e, () => { setShowMenu(false); setActiveModal('delete') })}
-                className="w-full px-4 py-2 text-left text-sm text-danger hover:bg-red-50 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
                 Eliminar lista

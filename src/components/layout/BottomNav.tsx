@@ -15,7 +15,7 @@ export function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-gray-100 safe-area-inset z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border-light safe-area-inset z-50">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
         {navItems.map((item) => {
           const isActive = pathname === item.href ||
@@ -31,7 +31,7 @@ export function BottomNav() {
                 transition-colors
                 ${isActive
                   ? 'text-primary'
-                  : 'text-gray-400 hover:text-gray-600'
+                  : 'text-muted-light hover:text-muted'
                 }
               `}
             >
