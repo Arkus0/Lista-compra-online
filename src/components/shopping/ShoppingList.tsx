@@ -657,7 +657,15 @@ export function ShoppingList({ list }: ShoppingListProps) {
         position: item.position
       }))
       const { data } = await supabase.from('list_items').insert(itemsToRestore).select()
-      if (data) setItems((prev: ListItemWithImage[]) => [...prev, ...(data as ListItemWithImage[])])
+      if (data) {
+        // Recargar todos los items desde la DB para tener el estado actualizado
+        const { data: allItems } = await supabase
+          .from('list_items')
+          .select('*')
+          .eq('list_id', list.id)
+          .order('position', { ascending: true })
+        if (allItems) setItems(allItems as ListItemWithImage[])
+      }
     }
 
     showUndoToast(`${itemsToDelete.length} items eliminados`, undoAction)
