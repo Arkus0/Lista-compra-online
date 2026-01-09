@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { XCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { JoinClient } from './JoinClient'
 
 interface Props {
   params: Promise<{ code: string }>
@@ -32,9 +33,25 @@ export default async function JoinPage({ params }: Props) {
 
   const response = result as { success: boolean, list_id?: string, message?: string }
 
-  // 3. Si éxito, redirigir a la lista
+  // 3. Si éxito, obtener datos del usuario y la lista para enviar notificación
   if (response.success && response.list_id) {
-    redirect(`/lists/${response.list_id}`)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('name')
+      .eq('id', user.id)
+      .single()
+
+    const { data: list } = await supabase
+      .from('shopping_lists')
+      .select('name')
+      .eq('id', response.list_id)
+      .single()
+
+    const userName = profile?.name || user.email?.split('@')[0] || 'Usuario'
+    const listName = list?.name || 'Lista'
+
+    // Usar componente cliente para enviar notificación y redirigir
+    return <JoinClient listId={response.list_id} userName={userName} listName={listName} />
   }
 
   // 4. Si falló (código inválido, etc), mostrar error

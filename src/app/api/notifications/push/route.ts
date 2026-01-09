@@ -18,7 +18,7 @@ if (vapidPublicKey && vapidPrivateKey) {
 interface NotificationPayload {
   listId: string
   listName: string
-  action: 'item_added' | 'item_removed' | 'item_checked' | 'note_added'
+  action: 'item_added' | 'item_removed' | 'item_checked' | 'note_added' | 'collaborator_joined'
   actorName: string
   itemName?: string
   excludeUserId?: string // Usuario que realizó la acción (no notificar)
@@ -73,6 +73,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, sent: 0 })
     }
 
+    // Guardar notificaciones en la base de datos para todos los usuarios
+    const notificationsToInsert = Array.from(userIds).map(userId => ({
+      user_id: userId,
+      list_id: listId,
+      type: action,
+      actor_id: excludeUserId || null,
+      actor_name: actorName,
+      list_name: listName,
+      item_name: itemName || null,
+    }))
+
+    await supabase.from('notifications').insert(notificationsToInsert)
+
     // Obtener suscripciones push de estos usuarios
     const { data: subscriptions } = await supabase
       .from('push_subscriptions')
@@ -107,6 +120,9 @@ export async function POST(request: NextRequest) {
         break
       case 'note_added':
         body = `${actorName} dejó una nota en la lista`
+        break
+      case 'collaborator_joined':
+        body = `${actorName} se unió a la lista colaborativa`
         break
     }
 

@@ -22,12 +22,7 @@ export function FavoriteItems({
   const [removingId, setRemovingId] = useState<string | null>(null)
 
   if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        <span>Cargando favoritos...</span>
-      </div>
-    )
+    return null // Oculto mientras carga para no saltar
   }
 
   if (favorites.length === 0) {
@@ -47,68 +42,73 @@ export function FavoriteItems({
   }
 
   return (
-    <div className="border-t border-gray-100 dark:border-gray-800">
+    <div className="bg-background border-t border-border/50">
+      {/* Barra de cabecera / Asa del cajón */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-2 hover:bg-secondary/50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-2 bg-secondary/30 hover:bg-secondary/60 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Star className="w-4 h-4 text-amber-500" />
-          <span className="text-sm font-medium">
+          <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Favoritos ({favorites.length})
           </span>
         </div>
         {isExpanded ? (
-          <ChevronUp className="w-4 h-4 text-muted" />
-        ) : (
           <ChevronDown className="w-4 h-4 text-muted" />
+        ) : (
+          <ChevronUp className="w-4 h-4 text-muted" />
         )}
       </button>
 
+      {/* Contenido desplegable (Drawer) */}
       {isExpanded && (
-        <div className="px-3 pb-3">
-          <div className="flex flex-wrap gap-2">
-            {favorites.map((favorite) => (
-              <div
-                key={favorite.id}
-                className="group flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 px-2 py-1 rounded-lg text-sm"
-              >
-                <button
-                  onClick={() => handleAdd(favorite)}
-                  disabled={addingId === favorite.id}
-                  className="flex items-center gap-1 hover:underline disabled:opacity-50"
-                  title="Añadir a la lista"
+        <div className="animate-in slide-in-from-bottom-2 duration-200">
+          <div className="px-3 py-3 max-h-48 overflow-y-auto scrollbar-thin">
+            <div className="flex flex-wrap gap-2">
+              {favorites.map((favorite) => (
+                <div
+                  key={favorite.id}
+                  className="group flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 px-2 py-1.5 rounded-lg text-sm border border-amber-100 dark:border-amber-800/30"
                 >
-                  {addingId === favorite.id ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Plus className="w-3 h-3" />
-                  )}
-                  <span>{favorite.name}</span>
-                  {favorite.quantity > 1 && (
-                    <span className="text-xs opacity-70">
-                      x{favorite.quantity}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => handleRemove(favorite.id)}
-                  disabled={removingId === favorite.id}
-                  className="ml-1 p-0.5 opacity-0 group-hover:opacity-100 hover:bg-amber-200 dark:hover:bg-amber-800 rounded transition-all disabled:opacity-50"
-                  title="Eliminar de favoritos"
-                >
-                  {removingId === favorite.id ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-3 h-3" />
-                  )}
-                </button>
-              </div>
-            ))}
+                  <button
+                    onClick={() => handleAdd(favorite)}
+                    disabled={addingId === favorite.id}
+                    className="flex items-center gap-1 hover:underline disabled:opacity-50"
+                    title="Añadir a la lista"
+                  >
+                    {addingId === favorite.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Plus className="w-3 h-3" />
+                    )}
+                    <span className="font-medium">{favorite.name}</span>
+                    {favorite.quantity > 1 && (
+                      <span className="text-xs opacity-70 ml-0.5">
+                        x{favorite.quantity}
+                      </span>
+                    )}
+                  </button>
+                  <div className="w-px h-3 bg-amber-200 dark:bg-amber-700 mx-1" />
+                  <button
+                    onClick={() => handleRemove(favorite.id)}
+                    disabled={removingId === favorite.id}
+                    className="p-0.5 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all disabled:opacity-50"
+                    title="Eliminar de favoritos"
+                  >
+                    {removingId === favorite.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3 h-3" />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-center text-muted-light mt-3 uppercase tracking-wider">
+              Toca para añadir rápido
+            </p>
           </div>
-          <p className="text-xs text-muted mt-2">
-            Toca un favorito para añadirlo a la lista
-          </p>
         </div>
       )}
     </div>
