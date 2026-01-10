@@ -74,11 +74,16 @@ function ShoppingItemComponent({
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const menuContentRef = useRef<HTMLDivElement>(null)
 
   // Cerrar menú al hacer clic fuera o con Escape
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      const isOutsideButton = !menuRef.current || !menuRef.current.contains(target)
+      const isOutsideMenu = !menuContentRef.current || !menuContentRef.current.contains(target)
+
+      if (isOutsideButton && isOutsideMenu) {
         setShowActionMenu(false)
         setShowAssignSubmenu(false)
       }
@@ -297,6 +302,7 @@ function ShoppingItemComponent({
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => { setShowActionMenu(false); setShowAssignSubmenu(false) }} />
           <div
+            ref={menuContentRef}
             role="menu"
             aria-label={`Acciones para ${item.name}`}
             className="fixed w-52 bg-card border border-border rounded-xl shadow-2xl z-[9999] py-1 animate-in fade-in slide-in-from-top-2 duration-150"
