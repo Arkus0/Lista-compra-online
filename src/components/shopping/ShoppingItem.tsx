@@ -84,12 +84,14 @@ function ShoppingItemComponent({
 
   // Cerrar menú al hacer clic fuera o con Escape
   useEffect(() => {
+    if (!showActionMenu) return
+
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node
       // Si el menú está montado en el portal, menuContentRef estará fuera del DOM del componente
       // pero debemos comprobar si el clic fue en el botón original o en el contenido del portal
-      const isOutsideButton = !menuRef.current || !menuRef.current.contains(target)
-      const isOutsideMenu = !menuContentRef.current || !menuContentRef.current.contains(target)
+      const isOutsideButton = menuRef.current && !menuRef.current.contains(target)
+      const isOutsideMenu = menuContentRef.current && !menuContentRef.current.contains(target)
 
       if (isOutsideButton && isOutsideMenu) {
         setShowActionMenu(false)
@@ -103,13 +105,17 @@ function ShoppingItemComponent({
         menuButtonRef.current?.focus()
       }
     }
-    if (showActionMenu) {
+
+    // Añadir listeners con un pequeño delay para evitar que capturen el click de apertura
+    const timeoutId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside)
       document.addEventListener('keydown', handleKeyDown)
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside)
-        document.removeEventListener('keydown', handleKeyDown)
-      }
+    }, 0)
+
+    return () => {
+      clearTimeout(timeoutId)
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
     }
   }, [showActionMenu])
 

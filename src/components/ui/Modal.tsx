@@ -42,14 +42,11 @@ export function Modal({
 
   // Effect 1: Focus management - only runs when modal opens/closes
   useEffect(() => {
-    console.log('[Modal] Effect 1 running, isOpen:', isOpen)
     if (isOpen) {
       // Store previously focused element when modal opens
       previousActiveElement.current = document.activeElement
-      console.log('[Modal] Stored previous element:', previousActiveElement.current)
     } else if (previousActiveElement.current instanceof HTMLElement) {
       // Restore focus when modal closes
-      console.log('[Modal] Restoring focus to:', previousActiveElement.current)
       previousActiveElement.current.focus()
       previousActiveElement.current = null
     }
@@ -99,7 +96,6 @@ export function Modal({
       {/* Modal content with animation */}
       <div
         ref={modalRef}
-        tabIndex={-1}
         className={`
           relative bg-card w-full ${sizeClasses[size]} rounded-2xl shadow-xl overflow-hidden
           animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-300

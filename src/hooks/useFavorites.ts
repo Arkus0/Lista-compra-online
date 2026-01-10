@@ -24,8 +24,13 @@ export function useFavorites(userId?: string): UseFavoritesReturn {
   useEffect(() => {
     if (!userId) {
       setIsLoading(false)
+      setFavoriteItems([])
+      setFavoriteLists(new Set())
       return
     }
+
+    // Resetear loading cuando cambia el userId
+    setIsLoading(true)
 
     const loadFavorites = async () => {
       const supabase = createClient()
