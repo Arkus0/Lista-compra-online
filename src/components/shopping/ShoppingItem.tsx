@@ -68,7 +68,9 @@ function ShoppingItemComponent({
   const [showImageModal, setShowImageModal] = useState(false)
   const [showActionMenu, setShowActionMenu] = useState(false)
   const [showAssignSubmenu, setShowAssignSubmenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
 
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
@@ -233,14 +235,27 @@ function ShoppingItemComponent({
         {/* Menú */}
         <div className="relative" ref={menuRef}>
           <button
-            onClick={() => setShowActionMenu(!showActionMenu)}
+            ref={menuButtonRef}
+            onClick={() => {
+              if (!showActionMenu && menuButtonRef.current) {
+                const rect = menuButtonRef.current.getBoundingClientRect()
+                setMenuPosition({
+                  top: rect.bottom + 4,
+                  right: window.innerWidth - rect.right
+                })
+              }
+              setShowActionMenu(!showActionMenu)
+            }}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-secondary"
           >
             <MoreVertical className="w-5 h-5" />
           </button>
 
-          {showActionMenu && (
-            <div className="absolute top-full right-0 mt-1 w-52 bg-card border border-border rounded-xl shadow-xl z-50 py-1 animate-in fade-in slide-in-from-top-2 duration-150">
+          {showActionMenu && menuPosition && (
+            <div
+              className="fixed w-52 bg-card border border-border rounded-xl shadow-xl z-[100] py-1 animate-in fade-in slide-in-from-top-2 duration-150"
+              style={{ top: `${menuPosition.top}px`, right: `${menuPosition.right}px` }}
+            >
               {onAssign && assignablePeople.length > 0 && (
                 <div className="relative">
                   <button

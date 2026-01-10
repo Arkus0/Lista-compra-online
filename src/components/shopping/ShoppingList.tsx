@@ -409,7 +409,35 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleAddImage = useCallback((itemId: string) => { setEditingItemId(itemId); setShowImageModal(true); setTimeout(() => imageInputRef.current?.click(), 100) }, [])
   const handleImageSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file || !editingItemId) return; const path = `items/${Date.now()}_${Math.random().toString(36).slice(2)}`; const imageUrl = await uploadImage(file, path); if (imageUrl) { updateItem(editingItemId, { image_url: imageUrl } as any); await supabase.from('list_items').update({ image_url: imageUrl }).eq('id', editingItemId) } setShowImageModal(false); setEditingItemId(null); if (imageInputRef.current) imageInputRef.current.value = '' }, [editingItemId, items, uploadImage, updateItem, supabase])
   const handleAddNote = useCallback((itemId: string) => { const item = items.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemNote(item?.note || ''); setShowNoteModal(true) }, [items])
-  const handleSaveNote = useCallback(async () => { if (!editingItemId) return; const noteValue = editingItemNote.trim() || null; updateItem(editingItemId, { note: noteValue } as any); await supabase.from('list_items').update({ note: noteValue }).eq('id', editingItemId); setShowNoteModal(false); setEditingItemId(null); setEditingItemNote('') }, [editingItemId, editingItemNote, updateItem, supabase])
+  const handleSaveNote = useCallback(async () => {
+    if (!editingItemId) return
+
+    const noteValue = editingItemNote.trim() || null
+
+    // Actualizar estado local primero (optimistic update)
+    updateItem(editingItemId, { note: noteValue } as any)
+
+    // Guardar en base de datos
+    const { error } = await supabase
+      .from('list_items')
+      .update({ note: noteValue })
+      .eq('id', editingItemId)
+
+    if (error) {
+      console.error('Error saving note:', error)
+      // Revertir cambio local si falla
+      const item = items.find(i => i.id === editingItemId)
+      if (item) {
+        updateItem(editingItemId, { note: item.note } as any)
+      }
+      return
+    }
+
+    // Cerrar modal solo si todo fue bien
+    setShowNoteModal(false)
+    setEditingItemId(null)
+    setEditingItemNote('')
+  }, [editingItemId, editingItemNote, items, updateItem, supabase])
   const handleCopyLink = () => { navigator.clipboard.writeText(shareUrl); setIsCopied(true); setTimeout(() => setIsCopied(false), 2000) }
   const closeModal = useCallback(() => setActiveModal(null), [])
   const handleUpdateName = async () => { if (!newName.trim()) return; await supabase.from('shopping_lists').update({ name: newName }).eq('id', list.id); closeModal(); router.refresh() }

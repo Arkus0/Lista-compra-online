@@ -31,7 +31,7 @@ interface NoteWithProfile extends ListNote {
 export function ListNotes({ listId, listName, currentUser, isCollaborative = false }: ListNotesProps) {
   const [notes, setNotes] = useState<NoteWithProfile[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [showNewNoteInput, setShowNewNoteInput] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [isSending, setIsSending] = useState(false)
 
@@ -160,11 +160,62 @@ export function ListNotes({ listId, listName, currentUser, isCollaborative = fal
   const unpinnedNotes = notes.filter((n) => !n.is_pinned)
 
   return (
-    <div className="border-t border-gray-100 dark:border-gray-800">
-      {/* Notas fijadas - siempre visibles */}
+    <div className="border-t border-gray-100 dark:border-gray-800 p-3 space-y-3">
+      {/* Botón para expandir/contraer input de nueva nota */}
+      <button
+        onClick={() => setShowNewNoteInput(!showNewNoteInput)}
+        className="w-full flex items-center justify-between p-2 hover:bg-secondary/50 rounded-lg transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-muted" />
+          <span className="text-sm font-medium">
+            {showNewNoteInput ? 'Ocultar' : 'Escribir nota'}
+          </span>
+        </div>
+        {showNewNoteInput ? (
+          <ChevronUp className="w-4 h-4 text-muted" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-muted" />
+        )}
+      </button>
+
+      {/* Input para nueva nota (expandible) */}
+      {showNewNoteInput && (
+        <div className="flex gap-2 animate-in slide-in-from-top-2 duration-200">
+          <textarea
+            ref={inputRef}
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleAddNote()
+              }
+            }}
+            placeholder="Escribe una nota..."
+            rows={2}
+            className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-background"
+            autoFocus
+          />
+          <Button
+            onClick={handleAddNote}
+            disabled={!newNote.trim() || isSending}
+            size="sm"
+            className="self-end"
+          >
+            {isSending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* Notas fijadas */}
       {pinnedNotes.length > 0 && (
-        <div className="px-3 pt-3 space-y-2">
-          <div className="flex items-center gap-2 mb-2">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
             <Pin className="w-3.5 h-3.5 text-amber-500" />
             <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
               Notas fijadas
@@ -182,88 +233,35 @@ export function ListNotes({ listId, listName, currentUser, isCollaborative = fal
         </div>
       )}
 
-      {/* Header toggle para ver todas las notas */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-3 hover:bg-secondary/50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-muted" />
-          <span className="text-sm font-medium">
-            {isExpanded ? 'Ocultar notas' : `Ver todas las notas (${notes.length})`}
-          </span>
+      {/* Lista de todas las notas */}
+      {isLoading ? (
+        <div className="flex justify-center py-4">
+          <Loader2 className="w-5 h-5 animate-spin text-muted" />
         </div>
-        {isExpanded ? (
-          <ChevronUp className="w-4 h-4 text-muted" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-muted" />
-        )}
-      </button>
-
-      {/* Contenido expandido */}
-      {isExpanded && (
-        <div className="px-3 pb-3 space-y-3">
-          {/* Input para nueva nota */}
-          <div className="flex gap-2">
-            <textarea
-              ref={inputRef}
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleAddNote()
-                }
-              }}
-              placeholder="Escribe una nota..."
-              rows={2}
-              className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-background"
-            />
-            <Button
-              onClick={handleAddNote}
-              disabled={!newNote.trim() || isSending}
-              size="sm"
-              className="self-end"
-            >
-              {isSending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
+      ) : notes.length === 0 ? (
+        <p className="text-sm text-muted text-center py-4">
+          No hay notas todavía. Haz clic en "Escribir nota" para añadir una.
+        </p>
+      ) : (
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {/* Notas no fijadas */}
+          {unpinnedNotes.length > 0 && (
+            <>
+              {pinnedNotes.length > 0 && (
+                <p className="text-xs font-medium text-muted mt-4 mb-2">
+                  Otras notas
+                </p>
               )}
-            </Button>
-          </div>
-
-          {/* Lista de todas las notas */}
-          {isLoading ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="w-5 h-5 animate-spin text-muted" />
-            </div>
-          ) : notes.length === 0 ? (
-            <p className="text-sm text-muted text-center py-4">
-              No hay notas todavía
-            </p>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {/* Notas no fijadas */}
-              {unpinnedNotes.length > 0 && (
-                <>
-                  {pinnedNotes.length > 0 && (
-                    <p className="text-xs font-medium text-muted mt-4 mb-2">
-                      Otras notas
-                    </p>
-                  )}
-                  {unpinnedNotes.map((note) => (
-                    <NoteCard
-                      key={note.id}
-                      note={note}
-                      isOwner={note.user_id === currentUser.id}
-                      onTogglePin={() => handleTogglePin(note.id, note.is_pinned)}
-                      onDelete={() => handleDeleteNote(note.id)}
-                    />
-                  ))}
-                </>
-              )}
-            </div>
+              {unpinnedNotes.map((note) => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  isOwner={note.user_id === currentUser.id}
+                  onTogglePin={() => handleTogglePin(note.id, note.is_pinned)}
+                  onDelete={() => handleDeleteNote(note.id)}
+                />
+              ))}
+            </>
           )}
         </div>
       )}
