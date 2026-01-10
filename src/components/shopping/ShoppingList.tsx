@@ -5,15 +5,16 @@ import { useRouter } from 'next/navigation'
 import {
   ShoppingBag, Users, Share2, MoreVertical,
   Trash2, Edit2, Check, Link as LinkIcon,
-  ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, Undo2,
+  ChevronDown, ChevronRight, LayoutGrid, Undo2,
   Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X,
-  FileText, Store, Zap, Plus
+  FileText, Zap, Plus
 } from 'lucide-react'
 import { ShoppingItem, AssignablePerson } from './ShoppingItem'
-import { AddItemForm } from './AddItemForm'
+// import { AddItemForm } -> Ya no se necesita aquí
+// import { FavoriteItems } -> Ya no se necesita aquí
+import { AddItemDrawer } from './AddItemDrawer' // NUEVO COMPONENTE
 import { PresenceIndicator } from './PresenceIndicator'
 import { ListNotes } from './ListNotes'
-import { FavoriteItems } from './FavoriteItems'
 import { useFavorites } from '@/hooks/useFavorites'
 import { useImageUpload } from '@/hooks/useImageUpload'
 import { Modal } from '@/components/ui/Modal'
@@ -46,8 +47,7 @@ import { SortableShoppingItem } from './SortableShoppingItem'
 import { sendPushNotification } from '@/lib/notifications'
 import { CATEGORIES, CategoryId, detectCategory, getSmartSuggestions, CommonProduct } from '@/lib/constants'
 
-// --- DATOS DEL CATÁLOGO RÁPIDO (CORREGIDO) ---
-// Se han añadido las claves faltantes para cumplir con Record<CategoryId, string[]>
+// --- DATOS DEL CATÁLOGO RÁPIDO ---
 const QUICK_CATALOG: Record<CategoryId, string[]> = {
   'fruits-veg': [
     'Manzanas', 'Plátanos', 'Lechuga', 'Tomates', 'Zanahorias', 
@@ -151,7 +151,7 @@ function UndoToast({
   )
 }
 
-// COMPONENTE MODAL DE CATÁLOGO (GAP 1)
+// COMPONENTE MODAL DE CATÁLOGO
 function CatalogModal({ 
   isOpen, 
   onClose, 
@@ -168,17 +168,14 @@ function CatalogModal({
   if (!isOpen) return null
 
   const handleItemClick = (item: string, categoryId: string) => {
-    // Haptic feedback
     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
     onSelect(item, categoryId)
   }
 
-  // Mapa de items existentes para marcar visualmente
   const existingMap = new Set(currentItems.filter(i => !i.checked).map(i => i.name.toLowerCase()))
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background animate-in slide-in-from-bottom duration-300">
-      {/* Header Modal */}
+    <div className="fixed inset-0 z-[60] flex flex-col bg-background animate-in slide-in-from-bottom duration-300">
       <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-card">
         <h2 className="font-bold text-lg flex items-center gap-2">
           <LayoutGrid className="w-5 h-5 text-primary" />
@@ -189,7 +186,6 @@ function CatalogModal({
         </button>
       </div>
 
-      {/* Tabs de Categorías Scrollable */}
       <div className="flex overflow-x-auto py-3 px-2 gap-2 border-b border-border bg-card/50 no-scrollbar">
         {Object.values(CATEGORIES).map(cat => (
           <button
@@ -207,7 +203,6 @@ function CatalogModal({
         ))}
       </div>
 
-      {/* Grid de Items */}
       <div className="flex-1 overflow-y-auto p-4 bg-secondary/10">
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 pb-20">
           {QUICK_CATALOG[activeTab]?.map((item) => {
@@ -270,13 +265,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
     isVisible: boolean, message: string, action: () => Promise<void> | void, timer: NodeJS.Timeout | null
   }>({ isVisible: false, message: '', action: () => {}, timer: null })
 
-  // Estados para scroll y visibilidad
-  const [isControlsVisible, setIsControlsVisible] = useState(true)
-  const [isInputActive, setIsInputActive] = useState(false)
-  
-  // Ref para el timeout del scroll
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  
   // Refs para medir la altura del header dinámicamente
   const headerRef = useRef<HTMLElement>(null)
   const [headerHeight, setHeaderHeight] = useState(130)
@@ -320,23 +308,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
       return () => resizeObserver.disconnect()
     }
   }, [user, collaborators, list.name])
-
-  // LOGICA DE SCROLL BLINDADA
-  const handleListScroll = useCallback(() => {
-    if (isInputActive) {
-      if (!isControlsVisible) setIsControlsVisible(true)
-      return
-    }
-    setIsControlsVisible(false)
-    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
-    scrollTimeoutRef.current = setTimeout(() => {
-      setIsControlsVisible(true)
-    }, 500)
-  }, [isInputActive, isControlsVisible])
-
-  useEffect(() => {
-    return () => { if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current) }
-  }, [])
 
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return items
@@ -479,7 +450,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
       {/* Header FLOTANTE */}
       <header 
         ref={headerRef}
-        className={`fixed top-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-md border-b border-border transition-transform duration-300 ${isControlsVisible ? 'translate-y-0' : '-translate-y-full'}`}
+        className="fixed top-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-md border-b border-border transition-transform duration-300 translate-y-0"
       >
         <div className="p-4">
           {showSearch ? (
@@ -516,7 +487,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
                     <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-20 py-2 animate-in fade-in slide-in-from-top-2">
-                       {/* Menú content */}
                        {uncheckedItems.length > 0 && <button onClick={handleMarkAllComplete} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><CheckCheck className="w-4 h-4 text-green-500" /> Marcar todo completado</button>}
                        {checkedItems.length > 0 && <button onClick={handleClearCompleted} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><Eraser className="w-4 h-4 text-orange-500" /> Limpiar completados ({checkedItems.length})</button>}
                        {(uncheckedItems.length > 0 || checkedItems.length > 0) && <div className="border-t border-border my-1" />}
@@ -550,9 +520,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
       {/* LISTA - Padding dinámico */}
       <div 
-        className="flex-1 overflow-y-auto p-4 space-y-2 pb-40 overscroll-contain"
+        className="flex-1 overflow-y-auto p-4 space-y-2 pb-32 overscroll-contain"
         style={{ paddingTop: `${headerHeight + 10}px` }}
-        onScroll={handleListScroll}
       >
         {isLoading ? (
           <div className="space-y-2"><ItemSkeleton /><ItemSkeleton /></div>
@@ -627,23 +596,17 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
       <UndoToast message={undoState.message} isVisible={undoState.isVisible} onUndo={handleUndo} />
 
-      {/* FOOTER FIXED - Integración del botón de catálogo */}
-      <div 
-        className="fixed bottom-0 left-0 right-0 bg-background z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-border/50"
-      >
-        <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isInputActive ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
-          <FavoriteItems favorites={favoriteItems} isLoading={favoritesLoading} onAddToList={handleAddFromFavorite} onRemove={removeFavoriteItem} />
-        </div>
-        <AddItemForm 
-          onAdd={handleAddItem} 
-          suggestionsSource={favoriteItems} 
-          isVisible={isControlsVisible || isInputActive} 
-          onFocusChange={setIsInputActive} 
-          onOpenCatalog={() => setActiveModal('catalog')} // NUEVO: Abrir modal
-        />
-      </div>
+      {/* NUEVO DRAWER Y FAB */}
+      <AddItemDrawer 
+        onAdd={handleAddItem}
+        onOpenCatalog={() => setActiveModal('catalog')}
+        favoriteItems={favoriteItems}
+        isLoadingFavorites={favoritesLoading}
+        onAddFromFavorite={handleAddFromFavorite}
+        onRemoveFavorite={removeFavoriteItem}
+      />
 
-      {/* MODAL DEL CATÁLOGO (GAP 1) */}
+      {/* MODAL DEL CATÁLOGO */}
       <CatalogModal 
         isOpen={activeModal === 'catalog'} 
         onClose={closeModal} 
