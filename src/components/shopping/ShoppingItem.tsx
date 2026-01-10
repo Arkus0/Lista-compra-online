@@ -300,13 +300,14 @@ function ShoppingItemComponent({
       {/* Menú contextual - Portal con posición fija */}
       {showActionMenu && menuPosition && (
         <>
-          <div className="fixed inset-0 z-[9998]" onClick={() => { setShowActionMenu(false); setShowAssignSubmenu(false) }} />
+          <div className="fixed inset-0 z-[9998]" onMouseDown={() => { setShowActionMenu(false); setShowAssignSubmenu(false) }} />
           <div
             ref={menuContentRef}
             role="menu"
             aria-label={`Acciones para ${item.name}`}
             className="fixed w-52 bg-card border border-border rounded-xl shadow-2xl z-[9999] py-1 animate-in fade-in slide-in-from-top-2 duration-150"
             style={{ top: menuPosition.top, right: menuPosition.right }}
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             {onAssign && assignablePeople.length > 0 && (
@@ -322,7 +323,7 @@ function ShoppingItemComponent({
                   <span className="flex-1">Asignar a...</span>
                 </button>
                 {showAssignSubmenu && (
-                  <div role="menu" aria-label="Personas disponibles" className="absolute left-full top-0 ml-1 w-48 bg-card border border-border rounded-xl shadow-xl z-[9999] py-1 animate-in fade-in slide-in-from-left-2 duration-150" onClick={(e) => e.stopPropagation()}>
+                  <div role="menu" aria-label="Personas disponibles" className="absolute left-full top-0 ml-1 w-48 bg-card border border-border rounded-xl shadow-xl z-[9999] py-1 animate-in fade-in slide-in-from-left-2 duration-150" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
                     {assignedToProfile && (
                        <button role="menuitem" onClick={() => handleAssign(null)} className="w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 text-danger"><X className="w-4 h-4" /> Quitar</button>
                     )}
