@@ -239,7 +239,7 @@ function CatalogModal({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 bg-secondary/10">
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 pb-20">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pb-20">
           {QUICK_CATALOG[activeTab]?.map((item) => {
              const itemData = itemQuantityMap.get(item.toLowerCase())
              const quantity = itemData?.quantity || 0
@@ -249,7 +249,7 @@ function CatalogModal({
               <div
                 key={item}
                 className={`
-                  aspect-square flex flex-col items-center justify-center p-2 rounded-2xl border transition-all duration-200
+                  aspect-square flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-200
                   ${hasItem
                     ? 'bg-primary/10 border-primary shadow-[0_0_0_2px] shadow-primary/20'
                     : 'bg-card border-border shadow-sm'
@@ -258,34 +258,34 @@ function CatalogModal({
               >
                 {hasItem ? (
                   // Show quantity with +/- buttons
-                  <div className="flex items-center gap-1 mb-1">
+                  <div className="flex items-center gap-2 mb-2">
                     <button
                       onClick={(e) => handleRemoveClick(itemData!.id, e)}
-                      className="w-7 h-7 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/50 active:scale-95 transition-all"
+                      className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/50 active:scale-95 transition-all"
                     >
-                      <span className="text-lg font-bold leading-none">−</span>
+                      <span className="text-xl font-bold leading-none">−</span>
                     </button>
-                    <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                    <span className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-base font-bold">
                       {quantity}
                     </span>
                     <button
                       onClick={(e) => handleAddClick(item, activeTab, e)}
-                      className="w-7 h-7 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/50 active:scale-95 transition-all"
+                      className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/50 active:scale-95 transition-all"
                     >
-                      <span className="text-lg font-bold leading-none">+</span>
+                      <span className="text-xl font-bold leading-none">+</span>
                     </button>
                   </div>
                 ) : (
                   // Show add button
                   <button
                     onClick={(e) => handleAddClick(item, activeTab, e)}
-                    className="w-8 h-8 rounded-full flex items-center justify-center mb-2 transition-colors bg-secondary text-muted-foreground hover:bg-primary hover:text-primary-foreground active:scale-95"
+                    className="w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-colors bg-secondary text-muted-foreground hover:bg-primary hover:text-primary-foreground active:scale-95"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-6 h-6" />
                   </button>
                 )}
-                <span className="text-lg mb-0.5">{getProductEmoji(item, activeTab)}</span>
-                <span className="text-xs text-center font-medium leading-tight line-clamp-2">{item}</span>
+                <span className="text-2xl mb-1">{getProductEmoji(item, activeTab)}</span>
+                <span className="text-sm text-center font-medium leading-tight line-clamp-2">{item}</span>
               </div>
              )
           })}
@@ -596,12 +596,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Link>
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center relative">
-                  <ShoppingBag className="w-5 h-5 text-primary" />
-                  <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-background ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
-                </div>
-                <h1 className="font-bold text-lg truncate max-w-[140px]">{list.name}</h1>
+                <h1 className="font-bold text-lg truncate max-w-[180px]">{list.name}</h1>
                 {presenceUsers.length > 0 && <PresenceIndicator users={presenceUsers} maxVisible={2} />}
+                {isConnected && <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />}
               </div>
 
               <div className="flex items-center gap-1 relative">
@@ -613,13 +610,13 @@ export function ShoppingList({ list }: ShoppingListProps) {
                   <Zap className="w-5 h-5" />
                 </Link>
                 <button onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted" title="Buscar"><Search className="w-5 h-5" /></button>
-                <button onClick={openShareModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted" title="Compartir"><Share2 className="w-5 h-5" /></button>
                 <button onClick={toggleMenu} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><MoreVertical className="w-5 h-5" /></button>
 
                 {showMenu && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                    <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                    <div className="fixed inset-0 z-[9998]" onClick={() => setShowMenu(false)} />
+                    <div className="fixed top-16 right-4 w-56 bg-card border border-border rounded-xl shadow-xl z-[9999] py-2 animate-in fade-in slide-in-from-top-2">
+                       <button onClick={() => { openShareModal(); setShowMenu(false) }} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><Share2 className="w-4 h-4 text-primary" /> Compartir</button>
                        <button onClick={() => { openCollaboratorsModal(); setShowMenu(false) }} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" /> Colaboradores</button>
                        <button
                          onClick={() => { setShowNotes(!showNotes); setShowMenu(false) }}

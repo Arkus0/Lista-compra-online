@@ -6,6 +6,7 @@ import { Plus, ShoppingBag, TrendingDown, Users } from 'lucide-react'
 import Link from 'next/link'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
 import { RecipeSection } from '@/components/recipes/RecipeSection'
+import { FeedbackBox } from '@/components/ui/FeedbackBox'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -65,8 +66,7 @@ export default async function Home() {
       <main className="p-4 space-y-6">
         {/* Welcome section */}
         <section>
-          <h2 className="text-2xl font-bold mb-1">Hola!</h2>
-          <p className="text-gray-500 mb-4">Que vas a comprar hoy?</p>
+          <h2 className="text-2xl font-bold mb-4">¡Hola!</h2>
           {/* Global Search */}
           <GlobalSearch userId={user.id} />
         </section>
@@ -185,6 +185,11 @@ export default async function Home() {
               </Card>
             </Link>
           </div>
+        </section>
+
+        {/* Sugerencias */}
+        <section>
+          <FeedbackBox variant="card" />
         </section>
       </main>
 
