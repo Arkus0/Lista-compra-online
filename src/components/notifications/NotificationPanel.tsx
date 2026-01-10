@@ -16,6 +16,7 @@ interface NotificationPanelProps {
   onDelete: (id: string) => void
   onClearAll: () => void
   onClose: () => void
+  triggerRef?: React.RefObject<HTMLButtonElement | null>
 }
 
 export function NotificationPanel({
@@ -27,20 +28,26 @@ export function NotificationPanel({
   onDelete,
   onClearAll,
   onClose,
+  triggerRef,
 }: NotificationPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
 
-  // Cerrar al hacer click fuera
+  // Cerrar al hacer click fuera (excluyendo el botón trigger)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      // Don't close if clicking on the trigger button (bell icon)
+      if (triggerRef?.current && triggerRef.current.contains(target)) {
+        return
+      }
+      if (panelRef.current && !panelRef.current.contains(target)) {
         onClose()
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
+  }, [onClose, triggerRef])
 
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {

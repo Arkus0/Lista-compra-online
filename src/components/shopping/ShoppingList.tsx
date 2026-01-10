@@ -7,7 +7,7 @@ import {
   Trash2, Edit2, Check, Link as LinkIcon,
   ChevronDown, ChevronRight, LayoutGrid, Undo2,
   Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X,
-  FileText, Zap, Plus, Eye, EyeOff
+  FileText, Zap, Plus, Eye, EyeOff, Star, Minus
 } from 'lucide-react'
 import { ShoppingItem, AssignablePerson } from './ShoppingItem'
 import { AddItemDrawer } from './AddItemDrawer'
@@ -106,55 +106,107 @@ const ItemSkeleton = () => (
   </div>
 )
 
-// COMPONENTE TOAST PARA DESHACER
-function UndoToast({ 
-  message, 
-  onUndo, 
-  isVisible 
-}: { 
-  message: string, 
-  onUndo: () => void, 
-  isVisible: boolean 
+// TIPOS DE TOAST
+type ToastType = 'success' | 'info' | 'warning' | 'undo'
+
+// COMPONENTE TOAST MEJORADO
+function ActionToast({
+  message,
+  type = 'info',
+  icon,
+  onUndo,
+  isVisible
+}: {
+  message: string,
+  type?: ToastType,
+  icon?: React.ReactNode,
+  onUndo?: () => void,
+  isVisible: boolean
 }) {
   if (!isVisible) return null
-  
+
+  const bgColors = {
+    success: 'bg-green-600',
+    info: 'bg-foreground',
+    warning: 'bg-amber-500',
+    undo: 'bg-foreground'
+  }
+
   return (
     <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 w-[90%] max-w-sm pointer-events-auto">
-      <div className="bg-foreground text-background px-4 py-3 rounded-xl shadow-2xl flex items-center gap-4 justify-between">
-        <span className="text-sm font-medium truncate">{message}</span>
-        <button 
-          onClick={onUndo}
-          className="text-primary-foreground font-bold text-sm hover:underline flex items-center gap-1 whitespace-nowrap"
-        >
-          <Undo2 className="w-4 h-4" /> Deshacer
-        </button>
+      <div className={`${bgColors[type]} text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 justify-between`}>
+        {icon && <span className="flex-shrink-0">{icon}</span>}
+        <span className="text-sm font-medium truncate flex-1">{message}</span>
+        {onUndo && (
+          <button
+            onClick={onUndo}
+            className="text-white/90 font-bold text-sm hover:text-white flex items-center gap-1 whitespace-nowrap"
+          >
+            <Undo2 className="w-4 h-4" /> Deshacer
+          </button>
+        )}
       </div>
     </div>
   )
 }
 
+// COMPONENTE TOAST LEGACY (para compatibilidad)
+function UndoToast({
+  message,
+  onUndo,
+  isVisible
+}: {
+  message: string,
+  onUndo: () => void,
+  isVisible: boolean
+}) {
+  return (
+    <ActionToast
+      message={message}
+      type="undo"
+      onUndo={onUndo}
+      isVisible={isVisible}
+      icon={<Check className="w-4 h-4" />}
+    />
+  )
+}
+
 // COMPONENTE MODAL DE CATÁLOGO
-function CatalogModal({ 
-  isOpen, 
-  onClose, 
-  onSelect, 
-  currentItems 
-}: { 
-  isOpen: boolean, 
-  onClose: () => void, 
+function CatalogModal({
+  isOpen,
+  onClose,
+  onSelect,
+  onRemove,
+  currentItems
+}: {
+  isOpen: boolean,
+  onClose: () => void,
   onSelect: (name: string, category: string) => void,
+  onRemove: (id: string) => void,
   currentItems: ListItem[]
 }) {
   const [activeTab, setActiveTab] = useState<CategoryId>('fruits-veg')
-  
+
   if (!isOpen) return null
 
-  const handleItemClick = (item: string, categoryId: string) => {
+  const handleAddClick = (item: string, categoryId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
     onSelect(item, categoryId)
   }
 
-  const existingMap = new Set(currentItems.filter(i => !i.checked).map(i => i.name.toLowerCase()))
+  const handleRemoveClick = (itemId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
+    onRemove(itemId)
+  }
+
+  // Map of item names to their quantity and id (only unchecked items)
+  const itemQuantityMap = new Map<string, { quantity: number, id: string }>()
+  currentItems.filter(i => !i.checked).forEach(item => {
+    const key = item.name.toLowerCase()
+    itemQuantityMap.set(key, { quantity: item.quantity || 1, id: item.id })
+  })
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-background animate-in slide-in-from-bottom duration-300">
@@ -174,8 +226,8 @@ function CatalogModal({
             key={cat.id}
             onClick={() => setActiveTab(cat.id)}
             className={`flex flex-col items-center gap-1 min-w-[70px] p-2 rounded-xl transition-all ${
-              activeTab === cat.id 
-                ? 'bg-primary text-primary-foreground shadow-md scale-105' 
+              activeTab === cat.id
+                ? 'bg-primary text-primary-foreground shadow-md scale-105'
                 : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
             }`}
           >
@@ -188,27 +240,51 @@ function CatalogModal({
       <div className="flex-1 overflow-y-auto p-4 bg-secondary/10">
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 pb-20">
           {QUICK_CATALOG[activeTab]?.map((item) => {
-             const exists = existingMap.has(item.toLowerCase())
+             const itemData = itemQuantityMap.get(item.toLowerCase())
+             const quantity = itemData?.quantity || 0
+             const hasItem = quantity > 0
+
              return (
-              <button
+              <div
                 key={item}
-                onClick={() => handleItemClick(item, activeTab)}
                 className={`
-                  aspect-square flex flex-col items-center justify-center p-2 rounded-2xl border transition-all duration-200 active:scale-95
-                  ${exists 
-                    ? 'bg-primary/10 border-primary shadow-[0_0_0_2px] shadow-primary/20' 
-                    : 'bg-card border-border shadow-sm hover:border-primary/50'
+                  aspect-square flex flex-col items-center justify-center p-2 rounded-2xl border transition-all duration-200
+                  ${hasItem
+                    ? 'bg-primary/10 border-primary shadow-[0_0_0_2px] shadow-primary/20'
+                    : 'bg-card border-border shadow-sm'
                   }
                 `}
               >
-                <div className={`
-                  w-8 h-8 rounded-full flex items-center justify-center mb-2 transition-colors
-                  ${exists ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}
-                `}>
-                  {exists ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                </div>
+                {hasItem ? (
+                  // Show quantity with +/- buttons
+                  <div className="flex items-center gap-1 mb-1">
+                    <button
+                      onClick={(e) => handleRemoveClick(itemData!.id, e)}
+                      className="w-7 h-7 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/50 active:scale-95 transition-all"
+                    >
+                      <span className="text-lg font-bold leading-none">−</span>
+                    </button>
+                    <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                      {quantity}
+                    </span>
+                    <button
+                      onClick={(e) => handleAddClick(item, activeTab, e)}
+                      className="w-7 h-7 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/50 active:scale-95 transition-all"
+                    >
+                      <span className="text-lg font-bold leading-none">+</span>
+                    </button>
+                  </div>
+                ) : (
+                  // Show add button
+                  <button
+                    onClick={(e) => handleAddClick(item, activeTab, e)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center mb-2 transition-colors bg-secondary text-muted-foreground hover:bg-primary hover:text-primary-foreground active:scale-95"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                )}
                 <span className="text-xs text-center font-medium leading-tight line-clamp-2">{item}</span>
-              </button>
+              </div>
              )
           })}
         </div>
@@ -248,6 +324,11 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const [undoState, setUndoState] = useState<{
     isVisible: boolean, message: string, action: () => Promise<void> | void, timer: NodeJS.Timeout | null
   }>({ isVisible: false, message: '', action: () => {}, timer: null })
+
+  // Toast de acción para feedback visual
+  const [actionToast, setActionToast] = useState<{
+    isVisible: boolean, message: string, type: ToastType, icon?: React.ReactNode
+  }>({ isVisible: false, message: '', type: 'info' })
 
   const headerRef = useRef<HTMLElement>(null)
   const [headerHeight, setHeaderHeight] = useState(130)
@@ -368,6 +449,14 @@ export function ShoppingList({ list }: ShoppingListProps) {
   }
   const handleUndo = async () => { if (undoState.action) { await undoState.action(); setUndoState(prev => ({ ...prev, isVisible: false })); if (undoState.timer) clearTimeout(undoState.timer) } }
 
+  // Show action toast (simple feedback without undo)
+  const showActionToast = useCallback((message: string, type: ToastType = 'success', icon?: React.ReactNode) => {
+    // Hide undo toast if visible
+    setUndoState(prev => ({ ...prev, isVisible: false }))
+    setActionToast({ isVisible: true, message, type, icon })
+    setTimeout(() => setActionToast(prev => ({ ...prev, isVisible: false })), 1500)
+  }, [])
+
   const handleAddItem = useCallback(async (name: string, category?: string, imageUrl?: string) => {
     if (!user) return
     const normalizedName = name.trim().toLowerCase()
@@ -377,23 +466,32 @@ export function ShoppingList({ list }: ShoppingListProps) {
       updateItem(existingItem.id, { quantity: newQuantity, checked: false })
       const { error } = await supabase.from('list_items').update({ quantity: newQuantity, checked: false, checked_by: null, category: existingItem.category === 'other' && category ? category : existingItem.category }).eq('id', existingItem.id)
       if (error) { updateItem(existingItem.id, { quantity: existingItem.quantity, checked: existingItem.checked }); return }
+      showActionToast(`${existingItem.name} (×${newQuantity})`, 'success', <Plus className="w-4 h-4" />)
       sendPushNotification({ listId: list.id, listName: list.name, action: 'item_added', actorName: user.name || 'Alguien', itemName: existingItem.name, excludeUserId: user.id })
     } else {
       const maxPosition = items.length > 0 ? Math.max(...items.map(i => i.position ?? 0)) : -1
       const itemData = { list_id: list.id, name: name.trim(), category, added_by: user.id, position: maxPosition + 1, image_url: imageUrl }
       const { data, error } = await supabase.from('list_items').insert(itemData).select().single()
-      if (!error && data) { addItem(data as ListItem); sendPushNotification({ listId: list.id, listName: list.name, action: 'item_added', actorName: user.name || 'Alguien', itemName: name, excludeUserId: user.id }) }
+      if (!error && data) {
+        addItem(data as ListItem)
+        showActionToast(`Añadido: ${name.trim()}`, 'success', <Plus className="w-4 h-4" />)
+        sendPushNotification({ listId: list.id, listName: list.name, action: 'item_added', actorName: user.name || 'Alguien', itemName: name, excludeUserId: user.id })
+      }
     }
-  }, [user, items, list.id, list.name, supabase, updateItem, addItem])
+  }, [user, items, list.id, list.name, supabase, updateItem, addItem, showActionToast])
 
   const handleToggleItem = useCallback(async (id: string) => {
     const item = items.find((i) => i.id === id); if (!item || !user) return
-    const newChecked = !item.checked; toggleItemChecked(id) 
+    const newChecked = !item.checked; toggleItemChecked(id)
     const undoAction = async () => { toggleItemChecked(id); await supabase.from('list_items').update({ checked: !newChecked, checked_by: !newChecked ? null : user.id }).eq('id', id) }
-    if (newChecked) showUndoToast(`Completado: ${item.name}`, undoAction)
+    if (newChecked) {
+      showUndoToast(`Comprado: ${item.name}`, undoAction)
+    } else {
+      showActionToast(`Devuelto a la lista: ${item.name}`, 'info', <Undo2 className="w-4 h-4" />)
+    }
     const { error } = await supabase.from('list_items').update({ checked: newChecked, checked_by: newChecked ? user.id : null }).eq('id', id)
     if (error) toggleItemChecked(id); else if (newChecked) sendPushNotification({ listId: list.id, listName: list.name, action: 'item_checked', actorName: user.name || 'Alguien', itemName: item.name, excludeUserId: user.id })
-  }, [items, user, toggleItemChecked, supabase, list.id, list.name])
+  }, [items, user, toggleItemChecked, supabase, list.id, list.name, showActionToast])
 
   const handleDeleteItem = useCallback(async (id: string) => {
     const item = items.find((i) => i.id === id); if (!item || !user) return; removeItem(id)
@@ -402,8 +500,38 @@ export function ShoppingList({ list }: ShoppingListProps) {
   }, [items, user, removeItem, addItem, supabase, list.id, list.name])
 
   const handleUpdateQuantity = useCallback(async (id: string, quantity: number) => { const item = items.find((i) => i.id === id); if (!item) return; const oldQuantity = item.quantity; updateItem(id, { quantity }); const { error } = await supabase.from('list_items').update({ quantity }).eq('id', id); if (error) updateItem(id, { quantity: oldQuantity }) }, [items, updateItem, supabase])
-  const handleAddToFavorites = useCallback(async (item: ListItem) => { await addFavoriteItem({ name: item.name, quantity: item.quantity, unit: item.unit, category: item.category }) }, [addFavoriteItem])
-  const handleAddFromFavorite = useCallback(async (favorite: typeof favoriteItems[0]) => { const result = await addItemToListFromFavorite(favorite, list.id); if (result) { if (result.action === 'created') addItem(result.item as ListItem); else updateItem(result.item.id, { quantity: result.item.quantity, checked: result.item.checked }) } }, [addItemToListFromFavorite, list.id, addItem, updateItem])
+
+  // Handle catalog decrement: reduce quantity or remove if quantity is 1
+  const handleCatalogRemove = useCallback(async (id: string) => {
+    const item = items.find((i) => i.id === id)
+    if (!item) return
+
+    const currentQuantity = item.quantity || 1
+
+    if (currentQuantity <= 1) {
+      // Remove the item completely
+      await handleDeleteItem(id)
+    } else {
+      // Decrement quantity
+      await handleUpdateQuantity(id, currentQuantity - 1)
+    }
+  }, [items, handleDeleteItem, handleUpdateQuantity])
+  const handleAddToFavorites = useCallback(async (item: ListItem) => {
+    await addFavoriteItem({ name: item.name, quantity: item.quantity, unit: item.unit, category: item.category })
+    showActionToast(`Añadido a favoritos: ${item.name}`, 'success', <Star className="w-4 h-4" />)
+  }, [addFavoriteItem, showActionToast])
+  const handleAddFromFavorite = useCallback(async (favorite: typeof favoriteItems[0]) => {
+    const result = await addItemToListFromFavorite(favorite, list.id)
+    if (result) {
+      if (result.action === 'created') {
+        addItem(result.item as ListItem)
+        showActionToast(`Añadido: ${favorite.name}`, 'success', <Star className="w-4 h-4" />)
+      } else {
+        updateItem(result.item.id, { quantity: result.item.quantity, checked: result.item.checked })
+        showActionToast(`${favorite.name} (×${result.item.quantity})`, 'success', <Plus className="w-4 h-4" />)
+      }
+    }
+  }, [addItemToListFromFavorite, list.id, addItem, updateItem, showActionToast])
   const handleAddFromSuggestion = useCallback((suggestion: CommonProduct) => { handleAddItem(suggestion.name, suggestion.category) }, [handleAddItem])
   const handleAssignItem = useCallback(async (itemId: string, userId: string | null) => { const item = items.find(i => i.id === itemId); if (!item) return; updateItem(itemId, { assigned_to: userId } as any); const { error } = await supabase.from('list_items').update({ assigned_to: userId }).eq('id', itemId); if (error) updateItem(itemId, { assigned_to: item.assigned_to } as any) }, [items, updateItem, supabase])
   const handleAddImage = useCallback((itemId: string) => { setEditingItemId(itemId); setShowImageModal(true); setTimeout(() => imageInputRef.current?.click(), 100) }, [])
@@ -629,6 +757,15 @@ export function ShoppingList({ list }: ShoppingListProps) {
       </div>
 
       <UndoToast message={undoState.message} isVisible={undoState.isVisible} onUndo={handleUndo} />
+      {/* Action toast for simple feedback */}
+      {!undoState.isVisible && (
+        <ActionToast
+          message={actionToast.message}
+          type={actionToast.type}
+          icon={actionToast.icon}
+          isVisible={actionToast.isVisible}
+        />
+      )}
 
       {/* NUEVO DRAWER Y FAB */}
       <AddItemDrawer 
@@ -641,10 +778,11 @@ export function ShoppingList({ list }: ShoppingListProps) {
       />
 
       {/* MODAL DEL CATÁLOGO */}
-      <CatalogModal 
-        isOpen={activeModal === 'catalog'} 
-        onClose={closeModal} 
+      <CatalogModal
+        isOpen={activeModal === 'catalog'}
+        onClose={closeModal}
         onSelect={handleAddItem}
+        onRemove={handleCatalogRemove}
         currentItems={items}
       />
 
