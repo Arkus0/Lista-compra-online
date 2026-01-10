@@ -11,7 +11,8 @@ import { BarcodeScannerModal } from './BarcodeScannerModal'
 interface AddItemFormProps {
   onAdd: (name: string, category: string, imageUrl?: string) => void | Promise<void>
   suggestionsSource?: UserFavoriteItem[]
-  isVisible?: boolean // <--- NUEVA PROP
+  isVisible?: boolean
+  onFocusChange?: (isFocused: boolean) => void // <--- NUEVA PROP
 }
 
 // Hook personalizado para debounce
@@ -31,7 +32,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
-function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true }: AddItemFormProps) {
+function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true, onFocusChange }: AddItemFormProps) {
   const [name, setName] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('other')
   const [showCategories, setShowCategories] = useState(false)
@@ -58,6 +59,11 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true 
   const inputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   
+  // Comunicar cambio de foco al padre
+  useEffect(() => {
+    onFocusChange?.(isInputFocused)
+  }, [isInputFocused, onFocusChange])
+
   // Hook de reconocimiento de voz
   const {
     isListening,
