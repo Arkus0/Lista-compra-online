@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   ShoppingBag, Users, Share2, MoreVertical,
   Trash2, Edit2, Check, Link as LinkIcon,
@@ -27,7 +28,7 @@ import {
 } from '@/store/useStore'
 import { useRealtimeList } from '@/hooks/useRealtimeList'
 import { sendPushNotification } from '@/lib/notifications'
-import { CATEGORIES, CategoryId, detectCategory, getSmartSuggestions, CommonProduct } from '@/lib/constants'
+import { CATEGORIES, CategoryId, detectCategory, getSmartSuggestions, CommonProduct, getProductEmoji, getCategoryEmoji } from '@/lib/constants'
 
 // --- DATOS DEL CATÁLOGO RÁPIDO ---
 const QUICK_CATALOG: Record<CategoryId, string[]> = {
@@ -283,6 +284,7 @@ function CatalogModal({
                     <Plus className="w-5 h-5" />
                   </button>
                 )}
+                <span className="text-lg mb-0.5">{getProductEmoji(item, activeTab)}</span>
                 <span className="text-xs text-center font-medium leading-tight line-clamp-2">{item}</span>
               </div>
              )
@@ -599,6 +601,13 @@ export function ShoppingList({ list }: ShoppingListProps) {
               </div>
 
               <div className="flex items-center gap-2 relative">
+                <Link
+                  href={`/lists/${list.id}/super`}
+                  className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-green-500 flex items-center justify-center text-white shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all"
+                  title="Modo Super"
+                >
+                  <Zap className="w-5 h-5" />
+                </Link>
                 <button onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted" title="Buscar"><Search className="w-5 h-5" /></button>
                 
                 {/* BOTÓN TOGGLE NOTAS (REUTILIZADO) */}

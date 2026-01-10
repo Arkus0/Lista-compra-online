@@ -6,6 +6,7 @@ import {
   UserPlus, X, MoreVertical, StickyNote, Camera
 } from 'lucide-react'
 import { ListItem, Profile } from '@/lib/supabase/types'
+import { getProductEmoji, CategoryId } from '@/lib/constants'
 
 // Tipo simple para personas asignables
 export interface AssignablePerson {
@@ -186,6 +187,7 @@ function ShoppingItemComponent({
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex items-center gap-2 flex-wrap">
             <p className={`text-base font-medium truncate transition-all ${item.checked ? 'line-through text-muted' : 'text-foreground'}`}>
+              <span className="mr-1.5">{getProductEmoji(item.name, item.category as CategoryId)}</span>
               {item.name}
             </p>
             
