@@ -887,3 +887,364 @@ export function getSmartSuggestions(
 
   return sortedSuggestions
 }
+
+// ============================================
+// EMOJIS PARA PRODUCTOS
+// ============================================
+
+// Mapeo de productos específicos a emojis
+const PRODUCT_EMOJIS: Record<string, string> = {
+  // ===== FRUTAS =====
+  'manzana': '🍎', 'manzanas': '🍎',
+  'platano': '🍌', 'platanos': '🍌', 'banana': '🍌', 'bananas': '🍌',
+  'naranja': '🍊', 'naranjas': '🍊',
+  'mandarina': '🍊', 'mandarinas': '🍊', 'clementina': '🍊',
+  'limon': '🍋', 'limones': '🍋', 'lima': '🍋',
+  'fresa': '🍓', 'fresas': '🍓', 'freson': '🍓',
+  'uva': '🍇', 'uvas': '🍇',
+  'pera': '🍐', 'peras': '🍐',
+  'melocoton': '🍑', 'melocotones': '🍑', 'nectarina': '🍑',
+  'cereza': '🍒', 'cerezas': '🍒',
+  'sandia': '🍉',
+  'melon': '🍈',
+  'piña': '🍍', 'pina': '🍍',
+  'mango': '🥭',
+  'coco': '🥥',
+  'kiwi': '🥝', 'kiwis': '🥝',
+  'aguacate': '🥑', 'aguacates': '🥑',
+  'arandano': '🫐', 'arandanos': '🫐',
+  'frambuesa': '🫐', 'frambuesas': '🫐', 'mora': '🫐', 'moras': '🫐',
+  'ciruela': '🫐', 'ciruelas': '🫐',
+  'higo': '🫐', 'higos': '🫐',
+  'granada': '🫐',
+  'papaya': '🥭',
+
+  // ===== VERDURAS =====
+  'tomate': '🍅', 'tomates': '🍅',
+  'zanahoria': '🥕', 'zanahorias': '🥕',
+  'pepino': '🥒', 'pepinos': '🥒',
+  'berenjena': '🍆', 'berenjenas': '🍆',
+  'brocoli': '🥦', 'brecol': '🥦',
+  'lechuga': '🥬', 'ensalada': '🥬',
+  'espinaca': '🥬', 'espinacas': '🥬', 'acelga': '🥬', 'acelgas': '🥬',
+  'col': '🥬', 'repollo': '🥬', 'lombarda': '🥬',
+  'coliflor': '🥬',
+  'patata': '🥔', 'patatas': '🥔', 'papa': '🥔', 'papas': '🥔',
+  'boniato': '🍠', 'batata': '🍠',
+  'cebolla': '🧅', 'cebollas': '🧅', 'cebolleta': '🧅',
+  'ajo': '🧄', 'ajos': '🧄',
+  'pimiento': '🫑', 'pimientos': '🫑',
+  'calabacin': '🥒', 'calabacines': '🥒',
+  'calabaza': '🎃',
+  'champiñon': '🍄', 'champiñones': '🍄', 'seta': '🍄', 'setas': '🍄',
+  'maiz': '🌽',
+  'puerro': '🧅', 'puerros': '🧅',
+  'judias verdes': '🫛', 'judia verde': '🫛',
+  'guisante': '🫛', 'guisantes': '🫛',
+  'esparrago': '🥬', 'esparragos': '🥬',
+  'alcachofa': '🥬', 'alcachofas': '🥬',
+  'jengibre': '🫚',
+  'perejil': '🌿', 'cilantro': '🌿', 'albahaca': '🌿', 'hierbas': '🌿',
+
+  // ===== CARNES =====
+  'pollo': '🍗', 'pechuga': '🍗', 'muslo': '🍗', 'alita': '🍗',
+  'pavo': '🦃',
+  'ternera': '🥩', 'vaca': '🥩', 'carne': '🥩',
+  'filete': '🥩', 'bistec': '🥩', 'entrecot': '🥩', 'solomillo': '🥩',
+  'chuleton': '🥩', 'chuleta': '🥩',
+  'cerdo': '🥓', 'lomo': '🥓',
+  'costilla': '🍖', 'costillas': '🍖',
+  'cordero': '🍖',
+  'conejo': '🍖',
+  'carne picada': '🥩', 'picada': '🥩',
+  'hamburguesa': '🍔',
+  'albondiga': '🧆', 'albondigas': '🧆',
+  'bacon': '🥓', 'panceta': '🥓', 'tocino': '🥓',
+  'jamon': '🥓', 'serrano': '🥓', 'iberico': '🥓', 'york': '🥓',
+  'chorizo': '🌭', 'salchichon': '🌭', 'fuet': '🌭', 'salchicha': '🌭',
+  'mortadela': '🌭', 'embutido': '🌭',
+  'sobrasada': '🥫',
+  'morcilla': '🌭',
+
+  // ===== PESCADOS Y MARISCOS =====
+  'pescado': '🐟', 'pescados': '🐟',
+  'salmon': '🍣',
+  'atun': '🐟', 'bonito': '🐟',
+  'merluza': '🐟', 'bacalao': '🐟', 'lubina': '🐟', 'dorada': '🐟',
+  'trucha': '🐟', 'sardina': '🐟', 'sardinas': '🐟',
+  'boqueron': '🐟', 'boquerones': '🐟', 'anchoa': '🐟',
+  'rape': '🐟', 'lenguado': '🐟',
+  'gamba': '🦐', 'gambas': '🦐', 'langostino': '🦐', 'langostinos': '🦐',
+  'camaron': '🦐', 'camarones': '🦐',
+  'marisco': '🦐', 'mariscos': '🦐',
+  'mejillon': '🦪', 'mejillones': '🦪',
+  'almeja': '🦪', 'almejas': '🦪', 'berberecho': '🦪',
+  'ostra': '🦪', 'ostras': '🦪',
+  'pulpo': '🐙',
+  'calamar': '🦑', 'calamares': '🦑', 'sepia': '🦑',
+  'cangrejo': '🦀',
+
+  // ===== LÁCTEOS =====
+  'leche': '🥛',
+  'huevo': '🥚', 'huevos': '🥚',
+  'yogur': '🥛', 'yogures': '🥛', 'yogurt': '🥛',
+  'queso': '🧀', 'quesos': '🧀',
+  'mozzarella': '🧀', 'parmesano': '🧀', 'manchego': '🧀',
+  'mantequilla': '🧈',
+  'margarina': '🧈',
+  'nata': '🥛',
+  'batido': '🥛',
+
+  // ===== PAN Y BOLLERÍA =====
+  'pan': '🍞',
+  'barra': '🥖', 'baguette': '🥖',
+  'pan de molde': '🍞',
+  'tostada': '🍞', 'tostadas': '🍞',
+  'croissant': '🥐', 'croissants': '🥐',
+  'bollo': '🥐',
+  'magdalena': '🧁', 'magdalenas': '🧁', 'muffin': '🧁',
+  'donut': '🍩', 'donuts': '🍩',
+  'bizcocho': '🍰',
+  'pastel': '🍰', 'tarta': '🎂',
+
+  // ===== PASTA Y ARROZ =====
+  'pasta': '🍝',
+  'espagueti': '🍝', 'espaguetis': '🍝', 'spaghetti': '🍝',
+  'macarron': '🍝', 'macarrones': '🍝',
+  'lasaña': '🍝', 'lasana': '🍝',
+  'fideo': '🍜', 'fideos': '🍜',
+  'arroz': '🍚',
+  'paella': '🥘',
+
+  // ===== LEGUMBRES =====
+  'garbanzo': '🫘', 'garbanzos': '🫘',
+  'lenteja': '🫘', 'lentejas': '🫘',
+  'alubia': '🫘', 'alubias': '🫘', 'judia': '🫘', 'judion': '🫘',
+
+  // ===== SALSAS Y CONDIMENTOS =====
+  'tomate frito': '🥫', 'salsa tomate': '🥫', 'tomate triturado': '🥫',
+  'ketchup': '🥫',
+  'mayonesa': '🥫', 'mahonesa': '🥫',
+  'mostaza': '🥫',
+  'aceite': '🫒', 'aceite de oliva': '🫒', 'oliva': '🫒',
+  'vinagre': '🍶',
+  'salsa de soja': '🥢',
+  'sal': '🧂',
+  'pimienta': '🌶️', 'especias': '🌶️',
+
+  // ===== DULCES =====
+  'azucar': '🍬',
+  'miel': '🍯',
+  'mermelada': '🍯',
+  'chocolate': '🍫',
+  'nocilla': '🍫', 'nutella': '🍫', 'cacao': '🍫',
+  'galleta': '🍪', 'galletas': '🍪',
+  'caramelo': '🍬', 'caramelos': '🍬',
+  'gominola': '🍬', 'gominolas': '🍬',
+  'chicle': '🍬',
+
+  // ===== SNACKS =====
+  'patatas fritas': '🍟', 'chips': '🍟',
+  'nachos': '🌮',
+  'palomitas': '🍿',
+  'frutos secos': '🥜',
+  'almendra': '🥜', 'almendras': '🥜',
+  'nuez': '🥜', 'nueces': '🥜',
+  'cacahuete': '🥜', 'cacahuetes': '🥜',
+  'pistacho': '🥜', 'pistachos': '🥜',
+  'avellana': '🥜', 'avellanas': '🥜',
+  'pipa': '🥜', 'pipas': '🥜',
+
+  // ===== BEBIDAS =====
+  'agua': '💧', 'agua mineral': '💧',
+  'refresco': '🥤', 'refrescos': '🥤',
+  'coca cola': '🥤', 'coca-cola': '🥤', 'pepsi': '🥤',
+  'fanta': '🥤', 'sprite': '🥤',
+  'zumo': '🧃', 'zumos': '🧃',
+  'cafe': '☕', 'café': '☕', 'nespresso': '☕', 'capsula': '☕',
+  'te': '🍵', 'té': '🍵', 'infusion': '🍵', 'infusiones': '🍵',
+  'cerveza': '🍺', 'cervezas': '🍺',
+  'vino': '🍷', 'vino tinto': '🍷', 'vino blanco': '🥂',
+  'cava': '🍾', 'champagne': '🍾',
+  'sidra': '🍺',
+  'vermut': '🍸',
+  'licor': '🥃', 'whisky': '🥃', 'ron': '🥃', 'vodka': '🥃', 'ginebra': '🍸',
+
+  // ===== CONGELADOS =====
+  'helado': '🍦', 'helados': '🍦',
+  'polo': '🍦', 'polos': '🍦',
+  'pizza': '🍕', 'pizza congelada': '🍕',
+  'nugget': '🍗', 'nuggets': '🍗',
+  'croqueta': '🥟', 'croquetas': '🥟',
+  'empanadilla': '🥟', 'empanadillas': '🥟',
+  'hielo': '🧊', 'cubitos': '🧊',
+
+  // ===== HOGAR Y LIMPIEZA =====
+  'papel higienico': '🧻', 'papel higiénico': '🧻',
+  'papel cocina': '🧻', 'papel de cocina': '🧻',
+  'servilleta': '🧻', 'servilletas': '🧻',
+  'panuelo': '🧻', 'pañuelo': '🧻', 'pañuelos': '🧻',
+  'bolsa basura': '🗑️', 'bolsas basura': '🗑️',
+  'detergente': '🧴', 'detergente ropa': '🧴',
+  'suavizante': '🧴',
+  'jabon': '🧼', 'jabón': '🧼',
+  'lejia': '🧴', 'lejía': '🧴',
+  'lavavajillas': '🧴', 'fairy': '🧴',
+  'limpiador': '🧴', 'fregasuelos': '🧴',
+  'estropajo': '🧽', 'esponja': '🧽',
+  'bayeta': '🧹',
+  'fregona': '🧹', 'escoba': '🧹',
+  'guantes': '🧤',
+  'ambientador': '🌸',
+  'vela': '🕯️', 'velas': '🕯️',
+  'pila': '🔋', 'pilas': '🔋',
+  'bombilla': '💡', 'bombillas': '💡',
+
+  // ===== HIGIENE PERSONAL =====
+  'champu': '🧴', 'champú': '🧴', 'shampoo': '🧴',
+  'gel ducha': '🧴', 'gel de ducha': '🧴',
+  'acondicionador': '🧴',
+  'crema': '🧴', 'crema hidratante': '🧴',
+  'pasta dientes': '🦷', 'pasta de dientes': '🦷', 'dentrifico': '🦷',
+  'cepillo dientes': '🪥', 'cepillo de dientes': '🪥',
+  'desodorante': '🧴',
+  'cuchilla': '🪒', 'maquinilla': '🪒',
+  'espuma afeitar': '🪒',
+  'compresa': '🩹', 'compresas': '🩹',
+  'tampon': '🩹', 'tampones': '🩹',
+  'pañal': '🧒', 'pañales': '🧒',
+  'toallita': '🧻', 'toallitas': '🧻',
+  'tirita': '🩹', 'tiritas': '🩹',
+  'algodon': '🩹', 'algodón': '🩹',
+  'colonia': '🧴', 'perfume': '🧴',
+
+  // ===== MASCOTAS =====
+  'comida perro': '🐕', 'pienso perro': '🐕',
+  'comida gato': '🐈', 'pienso gato': '🐈',
+  'arena gato': '🐈',
+  'snack perro': '🦴', 'hueso perro': '🦴',
+
+  // ===== OTROS COMUNES =====
+  'harina': '🌾',
+  'levadura': '🧫',
+  'cereales': '🥣',
+  'avena': '🥣', 'muesli': '🥣',
+}
+
+// Fallback por subcategoría cuando no hay emoji específico
+const SUBCATEGORY_EMOJIS: Record<string, string> = {
+  // Frutas y verduras
+  'fruta': '🍏',
+  'verdura': '🥬',
+  'hortaliza': '🥬',
+
+  // Carnes
+  'carne': '🥩',
+  'ave': '🍗',
+  'embutido': '🌭',
+  'fiambre': '🥓',
+
+  // Pescados
+  'pescado': '🐟',
+  'marisco': '🦐',
+
+  // Lácteos
+  'lacteo': '🥛',
+  'queso': '🧀',
+
+  // Panadería
+  'pan': '🍞',
+  'bolleria': '🥐',
+
+  // Despensa
+  'conserva': '🥫',
+  'legumbre': '🫘',
+  'cereal': '🥣',
+  'salsa': '🥫',
+  'condimento': '🌶️',
+  'dulce': '🍬',
+  'snack': '🍿',
+
+  // Bebidas
+  'bebida': '🥤',
+  'alcohol': '🍷',
+  'refresco': '🥤',
+
+  // Congelados
+  'congelado': '❄️',
+  'helado': '🍦',
+
+  // Hogar
+  'limpieza': '🧹',
+  'papel': '🧻',
+
+  // Higiene
+  'higiene': '🧴',
+  'aseo': '🧼',
+  'bebe': '👶',
+
+  // Mascotas
+  'perro': '🐕',
+  'gato': '🐈',
+  'mascota': '🐾',
+}
+
+// Emojis por categoría principal (fallback final)
+const CATEGORY_EMOJIS: Record<CategoryId, string> = {
+  'fruits-veg': '🥬',
+  'meat-fish': '🥩',
+  'dairy': '🥛',
+  'pantry': '🥫',
+  'frozen': '❄️',
+  'beverages': '🥤',
+  'household': '🧹',
+  'hygiene': '🧴',
+  'pets': '🐾',
+  'other': '📦',
+}
+
+/**
+ * Obtiene el emoji para un producto
+ * Búsqueda en cascada: producto específico -> subcategoría -> categoría
+ */
+export function getProductEmoji(productName: string, category?: CategoryId): string {
+  const normalized = productName.toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+
+  // 1. Buscar coincidencia exacta en productos específicos
+  if (PRODUCT_EMOJIS[normalized]) {
+    return PRODUCT_EMOJIS[normalized]
+  }
+
+  // 2. Buscar coincidencia parcial (el producto contiene la clave)
+  for (const [key, emoji] of Object.entries(PRODUCT_EMOJIS)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return emoji
+    }
+  }
+
+  // 3. Buscar en subcategorías
+  for (const [key, emoji] of Object.entries(SUBCATEGORY_EMOJIS)) {
+    if (normalized.includes(key)) {
+      return emoji
+    }
+  }
+
+  // 4. Si tenemos categoría, usar emoji de categoría
+  if (category && CATEGORY_EMOJIS[category]) {
+    return CATEGORY_EMOJIS[category]
+  }
+
+  // 5. Detectar categoría y usar su emoji
+  const detectedCategory = detectCategory(productName)
+  return CATEGORY_EMOJIS[detectedCategory] || '📦'
+}
+
+/**
+ * Obtiene el emoji para una categoría
+ */
+export function getCategoryEmoji(categoryId: CategoryId): string {
+  return CATEGORY_EMOJIS[categoryId] || '📦'
+}

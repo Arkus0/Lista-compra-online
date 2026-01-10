@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, lazy, Suspense } from 'react'
-import { ArrowLeft } from 'lucide-react'
-import Link from 'next/link'
 import { ShoppingList as ShoppingListType, Profile } from '@/lib/supabase/types'
 import { useSetCurrentList, useSetUser } from '@/store/useStore'
 
@@ -86,17 +84,6 @@ export function ShoppingListClient({ list, user }: Props) {
 
   return (
     <div className="h-screen flex flex-col">
-      {/* Back button overlay */}
-      <div className="absolute top-4 left-4 z-50">
-        <Link
-          href="/lists"
-          className="w-10 h-10 rounded-xl bg-background/80 backdrop-blur-sm border border-gray-100 flex items-center justify-center hover:bg-secondary transition-colors shadow-sm"
-          prefetch={true}
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-      </div>
-
       <Suspense fallback={<ShoppingListSkeleton />}>
         <ShoppingList list={list} />
       </Suspense>

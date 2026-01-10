@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { Plus, ChevronUp, Loader2, Mic, ScanBarcode, Star, LayoutGrid, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { CATEGORIES, detectCategory, CategoryId, searchProducts } from '@/lib/constants'
+import { CATEGORIES, detectCategory, CategoryId, searchProducts, getProductEmoji } from '@/lib/constants'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
 import { UserFavoriteItem } from '@/lib/supabase/types'
 import { BarcodeScannerModal } from './BarcodeScannerModal'
@@ -276,7 +276,6 @@ function AddItemFormComponent({
       {showSuggestions && (
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide mask-fade-sides">
           {suggestions.map((suggestion) => {
-            const CategoryConfig = suggestion.category ? CATEGORIES[suggestion.category as CategoryId] : null
             return (
               <button
                 key={suggestion.id}
@@ -285,8 +284,8 @@ function AddItemFormComponent({
                 className="flex items-center gap-1.5 px-3 py-2 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary whitespace-nowrap active:scale-95 transition-transform"
               >
                 {suggestion.source === 'favorite' && <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />}
+                <span className="text-base">{getProductEmoji(suggestion.name, suggestion.category as CategoryId)}</span>
                 <span className="font-medium text-sm text-foreground">{suggestion.name}</span>
-                {CategoryConfig && <div className={`w-2 h-2 rounded-full ${CategoryConfig.color.split(' ')[0].replace('text-', 'bg-')}`} />}
               </button>
             )
           })}
