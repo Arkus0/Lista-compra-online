@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, memo, useCallback } from 'react'
+import { useState, memo, useCallback, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Check, Trash2, GripVertical, Minus, Plus, User, Star,
   UserPlus, X, MoreVertical, StickyNote, Camera, Tag
 } from 'lucide-react'
 import { ListItem, Profile } from '@/lib/supabase/types'
 import { getProductEmoji, CategoryId } from '@/lib/constants'
-import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 
 // Tipo simple para personas asignables
 export interface AssignablePerson {
@@ -70,9 +70,53 @@ function ShoppingItemComponent({
 }: ShoppingItemProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showImageModal, setShowImageModal] = useState(false)
+  const [showActionMenu, setShowActionMenu] = useState(false)
+  const [showAssignSubmenu, setShowAssignSubmenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const menuContentRef = useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Cerrar menú al hacer clic fuera o con Escape
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node
+      // Si el menú está montado en el portal, menuContentRef estará fuera del DOM del componente
+      // pero debemos comprobar si el clic fue en el botón original o en el contenido del portal
+      const isOutsideButton = !menuRef.current || !menuRef.current.contains(target)
+      const isOutsideMenu = !menuContentRef.current || !menuContentRef.current.contains(target)
+
+      if (isOutsideButton && isOutsideMenu) {
+        setShowActionMenu(false)
+        setShowAssignSubmenu(false)
+      }
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowActionMenu(false)
+        setShowAssignSubmenu(false)
+        menuButtonRef.current?.focus()
+      }
+    }
+    if (showActionMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleKeyDown)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+        document.removeEventListener('keydown', handleKeyDown)
+      }
+    }
+  }, [showActionMenu])
 
   const handleAssign = useCallback((userId: string | null) => {
     onAssign?.(item.id, userId)
+    setShowActionMenu(false)
+    setShowAssignSubmenu(false)
   }, [item.id, onAssign])
 
   const getInitials = (name: string) => {
@@ -81,9 +125,10 @@ function ShoppingItemComponent({
 
   const handleDelete = useCallback(() => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(50)
+        navigator.vibrate(50) 
     }
     setIsDeleting(true)
+    setShowActionMenu(false)
     setTimeout(() => onDelete(item.id), 200)
   }, [item.id, onDelete])
 
@@ -107,101 +152,11 @@ function ShoppingItemComponent({
   }, [item.id, item.quantity, onUpdateQuantity])
 
   const handleAddToFavorites = useCallback(async () => {
+    setShowActionMenu(false)
     if (onAddToFavorites) {
       await onAddToFavorites(item)
     }
   }, [item, onAddToFavorites])
-
-  const categoryColor = item.category
-    ? categoryColors[item.category.toLowerCase()] || categoryColors.otros
-    : null
-
-  // Build menu items
-  const menuItems: DropdownMenuItem[] = []
-
-  // Submenu de asignación
-  if (onAssign && assignablePeople.length > 0) {
-    const assignItems: DropdownMenuItem[] = []
-
-    if (assignedToProfile) {
-      assignItems.push({
-        type: 'item',
-        label: 'Quitar',
-        icon: <X className="w-4 h-4" />,
-        onClick: () => handleAssign(null),
-        variant: 'danger'
-      })
-    }
-
-    assignablePeople.forEach(person => {
-      assignItems.push({
-        type: 'item',
-        label: person.name,
-        icon: item.assigned_to === person.id ? <Check className="w-4 h-4 text-primary" /> : undefined,
-        onClick: () => handleAssign(person.id),
-        className: item.assigned_to === person.id ? 'bg-primary/10' : ''
-      })
-    })
-
-    menuItems.push({
-      type: 'submenu',
-      label: 'Asignar a...',
-      icon: <UserPlus className="w-4 h-4 text-muted" />,
-      items: assignItems
-    })
-  }
-
-  // Favoritos
-  if (onAddToFavorites) {
-    menuItems.push({
-      type: 'item',
-      label: 'Favoritos',
-      icon: <Star className="w-4 h-4 text-amber-500" />,
-      onClick: handleAddToFavorites
-    })
-  }
-
-  // Imagen
-  if (onAddImage) {
-    menuItems.push({
-      type: 'item',
-      label: item.image_url ? 'Cambiar img' : 'Añadir img',
-      icon: <Camera className="w-4 h-4 text-muted" />,
-      onClick: () => onAddImage(item.id)
-    })
-  }
-
-  // Nota
-  if (onAddNote) {
-    menuItems.push({
-      type: 'item',
-      label: item.note ? 'Editar nota' : 'Añadir nota',
-      icon: <StickyNote className="w-4 h-4 text-muted" />,
-      onClick: () => onAddNote(item.id)
-    })
-  }
-
-  // Etiquetas
-  if (onAddTags) {
-    menuItems.push({
-      type: 'item',
-      label: item.tags && item.tags.length > 0 ? 'Editar etiquetas' : 'Añadir etiquetas',
-      icon: <Tag className="w-4 h-4 text-primary" />,
-      onClick: () => onAddTags(item.id)
-    })
-  }
-
-  // Separator
-  menuItems.push({ type: 'separator' })
-
-  // Eliminar
-  menuItems.push({
-    type: 'item',
-    label: 'Eliminar',
-    icon: <Trash2 className="w-4 h-4" />,
-    onClick: handleDelete,
-    variant: 'danger'
-  })
 
   return (
     <>
@@ -323,13 +278,86 @@ function ShoppingItemComponent({
         </div>
 
         {/* Menú */}
-        <DropdownMenu
-          trigger={<MoreVertical className="w-5 h-5" />}
-          items={menuItems}
-          align="right"
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-secondary"
-        />
+        <div ref={menuRef}>
+          <button
+            ref={menuButtonRef}
+            onClick={() => {
+              if (!showActionMenu && menuButtonRef.current) {
+                const rect = menuButtonRef.current.getBoundingClientRect()
+                setMenuPosition({
+                  top: rect.bottom + 4,
+                  right: window.innerWidth - rect.right
+                })
+              }
+              setShowActionMenu(!showActionMenu)
+            }}
+            aria-label={`Opciones para ${item.name}`}
+            aria-haspopup="menu"
+            aria-expanded={showActionMenu}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-secondary"
+          >
+            <MoreVertical className="w-5 h-5" />
+          </button>
+        </div>
       </div>
+
+      {/* Menú contextual - Portal con posición fija */}
+      {showActionMenu && menuPosition && mounted && createPortal(
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => { setShowActionMenu(false); setShowAssignSubmenu(false) }} />
+          <div
+            ref={menuContentRef}
+            role="menu"
+            aria-label={`Acciones para ${item.name}`}
+            className="fixed w-52 bg-card border border-border rounded-xl shadow-2xl z-[9999] py-1 animate-in fade-in slide-in-from-top-2 duration-150"
+            style={{ top: menuPosition.top, right: menuPosition.right }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {onAssign && assignablePeople.length > 0 && (
+              <div className="relative">
+                <button
+                  role="menuitem"
+                  aria-haspopup="menu"
+                  aria-expanded={showAssignSubmenu}
+                  onClick={() => setShowAssignSubmenu(!showAssignSubmenu)}
+                  className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"
+                >
+                  <UserPlus className="w-4 h-4 text-muted" />
+                  <span className="flex-1">Asignar a...</span>
+                </button>
+                {showAssignSubmenu && (
+                  <div role="menu" aria-label="Personas disponibles" className="absolute left-full top-0 ml-1 w-48 bg-card border border-border rounded-xl shadow-xl z-[9999] py-1 animate-in fade-in slide-in-from-left-2 duration-150" onClick={(e) => e.stopPropagation()}>
+                    {assignedToProfile && (
+                       <button role="menuitem" onClick={() => handleAssign(null)} className="w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 text-danger"><X className="w-4 h-4" /> Quitar</button>
+                    )}
+                    {assignablePeople.map(person => (
+                      <button role="menuitem" key={person.id} onClick={() => handleAssign(person.id)} className={`w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 ${item.assigned_to === person.id ? 'bg-primary/10' : ''}`}>
+                        <span className="truncate flex-1">{person.name}</span>
+                        {item.assigned_to === person.id && <Check className="w-4 h-4 text-primary" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {onAddToFavorites && (
+              <button role="menuitem" onClick={handleAddToFavorites} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Star className="w-4 h-4 text-amber-500" /> <span>Favoritos</span></button>
+            )}
+            {onAddImage && (
+              <button role="menuitem" onClick={() => { onAddImage(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Camera className="w-4 h-4 text-muted" /> <span>{item.image_url ? 'Cambiar img' : 'Añadir img'}</span></button>
+            )}
+            {onAddNote && (
+              <button role="menuitem" onClick={() => { onAddNote(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><StickyNote className="w-4 h-4 text-muted" /> <span>{item.note ? 'Editar nota' : 'Añadir nota'}</span></button>
+            )}
+            {onAddTags && (
+              <button role="menuitem" onClick={() => { onAddTags(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Tag className="w-4 h-4 text-primary" /> <span>{item.tags && item.tags.length > 0 ? 'Editar etiquetas' : 'Añadir etiquetas'}</span></button>
+            )}
+            <div role="separator" className="h-px bg-border-light my-1" />
+            <button role="menuitem" onClick={handleDelete} className="w-full px-3 py-2.5 text-left text-sm hover:bg-danger/10 flex items-center gap-3 text-danger"><Trash2 className="w-4 h-4" /> <span>Eliminar</span></button>
+          </div>
+        </>,
+        document.body
+      )}
 
       {showImageModal && item.image_url && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowImageModal(false)}>
