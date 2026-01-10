@@ -133,12 +133,24 @@ function AddItemFormComponent({
   }, [])
 
   const handleBarcodeProductFound = useCallback((productName: string, category?: string) => {
+    // Reset any lingering state first
+    setShowSuggestions(false)
+
+    // Set the product name and category
     setName(productName)
     if (category) {
       setSelectedCategory(category as CategoryId)
       setManuallySelected(true)
     }
-    inputRef.current?.focus()
+
+    // Focus with delay to ensure modal is fully closed
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus()
+        // Move cursor to end of input for easy editing
+        inputRef.current.setSelectionRange(productName.length, productName.length)
+      }
+    }, 100)
   }, [])
 
   // Push-to-talk: iniciar al presionar, detener al soltar

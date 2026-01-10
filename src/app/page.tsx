@@ -4,6 +4,7 @@ import { BottomNav } from '@/components/layout/BottomNav'
 import { Card } from '@/components/ui/Card'
 import { Plus, ShoppingBag, TrendingDown, Users } from 'lucide-react'
 import Link from 'next/link'
+import { GlobalSearch } from '@/components/search/GlobalSearch'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -49,13 +50,15 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen pb-20">
-      <Header showSearch />
+      <Header />
 
       <main className="p-4 space-y-6">
         {/* Welcome section */}
         <section>
           <h2 className="text-2xl font-bold mb-1">Hola!</h2>
-          <p className="text-gray-500">Que vas a comprar hoy?</p>
+          <p className="text-gray-500 mb-4">Que vas a comprar hoy?</p>
+          {/* Global Search */}
+          <GlobalSearch userId={user.id} />
         </section>
 
         {/* Quick actions */}
