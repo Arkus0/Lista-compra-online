@@ -29,6 +29,7 @@ interface ShoppingItemProps {
   addedByProfile?: Profile | null
   checkedByProfile?: Profile | null
   isDragEnabled?: boolean
+  isNoteVisible?: boolean // NUEVA PROP
 }
 
 // Colores de categoría
@@ -58,7 +59,8 @@ function ShoppingItemComponent({
   dragHandleProps,
   addedByProfile,
   checkedByProfile,
-  isDragEnabled = true
+  isDragEnabled = true,
+  isNoteVisible = false
 }: ShoppingItemProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showImageModal, setShowImageModal] = useState(false)
@@ -188,30 +190,13 @@ function ShoppingItemComponent({
           </button>
         )}
 
-        {/* Contenido principal: Nombre prominente */}
-        <div className="flex-1 min-w-0">
+        {/* Contenido principal: Nombre y Notas */}
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex items-center gap-2 flex-wrap">
             <p className={`text-base font-medium truncate transition-all ${item.checked ? 'line-through text-muted' : 'text-foreground'}`}>
               {item.name}
             </p>
             
-            {/* Nota visual sutil */}
-            {item.note && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddNote?.(item.id);
-                }}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 hover:bg-yellow-200 transition-colors"
-                title={item.note}
-              >
-                <StickyNote className="w-3 h-3" />
-                <span className="text-[10px] font-medium max-w-[60px] truncate hidden sm:inline">
-                  {item.note}
-                </span>
-              </button>
-            )}
-
             {/* Avatar pequeño si está asignado */}
             {assignedToProfile && (
               <span
@@ -228,9 +213,17 @@ function ShoppingItemComponent({
               </span>
             )}
           </div>
-          {/* Categoría debajo del nombre */}
-          {categoryColor && !item.checked && (
-            <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-md mt-0.5 ${categoryColor}`}>
+
+          {/* NOTA VISUAL SUTIL (NUEVO DISEÑO) */}
+          {isNoteVisible && item.note && (
+             <p className="text-xs text-muted-foreground mt-0.5 leading-tight break-words pr-2">
+               {item.note}
+             </p>
+          )}
+
+          {/* Categoría debajo del nombre (opcional si ya está agrupado, pero útil visualmente) */}
+          {categoryColor && !item.checked && !isNoteVisible && ( // Oculto categoría si muestro nota para ahorrar espacio vertical si es necesario
+            <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-md mt-0.5 w-fit ${categoryColor}`}>
               {item.category}
             </span>
           )}
@@ -373,7 +366,7 @@ function ShoppingItemComponent({
                   role="menuitem"
                 >
                   <StickyNote className="w-4 h-4 text-muted" />
-                  <span>Añadir nota</span>
+                  <span>{item.note ? 'Editar nota' : 'Añadir nota'}</span>
                 </button>
               )}
 
@@ -441,6 +434,7 @@ export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) =
     prevProps.checkedByProfile?.id === nextProps.checkedByProfile?.id &&
     prevProps.assignedToProfile?.id === nextProps.assignedToProfile?.id &&
     prevProps.isDragEnabled === nextProps.isDragEnabled &&
+    prevProps.isNoteVisible === nextProps.isNoteVisible &&
     prevProps.assignablePeople?.length === nextProps.assignablePeople?.length
   )
 })
