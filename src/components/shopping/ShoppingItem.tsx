@@ -325,7 +325,12 @@ export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) =
     prevProps.item.assigned_to === nextProps.item.assigned_to &&
     prevProps.item.note === nextProps.item.note &&
     prevProps.onToggle === nextProps.onToggle &&
-    prevProps.onDelete === nextProps.onDelete
+    prevProps.onDelete === nextProps.onDelete &&
+    prevProps.onAddToFavorites === nextProps.onAddToFavorites &&
+    prevProps.onAddImage === nextProps.onAddImage &&
+    prevProps.onAddNote === nextProps.onAddNote &&
+    prevProps.onAssign === nextProps.onAssign &&
+    prevProps.onUpdateQuantity === nextProps.onUpdateQuantity
   )
 })
 
