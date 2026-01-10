@@ -37,14 +37,18 @@ export function DropdownMenu({
 
   // Calculate position when opening
   const handleToggle = () => {
+    console.log('[DropdownMenu] handleToggle called, isOpen:', isOpen)
     if (!isOpen && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
-      setPosition({
+      const pos = {
         top: rect.bottom + 4,
         [align]: align === 'right' ? window.innerWidth - rect.right : rect.left
-      })
+      }
+      console.log('[DropdownMenu] Setting position:', pos)
+      setPosition(pos)
     }
     const newState = !isOpen
+    console.log('[DropdownMenu] Setting isOpen to:', newState)
     setIsOpen(newState)
     setShowSubmenu(null)
     onOpenChange?.(newState)
@@ -95,8 +99,14 @@ export function DropdownMenu({
   }, [isOpen, onOpenChange])
 
   const handleItemClick = (item: DropdownMenuItem) => {
-    if (item.disabled) return
+    console.log('[DropdownMenu] handleItemClick called for:', item.label)
+    if (item.disabled) {
+      console.log('[DropdownMenu] Item is disabled, ignoring click')
+      return
+    }
+    console.log('[DropdownMenu] Calling onClick handler')
     item.onClick?.()
+    console.log('[DropdownMenu] Closing menu')
     setIsOpen(false)
     setShowSubmenu(null)
     onOpenChange?.(false)

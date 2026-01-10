@@ -42,11 +42,14 @@ export function Modal({
 
   // Effect 1: Focus management - only runs when modal opens/closes
   useEffect(() => {
+    console.log('[Modal] Effect 1 running, isOpen:', isOpen)
     if (isOpen) {
       // Store previously focused element when modal opens
       previousActiveElement.current = document.activeElement
+      console.log('[Modal] Stored previous element:', previousActiveElement.current)
     } else if (previousActiveElement.current instanceof HTMLElement) {
       // Restore focus when modal closes
+      console.log('[Modal] Restoring focus to:', previousActiveElement.current)
       previousActiveElement.current.focus()
       previousActiveElement.current = null
     }
