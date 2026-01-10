@@ -7,7 +7,7 @@ import {
   Trash2, Edit2, Check, Link as LinkIcon,
   ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, Undo2,
   Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X,
-  FileText, Store
+  FileText, Store, Zap
 } from 'lucide-react'
 import { ShoppingItem, AssignablePerson } from './ShoppingItem'
 import { AddItemForm } from './AddItemForm'
@@ -45,6 +45,18 @@ import {
 import { SortableShoppingItem } from './SortableShoppingItem'
 import { sendPushNotification } from '@/lib/notifications'
 import { CATEGORIES, CategoryId, detectCategory, getSmartSuggestions, CommonProduct } from '@/lib/constants'
+
+// --- DATOS DEL CATÁLOGO RÁPIDO (GAP 1) ---
+// En una app real esto podría venir de base de datos, pero para UI instantánea lo definimos aquí o en constantes
+const QUICK_CATALOG: Record<CategoryId, string[]> = {
+  'fruits-veg': ['Manzanas', 'Plátanos', 'Lechuga', 'Tomates', 'Zanahorias', 'Cebollas', 'Patatas', 'Aguacate', 'Limones', 'Ajos'],
+  'meat-fish': ['Pollo', 'Ternera', 'Carne picada', 'Jamón', 'Pechuga de pavo', 'Salmón', 'Atún', 'Huevos', 'Bacon'],
+  'dairy': ['Leche', 'Queso', 'Yogur', 'Mantequilla', 'Nata', 'Queso rallado'],
+  'pantry': ['Pan', 'Arroz', 'Pasta', 'Aceite', 'Sal', 'Azúcar', 'Café', 'Cereales', 'Harina', 'Galletas'],
+  'beverages': ['Agua', 'Refrescos', 'Cerveza', 'Vino', 'Zumo', 'Té'],
+  'household': ['Papel higiénico', 'Detergente', 'Lavavajillas', 'Servilletas', 'Bolsas basura', 'Champú', 'Gel', 'Pasta dientes'],
+  'other': ['Pilas', 'Bombillas', 'Comida gato/perro']
+}
 
 interface ShoppingListProps {
   list: ShoppingListType
@@ -91,7 +103,7 @@ function UndoToast({
   if (!isVisible) return null
   
   return (
-    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 w-[90%] max-w-sm">
+    <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 w-[90%] max-w-sm pointer-events-auto">
       <div className="bg-foreground text-background px-4 py-3 rounded-xl shadow-2xl flex items-center gap-4 justify-between">
         <span className="text-sm font-medium truncate">{message}</span>
         <button 
@@ -100,6 +112,95 @@ function UndoToast({
         >
           <Undo2 className="w-4 h-4" /> Deshacer
         </button>
+      </div>
+    </div>
+  )
+}
+
+// COMPONENTE MODAL DE CATÁLOGO (GAP 1)
+function CatalogModal({ 
+  isOpen, 
+  onClose, 
+  onSelect, 
+  currentItems 
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  onSelect: (name: string, category: string) => void,
+  currentItems: ListItem[]
+}) {
+  const [activeTab, setActiveTab] = useState<CategoryId>('fruits-veg')
+  
+  if (!isOpen) return null
+
+  const handleItemClick = (item: string, categoryId: string) => {
+    // Haptic feedback
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
+    onSelect(item, categoryId)
+  }
+
+  // Mapa de items existentes para marcar visualmente
+  const existingMap = new Set(currentItems.filter(i => !i.checked).map(i => i.name.toLowerCase()))
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-background animate-in slide-in-from-bottom duration-300">
+      {/* Header Modal */}
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-card">
+        <h2 className="font-bold text-lg flex items-center gap-2">
+          <LayoutGrid className="w-5 h-5 text-primary" />
+          Catálogo Rápido
+        </h2>
+        <button onClick={onClose} className="p-2 bg-secondary rounded-full hover:bg-gray-200 transition-colors">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Tabs de Categorías Scrollable */}
+      <div className="flex overflow-x-auto py-3 px-2 gap-2 border-b border-border bg-card/50 no-scrollbar">
+        {Object.values(CATEGORIES).map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveTab(cat.id)}
+            className={`flex flex-col items-center gap-1 min-w-[70px] p-2 rounded-xl transition-all ${
+              activeTab === cat.id 
+                ? 'bg-primary text-primary-foreground shadow-md scale-105' 
+                : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+            }`}
+          >
+            <cat.icon className="w-6 h-6" />
+            <span className="text-[10px] font-medium leading-none">{cat.label.split(' ')[0]}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Grid de Items */}
+      <div className="flex-1 overflow-y-auto p-4 bg-secondary/10">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 pb-20">
+          {QUICK_CATALOG[activeTab]?.map((item) => {
+             const exists = existingMap.has(item.toLowerCase())
+             return (
+              <button
+                key={item}
+                onClick={() => handleItemClick(item, activeTab)}
+                className={`
+                  aspect-square flex flex-col items-center justify-center p-2 rounded-2xl border transition-all duration-200 active:scale-95
+                  ${exists 
+                    ? 'bg-primary/10 border-primary shadow-[0_0_0_2px] shadow-primary/20' 
+                    : 'bg-card border-border shadow-sm hover:border-primary/50'
+                  }
+                `}
+              >
+                <div className={`
+                  w-8 h-8 rounded-full flex items-center justify-center mb-2 transition-colors
+                  ${exists ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}
+                `}>
+                  {exists ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                </div>
+                <span className="text-xs text-center font-medium leading-tight line-clamp-2">{item}</span>
+              </button>
+             )
+          })}
+        </div>
       </div>
     </div>
   )
@@ -123,7 +224,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const { upload: uploadImage, isUploading: isUploadingImage } = useImageUpload({ bucket: 'list-images' })
 
   const [isLoading, setIsLoading] = useState(true)
-  const [activeModal, setActiveModal] = useState<'share' | 'collaborators' | 'edit' | 'delete' | null>(null)
+  const [activeModal, setActiveModal] = useState<'share' | 'collaborators' | 'edit' | 'delete' | 'catalog' | null>(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   
@@ -340,8 +441,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const openShareModal = () => setActiveModal('share'); const openCollaboratorsModal = () => setActiveModal('collaborators'); const toggleMenu = () => setShowMenu(p => !p); const handleCloseNoteModal = useCallback(() => { setShowNoteModal(false); setEditingItemId(null); setEditingItemNote('') }, [])
 
   return (
-    <div className="flex flex-col h-full relative">
-      {/* Header FLOTANTE (Ahora incluye las notas para que desaparezcan en scroll) */}
+    <div className="flex flex-col h-full relative bg-background">
+      {/* Header FLOTANTE */}
       <header 
         ref={headerRef}
         className={`fixed top-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-md border-b border-border transition-transform duration-300 ${isControlsVisible ? 'translate-y-0' : '-translate-y-full'}`}
@@ -380,7 +481,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
                 {showMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                    <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-20 py-2">
+                    <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-20 py-2 animate-in fade-in slide-in-from-top-2">
                        {/* Menú content */}
                        {uncheckedItems.length > 0 && <button onClick={handleMarkAllComplete} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><CheckCheck className="w-4 h-4 text-green-500" /> Marcar todo completado</button>}
                        {checkedItems.length > 0 && <button onClick={handleClearCompleted} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><Eraser className="w-4 h-4 text-orange-500" /> Limpiar completados ({checkedItems.length})</button>}
@@ -415,7 +516,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
       {/* LISTA - Padding dinámico */}
       <div 
-        className="flex-1 overflow-y-auto p-4 space-y-2 pb-40"
+        className="flex-1 overflow-y-auto p-4 space-y-2 pb-40 overscroll-contain"
         style={{ paddingTop: `${headerHeight + 10}px` }}
         onScroll={handleListScroll}
       >
@@ -430,8 +531,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
                    return (
                      <div key={catId} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                        <div 
-                        className="sticky z-10 bg-background/95 backdrop-blur-sm py-2 mb-2"
-                        style={{ top: '0px' }} 
+                        className="sticky z-10 bg-background/95 backdrop-blur-sm py-2 mb-2 top-0"
                        >
                          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${CategoryConfig.color}`}>
                            <CategoryConfig.icon className="w-5 h-5" />
@@ -447,7 +547,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
                      </div>
                    )
                  })}
-                 {groupedItems.length === 0 && <div className="text-center py-12 text-muted"><p>No hay items pendientes</p></div>}
+                 {groupedItems.length === 0 && <div className="text-center py-12 text-muted flex flex-col items-center gap-3"><ShoppingBag className="w-12 h-12 text-muted-light" /><p>No hay items pendientes</p></div>}
                </div>
             ) : (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -474,13 +574,14 @@ export function ShoppingList({ list }: ShoppingListProps) {
             {smartSuggestions.length > 0 && (
               <div className="mt-8 mb-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-medium text-muted uppercase tracking-wider">Sugerencias rápidas</span>
+                  <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
+                  <span className="text-xs font-medium text-muted uppercase tracking-wider">Sugerencias inteligentes</span>
                   <div className="h-px bg-border flex-1" />
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {smartSuggestions.map((suggestion, i) => (
                     <button key={i} onClick={() => handleAddFromSuggestion(suggestion)} className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 rounded-full border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-sm group shadow-sm">
-                      <span className="text-lg leading-none">+</span><span>{suggestion.name}</span>
+                      <span className="text-lg leading-none text-primary">+</span><span>{suggestion.name}</span>
                     </button>
                   ))}
                 </div>
@@ -492,15 +593,31 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
       <UndoToast message={undoState.message} isVisible={undoState.isVisible} onUndo={handleUndo} />
 
-      {/* FOOTER FIXED */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-border/50">
+      {/* FOOTER FIXED - Integración del botón de catálogo */}
+      <div 
+        className="fixed bottom-0 left-0 right-0 bg-background z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-border/50"
+      >
         <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isInputActive ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
           <FavoriteItems favorites={favoriteItems} isLoading={favoritesLoading} onAddToList={handleAddFromFavorite} onRemove={removeFavoriteItem} />
         </div>
-        <AddItemForm onAdd={handleAddItem} suggestionsSource={favoriteItems} isVisible={isControlsVisible || isInputActive} onFocusChange={setIsInputActive} />
+        <AddItemForm 
+          onAdd={handleAddItem} 
+          suggestionsSource={favoriteItems} 
+          isVisible={isControlsVisible || isInputActive} 
+          onFocusChange={setIsInputActive} 
+          onOpenCatalog={() => setActiveModal('catalog')} // NUEVO: Abrir modal
+        />
       </div>
 
-      {/* Modales */}
+      {/* MODAL DEL CATÁLOGO (GAP 1) */}
+      <CatalogModal 
+        isOpen={activeModal === 'catalog'} 
+        onClose={closeModal} 
+        onSelect={handleAddItem}
+        currentItems={items}
+      />
+
+      {/* Otros Modales */}
       <Modal isOpen={activeModal === 'share'} onClose={closeModal} title="Compartir Lista"><div className="flex flex-col items-center gap-4 py-2"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl)}`} alt="QR Code" className="rounded-xl border shadow-sm" /><div className="w-full space-y-2"><div className="text-xs text-muted font-medium uppercase tracking-wider text-center">Código de acceso</div><p className="font-mono text-2xl text-center font-bold tracking-widest bg-secondary py-3 rounded-lg border border-border">{list.share_code}</p></div><p className="text-sm text-center text-muted px-4">Comparte este código o escanea el QR.</p><Button onClick={handleCopyLink} className="w-full flex items-center justify-center gap-2">{isCopied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}{isCopied ? 'Enlace Copiado' : 'Copiar Enlace'}</Button></div></Modal>
       <Modal isOpen={activeModal === 'collaborators'} onClose={closeModal} title="Colaboradores"><div className="space-y-2">{collaborators.map((c, i) => <div key={i} className="p-2 border rounded">{c.profiles.name} ({c.role})</div>)}</div></Modal>
       <Modal isOpen={activeModal === 'edit'} onClose={closeModal} title="Editar Nombre"><div className="gap-2 flex flex-col"><Input value={newName} onChange={e => setNewName(e.target.value)} /><Button onClick={handleUpdateName}>Guardar</Button></div></Modal>
