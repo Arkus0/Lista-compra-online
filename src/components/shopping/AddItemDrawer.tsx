@@ -54,8 +54,8 @@ export function AddItemDrawer({
       </Drawer.Trigger>
       
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-black/40 z-[60] backdrop-blur-[2px]" />
-        <Drawer.Content className="bg-background flex flex-col rounded-t-[10px] h-fit mt-24 fixed bottom-0 left-0 right-0 z-[60] outline-none max-h-[90vh]">
+        <Drawer.Overlay className="fixed inset-0 bg-black/40 z-50 backdrop-blur-[2px]" />
+        <Drawer.Content className="bg-background flex flex-col rounded-t-[10px] h-fit mt-24 fixed bottom-0 left-0 right-0 z-50 outline-none max-h-[90vh]">
           {/* Handle visual */}
           <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted-foreground/20 mt-4 mb-2" />
           
@@ -80,8 +80,8 @@ export function AddItemDrawer({
                 suggestionsSource={favoriteItems}
             />
 
-            {/* Espacio extra para el menú de navegación inferior (BottomNav) */}
-            <div className="h-20" />
+            {/* Espacio extra para teclados en iOS si fuera necesario, aunque Vaul lo maneja bien */}
+            <div className="h-4" />
           </div>
         </Drawer.Content>
       </Drawer.Portal>

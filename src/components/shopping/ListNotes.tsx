@@ -161,6 +161,27 @@ export function ListNotes({ listId, listName, currentUser, isCollaborative = fal
 
   return (
     <div className="border-t border-gray-100 dark:border-gray-800 p-3 space-y-3">
+      {/* Notas fijadas - SIEMPRE VISIBLES */}
+      {pinnedNotes.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Pin className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+              Notas fijadas
+            </span>
+          </div>
+          {pinnedNotes.map((note) => (
+            <NoteCard
+              key={note.id}
+              note={note}
+              isOwner={note.user_id === currentUser.id}
+              onTogglePin={() => handleTogglePin(note.id, note.is_pinned)}
+              onDelete={() => handleDeleteNote(note.id)}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Botón para expandir/contraer input de nueva nota */}
       <button
         onClick={() => setShowNewNoteInput(!showNewNoteInput)}
@@ -212,58 +233,41 @@ export function ListNotes({ listId, listName, currentUser, isCollaborative = fal
         </div>
       )}
 
-      {/* Notas fijadas */}
-      {pinnedNotes.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Pin className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-              Notas fijadas
-            </span>
-          </div>
-          {pinnedNotes.map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              isOwner={note.user_id === currentUser.id}
-              onTogglePin={() => handleTogglePin(note.id, note.is_pinned)}
-              onDelete={() => handleDeleteNote(note.id)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Lista de todas las notas */}
-      {isLoading ? (
-        <div className="flex justify-center py-4">
-          <Loader2 className="w-5 h-5 animate-spin text-muted" />
-        </div>
-      ) : notes.length === 0 ? (
-        <p className="text-sm text-muted text-center py-4">
-          No hay notas todavía. Haz clic en "Escribir nota" para añadir una.
-        </p>
-      ) : (
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {/* Notas no fijadas */}
-          {unpinnedNotes.length > 0 && (
-            <>
-              {pinnedNotes.length > 0 && (
-                <p className="text-xs font-medium text-muted mt-4 mb-2">
-                  Otras notas
-                </p>
+      {/* Lista de todas las notas no fijadas (expandible) */}
+      {showNewNoteInput && (
+        <>
+          {isLoading ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-muted" />
+            </div>
+          ) : notes.length === 0 ? (
+            <p className="text-sm text-muted text-center py-4">
+              No hay notas todavía. Haz clic en "Escribir nota" para añadir una.
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {/* Notas no fijadas */}
+              {unpinnedNotes.length > 0 && (
+                <>
+                  {pinnedNotes.length > 0 && (
+                    <p className="text-xs font-medium text-muted mt-4 mb-2">
+                      Otras notas
+                    </p>
+                  )}
+                  {unpinnedNotes.map((note) => (
+                    <NoteCard
+                      key={note.id}
+                      note={note}
+                      isOwner={note.user_id === currentUser.id}
+                      onTogglePin={() => handleTogglePin(note.id, note.is_pinned)}
+                      onDelete={() => handleDeleteNote(note.id)}
+                    />
+                  ))}
+                </>
               )}
-              {unpinnedNotes.map((note) => (
-                <NoteCard
-                  key={note.id}
-                  note={note}
-                  isOwner={note.user_id === currentUser.id}
-                  onTogglePin={() => handleTogglePin(note.id, note.is_pinned)}
-                  onDelete={() => handleDeleteNote(note.id)}
-                />
-              ))}
-            </>
+            </div>
           )}
-        </div>
+        </>
       )}
     </div>
   )
