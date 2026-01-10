@@ -312,7 +312,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
               </div>
               <div className="flex items-center gap-2 relative">
                 <button onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><Search className="w-5 h-5" /></button>
-                {/* TOGGLE NOTAS */}
+                {/* TOGGLE NOTAS: Ya no afecta a las etiquetas */}
                 <button onClick={() => setShowNotes(!showNotes)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${showNotes ? 'bg-primary/10 text-primary' : 'hover:bg-secondary text-muted'}`}>
                   <FileText className={`w-5 h-5 ${!showNotes && 'opacity-50'}`} />
                 </button>
