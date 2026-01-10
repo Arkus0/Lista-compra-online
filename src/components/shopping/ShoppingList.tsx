@@ -603,7 +603,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
         favoriteItems={favoriteItems}
         isLoadingFavorites={favoritesLoading}
         onAddFromFavorite={handleAddFromFavorite}
-        onRemoveFavorite={removeFavoriteItem}
+        onRemoveFavorite={async (id) => { await removeFavoriteItem(id); }}
       />
 
       {/* MODAL DEL CATÁLOGO */}
