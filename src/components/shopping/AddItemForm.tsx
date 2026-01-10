@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
-import { Plus, ChevronUp, Loader2, Mic, MicOff, ScanBarcode, Star, LayoutGrid, X } from 'lucide-react'
+import { Plus, ChevronUp, Loader2, Mic, ScanBarcode, Star, LayoutGrid, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { CATEGORIES, detectCategory, CategoryId, searchProducts } from '@/lib/constants'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
@@ -141,36 +141,19 @@ function AddItemFormComponent({
     inputRef.current?.focus()
   }, [])
 
-  const handleVoiceButton = useCallback(() => {
+  // Push-to-talk: iniciar al presionar, detener al soltar
+  const handleVoiceStart = useCallback(() => {
+    if (!isListening) startListening()
+  }, [isListening, startListening])
+
+  const handleVoiceEnd = useCallback(() => {
     if (isListening) stopListening()
-    else startListening()
-  }, [isListening, startListening, stopListening])
+  }, [isListening, stopListening])
 
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
   return (
-    <div className="w-full bg-card pt-2 pb-4">
-      {/* Sugerencias integradas en el flujo */}
-      {showSuggestions && (
-        <div className="mb-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide mask-fade-sides">
-          {suggestions.map((suggestion) => {
-            const CategoryConfig = suggestion.category ? CATEGORIES[suggestion.category as CategoryId] : null
-            return (
-              <button
-                key={suggestion.id}
-                type="button"
-                onClick={() => handleSuggestionClick(suggestion)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary whitespace-nowrap active:scale-95 transition-transform"
-              >
-                {suggestion.source === 'favorite' && <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />}
-                <span className="font-medium text-sm text-foreground">{suggestion.name}</span>
-                {CategoryConfig && <div className={`w-2 h-2 rounded-full ${CategoryConfig.color.split(' ')[0].replace('text-', 'bg-')}`} />}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
+    <div className="w-full bg-card pt-2 pb-4 flex flex-col-reverse">
       <form onSubmit={handleSubmit} className="relative">
         {/* Selector de Categorías (Overlay relativo) */}
         {showCategories && (
@@ -216,7 +199,7 @@ function AddItemFormComponent({
           </button>
 
           {/* Input Principal */}
-          <div className="flex-1 relative">
+          <div className="flex-1">
             <input
               ref={inputRef}
               type="text"
@@ -228,17 +211,41 @@ function AddItemFormComponent({
               placeholder={isListening ? "Escuchando..." : "Añadir item..."}
               className={`w-full h-11 rounded-xl bg-secondary px-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground ${isListening ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
               autoComplete="off"
-              // AutoFocus es seguro dentro de un Drawer abierto
-              autoFocus 
+              autoFocus
             />
           </div>
+
+          {/* Botón X para limpiar (cuando hay texto) */}
+          {name && (
+            <button
+              type="button"
+              onClick={() => {
+                setName('')
+                setManuallySelected(false)
+                setSelectedCategory('other')
+                setShowSuggestions(false)
+                inputRef.current?.focus()
+              }}
+              className="flex-shrink-0 w-11 h-11 rounded-xl bg-secondary text-muted-foreground hover:text-danger hover:bg-danger/10 flex items-center justify-center transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
 
           {/* Botones de acción derecha */}
           {!name && (
             <>
               {voiceSupported && (
-                <button type="button" onClick={handleVoiceButton} className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isListening ? 'text-white bg-red-500 animate-pulse' : 'text-muted-foreground bg-secondary hover:text-primary'}`}>
-                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                <button
+                  type="button"
+                  onMouseDown={handleVoiceStart}
+                  onMouseUp={handleVoiceEnd}
+                  onMouseLeave={handleVoiceEnd}
+                  onTouchStart={handleVoiceStart}
+                  onTouchEnd={handleVoiceEnd}
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all select-none ${isListening ? 'text-white bg-red-500 animate-pulse scale-110' : 'text-muted-foreground bg-secondary hover:text-primary active:scale-95'}`}
+                >
+                  <Mic className="w-5 h-5" />
                 </button>
               )}
               <button type="button" onClick={() => setShowBarcodeScanner(true)} className="w-11 h-11 rounded-xl bg-secondary text-muted-foreground hover:text-primary flex items-center justify-center"><ScanBarcode className="w-5 h-5" /></button>
@@ -252,6 +259,27 @@ function AddItemFormComponent({
           )}
         </div>
       </form>
+
+      {/* Sugerencias - con flex-col-reverse aparecen visualmente arriba del form */}
+      {showSuggestions && (
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide mask-fade-sides">
+          {suggestions.map((suggestion) => {
+            const CategoryConfig = suggestion.category ? CATEGORIES[suggestion.category as CategoryId] : null
+            return (
+              <button
+                key={suggestion.id}
+                type="button"
+                onClick={() => handleSuggestionClick(suggestion)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary whitespace-nowrap active:scale-95 transition-transform"
+              >
+                {suggestion.source === 'favorite' && <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />}
+                <span className="font-medium text-sm text-foreground">{suggestion.name}</span>
+                {CategoryConfig && <div className={`w-2 h-2 rounded-full ${CategoryConfig.color.split(' ')[0].replace('text-', 'bg-')}`} />}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <BarcodeScannerModal isOpen={showBarcodeScanner} onClose={() => setShowBarcodeScanner(false)} onProductFound={handleBarcodeProductFound} />
     </div>

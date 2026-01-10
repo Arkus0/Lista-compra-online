@@ -2,15 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  MessageSquare,
   Pin,
   PinOff,
   Trash2,
   Send,
-  X,
   Loader2,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { createClient } from '@/lib/supabase/client'
@@ -22,16 +18,28 @@ interface ListNotesProps {
   listName: string
   currentUser: Profile
   isCollaborative?: boolean
+  isExpandedExternal?: boolean
+  onExpandedChange?: (expanded: boolean) => void
 }
 
 interface NoteWithProfile extends ListNote {
   profile?: Profile
 }
 
-export function ListNotes({ listId, listName, currentUser, isCollaborative = false }: ListNotesProps) {
+export function ListNotes({ listId, listName, currentUser, isCollaborative = false, isExpandedExternal, onExpandedChange }: ListNotesProps) {
   const [notes, setNotes] = useState<NoteWithProfile[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpandedInternal, setIsExpandedInternal] = useState(false)
+
+  // Usar estado externo si está disponible, de lo contrario usar interno
+  const isExpanded = isExpandedExternal !== undefined ? isExpandedExternal : isExpandedInternal
+  const setIsExpanded = (value: boolean) => {
+    if (onExpandedChange) {
+      onExpandedChange(value)
+    } else {
+      setIsExpandedInternal(value)
+    }
+  }
   const [newNote, setNewNote] = useState('')
   const [isSending, setIsSending] = useState(false)
 
@@ -182,25 +190,7 @@ export function ListNotes({ listId, listName, currentUser, isCollaborative = fal
         </div>
       )}
 
-      {/* Header toggle para ver todas las notas */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-3 hover:bg-secondary/50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-muted" />
-          <span className="text-sm font-medium">
-            {isExpanded ? 'Ocultar notas' : `Ver todas las notas (${notes.length})`}
-          </span>
-        </div>
-        {isExpanded ? (
-          <ChevronUp className="w-4 h-4 text-muted" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-muted" />
-        )}
-      </button>
-
-      {/* Contenido expandido */}
+      {/* Contenido expandido (controlado por botón del header) */}
       {isExpanded && (
         <div className="px-3 pb-3 space-y-3">
           {/* Input para nueva nota */}

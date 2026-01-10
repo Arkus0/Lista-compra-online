@@ -1,6 +1,7 @@
 'use client'
 
 import { Header } from '@/components/layout/Header'
+import { BottomNav } from '@/components/layout/BottomNav'
 import { useFavorites } from '@/hooks/useFavorites'
 import { useUser } from '@/store/useStore'
 import { Star, Plus, Trash2, Loader2, Edit2, X } from 'lucide-react'
@@ -303,6 +304,8 @@ export default function FavoritesPage() {
           </>
         )}
       </main>
+
+      <BottomNav />
     </div>
   )
 }
