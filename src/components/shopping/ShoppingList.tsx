@@ -534,8 +534,12 @@ export function ShoppingList({ list }: ShoppingListProps) {
     }
   }, [handleDeleteItem, handleUpdateQuantity])
   const handleAddToFavorites = useCallback(async (item: ListItem) => {
-    await addFavoriteItem({ name: item.name, quantity: item.quantity, unit: item.unit, category: item.category })
-    showActionToast(`Añadido a favoritos: ${item.name}`, 'success', <Star className="w-4 h-4" />)
+    const success = await addFavoriteItem({ name: item.name, quantity: item.quantity, unit: item.unit, category: item.category })
+    if (success) {
+      showActionToast(`Añadido a favoritos: ${item.name}`, 'success', <Star className="w-4 h-4" />)
+    } else {
+      showActionToast(`Error al guardar favorito`, 'warning', <Star className="w-4 h-4" />)
+    }
   }, [addFavoriteItem, showActionToast])
   const handleAddFromFavorite = useCallback(async (favorite: typeof favoriteItems[0]) => {
     const result = await addItemToListFromFavorite(favorite, list.id)

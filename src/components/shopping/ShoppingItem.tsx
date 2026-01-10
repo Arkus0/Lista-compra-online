@@ -138,9 +138,11 @@ function ShoppingItemComponent({
     onUpdateQuantity(item.id, item.quantity + 1)
   }, [item.id, item.quantity, onUpdateQuantity])
 
-  const handleAddToFavorites = useCallback(() => {
-    onAddToFavorites?.(item)
+  const handleAddToFavorites = useCallback(async () => {
     setShowActionMenu(false)
+    if (onAddToFavorites) {
+      await onAddToFavorites(item)
+    }
   }, [item, onAddToFavorites])
 
   const categoryColor = item.category
