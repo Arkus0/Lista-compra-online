@@ -39,7 +39,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
   const inputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   
-  // Comunicar cambio de foco al padre
+  // Comunicar cambio de foco al padre, pero mantenemos estado local para respuesta inmediata
   useEffect(() => {
     onFocusChange?.(isInputFocused)
   }, [isInputFocused, onFocusChange])
@@ -115,6 +115,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
       setManuallySelected(false)
       setShowSuggestions(false)
       setIsSubmitting(false)
+      // Mantener el foco permite seguir añadiendo items rápidamente
       inputRef.current?.focus()
     }
   }, [name, selectedCategory, onAdd, isSubmitting])
@@ -161,11 +162,16 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
 
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
+  // LÓGICA CRÍTICA:
+  // Si el input tiene foco localmente, FORZAMOS que sea visible.
+  // Esto evita que una actualización del padre (handleListScroll) oculte el form
+  // mientras el teclado está intentando abrirse, lo que causaría que el teclado se cerrara.
+  const shouldBeVisible = isVisible || isInputFocused
+
   return (
-    // CAMBIO IMPORTANTE: FIXED en lugar de STICKY
     <div 
       className={`fixed bottom-0 left-0 right-0 w-full bg-card border-t border-border-light z-30 pb-safe transition-transform duration-300 ${
-        isVisible ? 'translate-y-0' : 'translate-y-full'
+        shouldBeVisible ? 'translate-y-0' : 'translate-y-full'
       }`}
     >
       {/* Sugerencias Flotantes */}
@@ -247,6 +253,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
             />
           </div>
 
+          {/* Mostrar botones extra solo si hay foco (y por ende el teclado está abierto o abriéndose) */}
           {isInputFocused && (
             <div className="flex items-center gap-1 flex-shrink-0 animate-in fade-in slide-in-from-right-2 duration-200">
               {voiceSupported && (
