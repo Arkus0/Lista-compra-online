@@ -22,16 +22,28 @@ interface ListNotesProps {
   listName: string
   currentUser: Profile
   isCollaborative?: boolean
+  isExpandedExternal?: boolean
+  onExpandedChange?: (expanded: boolean) => void
 }
 
 interface NoteWithProfile extends ListNote {
   profile?: Profile
 }
 
-export function ListNotes({ listId, listName, currentUser, isCollaborative = false }: ListNotesProps) {
+export function ListNotes({ listId, listName, currentUser, isCollaborative = false, isExpandedExternal, onExpandedChange }: ListNotesProps) {
   const [notes, setNotes] = useState<NoteWithProfile[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpandedInternal, setIsExpandedInternal] = useState(false)
+
+  // Usar estado externo si está disponible, de lo contrario usar interno
+  const isExpanded = isExpandedExternal !== undefined ? isExpandedExternal : isExpandedInternal
+  const setIsExpanded = (value: boolean) => {
+    if (onExpandedChange) {
+      onExpandedChange(value)
+    } else {
+      setIsExpandedInternal(value)
+    }
+  }
   const [newNote, setNewNote] = useState('')
   const [isSending, setIsSending] = useState(false)
 

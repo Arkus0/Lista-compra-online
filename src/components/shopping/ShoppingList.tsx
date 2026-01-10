@@ -409,11 +409,30 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleAddImage = useCallback((itemId: string) => { setEditingItemId(itemId); setShowImageModal(true); setTimeout(() => imageInputRef.current?.click(), 100) }, [])
   const handleImageSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file || !editingItemId) return; const path = `items/${Date.now()}_${Math.random().toString(36).slice(2)}`; const imageUrl = await uploadImage(file, path); if (imageUrl) { updateItem(editingItemId, { image_url: imageUrl } as any); await supabase.from('list_items').update({ image_url: imageUrl }).eq('id', editingItemId) } setShowImageModal(false); setEditingItemId(null); if (imageInputRef.current) imageInputRef.current.value = '' }, [editingItemId, items, uploadImage, updateItem, supabase])
   const handleAddNote = useCallback((itemId: string) => { const item = items.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemNote(item?.note || ''); setShowNoteModal(true) }, [items])
-  const handleSaveNote = useCallback(async () => { if (!editingItemId) return; const noteValue = editingItemNote.trim() || null; updateItem(editingItemId, { note: noteValue } as any); await supabase.from('list_items').update({ note: noteValue }).eq('id', editingItemId); setShowNoteModal(false); setEditingItemId(null); setEditingItemNote('') }, [editingItemId, editingItemNote, updateItem, supabase])
+  const handleSaveNote = useCallback(async () => {
+    if (!editingItemId) return
+    const noteValue = editingItemNote.trim() || null
+    const item = items.find(i => i.id === editingItemId)
+
+    // Actualizar estado local primero (optimistic update)
+    updateItem(editingItemId, { note: noteValue })
+    setShowNoteModal(false)
+    setEditingItemId(null)
+    setEditingItemNote('')
+
+    // Guardar en base de datos
+    const { error } = await supabase.from('list_items').update({ note: noteValue }).eq('id', editingItemId)
+
+    // Si hay error, revertir el cambio local
+    if (error) {
+      console.error('Error guardando nota:', error)
+      updateItem(editingItemId, { note: item?.note || null })
+    }
+  }, [editingItemId, editingItemNote, items, updateItem, supabase])
   const handleCopyLink = () => { navigator.clipboard.writeText(shareUrl); setIsCopied(true); setTimeout(() => setIsCopied(false), 2000) }
   const closeModal = useCallback(() => setActiveModal(null), [])
   const handleUpdateName = async () => { if (!newName.trim()) return; await supabase.from('shopping_lists').update({ name: newName }).eq('id', list.id); closeModal(); router.refresh() }
-  const handleDeleteList = async () => { await supabase.from('shopping_lists').delete().eq('id', list.id); router.push('/lists') }
+  const handleDeleteList = async () => { await supabase.from('shopping_lists').delete().eq('id', list.id); router.replace('/'); router.refresh() }
   const handleArchiveList = async () => { await supabase.from('shopping_lists').update({ is_archived: true }).eq('id', list.id); router.push('/lists') }
   const handleDuplicateList = async () => { if (isDuplicating) return; setIsDuplicating(true); const { data: newList, error: listError } = await supabase.from('shopping_lists').insert({ name: `${list.name} (copia)`, owner_id: user?.id, share_code: null }).select().single(); if (listError || !newList) { setIsDuplicating(false); return } if (items.length > 0) { const itemsCopy = items.map((item, index) => ({ list_id: newList.id, name: item.name, quantity: item.quantity, unit: item.unit, category: item.category, checked: false, added_by: user?.id, position: index })); await supabase.from('list_items').insert(itemsCopy) } setIsDuplicating(false); setShowMenu(false); router.push(`/lists/${newList.id}`) }
   const handleSaveAsTemplate = async () => { if (!user) return; const { data: newTemplate, error } = await supabase.from('shopping_lists').insert({ name: `${list.name} (plantilla)`, owner_id: user.id, is_template: true }).select().single(); if (error || !newTemplate) return; if (items.length > 0) { const itemsCopy = items.map((item, index) => ({ list_id: newTemplate.id, name: item.name, quantity: item.quantity, unit: item.unit, category: item.category, checked: false, added_by: user.id, position: index })); await supabase.from('list_items').insert(itemsCopy) } setShowMenu(false); showUndoToast('Plantilla creada correctamente', () => { router.push('/lists/templates') }) }
@@ -498,7 +517,14 @@ export function ShoppingList({ list }: ShoppingListProps) {
         {/* NOTAS EN HEADER */}
         {user && (
           <div className="px-4 pb-2">
-             <ListNotes listId={list.id} listName={list.name} currentUser={user} isCollaborative={collaborators.length > 0 || list.share_code !== null} />
+             <ListNotes
+               listId={list.id}
+               listName={list.name}
+               currentUser={user}
+               isCollaborative={collaborators.length > 0 || list.share_code !== null}
+               isExpandedExternal={showNotes}
+               onExpandedChange={setShowNotes}
+             />
           </div>
         )}
       </header>
@@ -545,7 +571,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
                                 addedByProfile={profilesCache.get(item.added_by)} 
                                 checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null} 
                                 isDragEnabled={false}
-                                isNoteVisible={showNotes} // PROP NUEVA
                              />
                           ))}
                        </div>
@@ -578,7 +603,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
                         addedByProfile={profilesCache.get(item.added_by)} 
                         checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null} 
                         isDragEnabled={false}
-                        isNoteVisible={showNotes}
                       />
                     ))}</div>}
               </div>
