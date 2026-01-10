@@ -70,6 +70,11 @@ const ItemSkeleton = () => (
       <div className="h-4 bg-gray-200 rounded w-3/4" />
       <div className="h-3 bg-gray-200 rounded w-1/4" />
     </div>
+    <div className="flex gap-1">
+      <div className="w-7 h-7 bg-gray-200 rounded-lg" />
+      <div className="w-8 h-7 bg-gray-200 rounded" />
+      <div className="w-7 h-7 bg-gray-200 rounded-lg" />
+    </div>
   </div>
 )
 
@@ -86,8 +91,8 @@ function UndoToast({
   if (!isVisible) return null
   
   return (
-    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 fade-in duration-200 w-[90%] max-w-sm pointer-events-none">
-      <div className="bg-foreground text-background px-4 py-3 rounded-xl shadow-2xl flex items-center gap-4 justify-between pointer-events-auto">
+    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 w-[90%] max-w-sm">
+      <div className="bg-foreground text-background px-4 py-3 rounded-xl shadow-2xl flex items-center gap-4 justify-between">
         <span className="text-sm font-medium truncate">{message}</span>
         <button 
           onClick={onUndo}
@@ -139,7 +144,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   
   // Refs para medir la altura del header dinámicamente
   const headerRef = useRef<HTMLElement>(null)
-  const [headerHeight, setHeaderHeight] = useState(130) // Valor inicial seguro
+  const [headerHeight, setHeaderHeight] = useState(130)
 
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
   const [collaboratorsLoaded, setCollaboratorsLoaded] = useState(false)
@@ -168,7 +173,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  // Medir altura del header cuando cambia el contenido (ej: notas)
+  // Medir altura del header cuando cambia el contenido
   useEffect(() => {
     if (headerRef.current) {
       const resizeObserver = new ResizeObserver((entries) => {
@@ -179,23 +184,16 @@ export function ShoppingList({ list }: ShoppingListProps) {
       resizeObserver.observe(headerRef.current)
       return () => resizeObserver.disconnect()
     }
-  }, [user, collaborators, list.name]) // Dependencias que pueden cambiar la altura
+  }, [user, collaborators, list.name])
 
   // LOGICA DE SCROLL BLINDADA
   const handleListScroll = useCallback(() => {
-    // Si el teclado está abierto (input activo), IGNORAMOS cualquier evento de scroll.
-    // Esto es crucial porque abrir el teclado provoca un scroll del navegador.
     if (isInputActive) {
       if (!isControlsVisible) setIsControlsVisible(true)
       return
     }
-
-    // Comportamiento normal: Ocultar al mover
     setIsControlsVisible(false)
-
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
-
-    // Mostrar al detenerse (0.5s)
     scrollTimeoutRef.current = setTimeout(() => {
       setIsControlsVisible(true)
     }, 500)
@@ -205,7 +203,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
     return () => { if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current) }
   }, [])
 
-  // Filtrado y carga de datos (Misma lógica que antes)
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return items
     const query = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -280,7 +277,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     if (items.length > 0) loadProfiles()
   }, [items, supabase, profilesCache])
 
-  // --- HANDLERS (Igual que antes) ---
+  // --- HANDLERS ---
   const showUndoToast = (message: string, undoAction: () => Promise<void> | void) => {
     if (undoState.timer) clearTimeout(undoState.timer)
     const timer = setTimeout(() => setUndoState(prev => ({ ...prev, isVisible: false })), 2000)
@@ -344,7 +341,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Header FLOTANTE (Ahora incluye las notas) */}
+      {/* Header FLOTANTE (Ahora incluye las notas para que desaparezcan en scroll) */}
       <header 
         ref={headerRef}
         className={`fixed top-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-md border-b border-border transition-transform duration-300 ${isControlsVisible ? 'translate-y-0' : '-translate-y-full'}`}
@@ -384,7 +381,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
                     <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-20 py-2">
-                       {/* Menú content (igual) */}
+                       {/* Menú content */}
                        {uncheckedItems.length > 0 && <button onClick={handleMarkAllComplete} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><CheckCheck className="w-4 h-4 text-green-500" /> Marcar todo completado</button>}
                        {checkedItems.length > 0 && <button onClick={handleClearCompleted} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><Eraser className="w-4 h-4 text-orange-500" /> Limpiar completados ({checkedItems.length})</button>}
                        {(uncheckedItems.length > 0 || checkedItems.length > 0) && <div className="border-t border-border my-1" />}
@@ -408,7 +405,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
           )}
         </div>
 
-        {/* NOTAS MOVIDAS AL HEADER PARA QUE DESAPAREZCAN AL SCROLL */}
+        {/* NOTAS EN HEADER */}
         {user && (
           <div className="px-4 pb-2">
              <ListNotes listId={list.id} listName={list.name} currentUser={user} isCollaborative={collaborators.length > 0 || list.share_code !== null} />
@@ -416,7 +413,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
         )}
       </header>
 
-      {/* LISTA DE COMPRA - padding-top dinámico */}
+      {/* LISTA - Padding dinámico */}
       <div 
         className="flex-1 overflow-y-auto p-4 space-y-2 pb-40"
         style={{ paddingTop: `${headerHeight + 10}px` }}
@@ -434,7 +431,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
                      <div key={catId} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                        <div 
                         className="sticky z-10 bg-background/95 backdrop-blur-sm py-2 mb-2"
-                        style={{ top: '0px' }} // Sticky relativo al contenedor scrollable
+                        style={{ top: '0px' }} 
                        >
                          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${CategoryConfig.color}`}>
                            <CategoryConfig.icon className="w-5 h-5" />
@@ -503,7 +500,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
         <AddItemForm onAdd={handleAddItem} suggestionsSource={favoriteItems} isVisible={isControlsVisible || isInputActive} onFocusChange={setIsInputActive} />
       </div>
 
-      {/* Modales (Share, Collab, Edit, Delete, Note, Image) - Igual que antes */}
+      {/* Modales */}
       <Modal isOpen={activeModal === 'share'} onClose={closeModal} title="Compartir Lista"><div className="flex flex-col items-center gap-4 py-2"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl)}`} alt="QR Code" className="rounded-xl border shadow-sm" /><div className="w-full space-y-2"><div className="text-xs text-muted font-medium uppercase tracking-wider text-center">Código de acceso</div><p className="font-mono text-2xl text-center font-bold tracking-widest bg-secondary py-3 rounded-lg border border-border">{list.share_code}</p></div><p className="text-sm text-center text-muted px-4">Comparte este código o escanea el QR.</p><Button onClick={handleCopyLink} className="w-full flex items-center justify-center gap-2">{isCopied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}{isCopied ? 'Enlace Copiado' : 'Copiar Enlace'}</Button></div></Modal>
       <Modal isOpen={activeModal === 'collaborators'} onClose={closeModal} title="Colaboradores"><div className="space-y-2">{collaborators.map((c, i) => <div key={i} className="p-2 border rounded">{c.profiles.name} ({c.role})</div>)}</div></Modal>
       <Modal isOpen={activeModal === 'edit'} onClose={closeModal} title="Editar Nombre"><div className="gap-2 flex flex-col"><Input value={newName} onChange={e => setNewName(e.target.value)} /><Button onClick={handleUpdateName}>Guardar</Button></div></Modal>
