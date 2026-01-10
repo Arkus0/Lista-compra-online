@@ -240,6 +240,7 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
               key={recipe.id}
               recipe={recipe}
               onSelect={setSelectedRecipe}
+              onExportIngredients={handleExportToList}
             />
           ))}
         </div>

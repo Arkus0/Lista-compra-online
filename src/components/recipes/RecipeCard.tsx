@@ -1,16 +1,17 @@
 'use client'
 
 import { memo } from 'react'
-import { Clock, Users, ChefHat } from 'lucide-react'
-import { TheMealDBRecipe } from '@/lib/supabase/types'
+import { Clock, Users, ChefHat, Plus } from 'lucide-react'
+import { TheMealDBRecipe, RecipeIngredient } from '@/lib/supabase/types'
 
 interface RecipeCardProps {
   recipe: TheMealDBRecipe
   onSelect: (recipe: TheMealDBRecipe) => void
+  onExportIngredients?: (ingredients: RecipeIngredient[]) => void
   compact?: boolean
 }
 
-function RecipeCardComponent({ recipe, onSelect, compact = false }: RecipeCardProps) {
+function RecipeCardComponent({ recipe, onSelect, onExportIngredients, compact = false }: RecipeCardProps) {
   if (compact) {
     return (
       <button
@@ -41,41 +42,57 @@ function RecipeCardComponent({ recipe, onSelect, compact = false }: RecipeCardPr
   }
 
   return (
-    <button
-      onClick={() => onSelect(recipe)}
-      className="bg-card rounded-2xl border border-border overflow-hidden hover:border-primary/50 hover:shadow-lg transition-all text-left group"
-    >
-      <div className="aspect-[4/3] relative overflow-hidden bg-secondary">
-        {recipe.image_url ? (
-          <img
-            src={recipe.image_url}
-            alt={recipe.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <ChefHat className="w-12 h-12 text-muted" />
+    <div className="bg-card rounded-2xl border border-border overflow-hidden hover:border-primary/50 hover:shadow-lg transition-all group relative">
+      <button
+        onClick={() => onSelect(recipe)}
+        className="w-full text-left"
+      >
+        <div className="aspect-[4/3] relative overflow-hidden bg-secondary">
+          {recipe.image_url ? (
+            <img
+              src={recipe.image_url}
+              alt={recipe.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <ChefHat className="w-12 h-12 text-muted" />
+            </div>
+          )}
+          <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs font-medium">
+            {recipe.category}
           </div>
-        )}
-        <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs font-medium">
-          {recipe.category}
         </div>
-      </div>
 
-      <div className="p-3">
-        <h3 className="font-semibold text-sm line-clamp-2 mb-1 group-hover:text-primary transition-colors">
-          {recipe.title}
-        </h3>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Users className="w-3 h-3" />
-            {recipe.cuisine}
-          </span>
-          <span>•</span>
-          <span>{recipe.ingredients.length} ingr.</span>
+        <div className="p-3">
+          <h3 className="font-semibold text-sm line-clamp-2 mb-1 group-hover:text-primary transition-colors">
+            {recipe.title}
+          </h3>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              {recipe.cuisine}
+            </span>
+            <span>•</span>
+            <span>{recipe.ingredients.length} ingr.</span>
+          </div>
         </div>
-      </div>
-    </button>
+      </button>
+
+      {/* Botón de añadir a lista */}
+      {onExportIngredients && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onExportIngredients(recipe.ingredients)
+          }}
+          className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:scale-110 active:scale-95"
+          title="Añadir ingredientes a lista"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      )}
+    </div>
   )
 }
 
