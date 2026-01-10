@@ -70,11 +70,6 @@ const ItemSkeleton = () => (
       <div className="h-4 bg-gray-200 rounded w-3/4" />
       <div className="h-3 bg-gray-200 rounded w-1/4" />
     </div>
-    <div className="flex gap-1">
-      <div className="w-7 h-7 bg-gray-200 rounded-lg" />
-      <div className="w-8 h-7 bg-gray-200 rounded" />
-      <div className="w-7 h-7 bg-gray-200 rounded-lg" />
-    </div>
   </div>
 )
 
@@ -91,8 +86,8 @@ function UndoToast({
   if (!isVisible) return null
   
   return (
-    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 w-[90%] max-w-sm">
-      <div className="bg-foreground text-background px-4 py-3 rounded-xl shadow-2xl flex items-center gap-4 justify-between">
+    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 fade-in duration-200 w-[90%] max-w-sm pointer-events-none">
+      <div className="bg-foreground text-background px-4 py-3 rounded-xl shadow-2xl flex items-center gap-4 justify-between pointer-events-auto">
         <span className="text-sm font-medium truncate">{message}</span>
         <button 
           onClick={onUndo}

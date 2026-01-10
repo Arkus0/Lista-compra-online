@@ -146,15 +146,8 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
     }
   }
 
-  const handleCategorySelect = useCallback((categoryId: CategoryId) => {
-    setSelectedCategory(categoryId)
-    setShowCategories(false)
-    setManuallySelected(true)
-    inputRef.current?.focus()
-  }, [])
-
-  const toggleCategories = useCallback(() => {
-    setShowCategories(prev => !prev)
+  const handleSuggestionClick = async (suggestion: any) => {
+    const categoryToUse = suggestion.category ? (suggestion.category as CategoryId) : 'other'
     setShowSuggestions(false)
   }, [])
 
