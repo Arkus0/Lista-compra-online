@@ -70,6 +70,8 @@ export interface Database {
           checked_by: string | null
           assigned_to: string | null
           position?: number
+          image_url: string | null
+          note: string | null
           created_at: string
           updated_at: string
         }
@@ -85,6 +87,8 @@ export interface Database {
           checked_by?: string | null
           assigned_to?: string | null
           position?: number
+          image_url?: string | null
+          note?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -97,6 +101,8 @@ export interface Database {
           checked_by?: string | null
           assigned_to?: string | null
           position?: number
+          image_url?: string | null
+          note?: string | null
           updated_at?: string
         }
       }

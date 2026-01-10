@@ -15,6 +15,7 @@ import { PresenceIndicator } from './PresenceIndicator'
 import { ListNotes } from './ListNotes'
 import { FavoriteItems } from './FavoriteItems'
 import { useFavorites } from '@/hooks/useFavorites'
+import { useImageUpload } from '@/hooks/useImageUpload'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -44,9 +45,6 @@ import {
 import { SortableShoppingItem } from './SortableShoppingItem'
 import { sendPushNotification } from '@/lib/notifications'
 import { CATEGORIES, CategoryId, detectCategory, getSmartSuggestions, CommonProduct } from '@/lib/constants'
-
-// Definimos el tipo local extendido
-type ListItemWithImage = ListItem & { image_url?: string | null }
 
 interface ShoppingListProps {
   list: ShoppingListType
@@ -109,7 +107,7 @@ function UndoToast({
 
 export function ShoppingList({ list }: ShoppingListProps) {
   // Usar selectores optimizados del store
-  const items = useItems() as ListItemWithImage[]
+  const items = useItems() as ListItem[]
   const { setItems, addItem, updateItem, removeItem, toggleItemChecked, updateItemsPositions } = useItemsActions()
   const user = useUser()
 
@@ -127,6 +125,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
     removeFavoriteItem,
     addItemToListFromFavorite,
   } = useFavorites(user?.id)
+
+  // Hook de subida de imágenes
+  const { upload: uploadImage, isUploading: isUploadingImage } = useImageUpload({ bucket: 'list-images' })
 
   const [isLoading, setIsLoading] = useState(true)
   const [activeModal, setActiveModal] = useState<'share' | 'collaborators' | 'edit' | 'delete' | null>(null)
@@ -152,6 +153,13 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const [isCopied, setIsCopied] = useState(false)
   const [isDuplicating, setIsDuplicating] = useState(false)
   const [profilesCache, setProfilesCache] = useState<Map<string, Profile>>(new Map())
+
+  // Estados para modales de imagen y nota
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editingItemNote, setEditingItemNote] = useState('')
+  const [showNoteModal, setShowNoteModal] = useState(false)
+  const [showImageModal, setShowImageModal] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   const supabaseRef = useRef(createClient())
   const supabase = supabaseRef.current
@@ -183,7 +191,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const progress = useMemo(() => items.length > 0 ? (items.filter(i => i.checked).length / items.length) * 100 : 0, [items])
 
   // Función para normalizar categoría (manejar legacy y autodetectar)
-  const normalizeCategory = useCallback((item: ListItemWithImage): CategoryId => {
+  const normalizeCategory = useCallback((item: ListItem): CategoryId => {
     // Si tiene categoría válida del sistema, usarla
     if (item.category && CATEGORIES[item.category as CategoryId]) {
       return item.category as CategoryId
@@ -215,7 +223,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     if (viewMode === 'list') return null
 
     // Orden definido en constants.ts
-    const groups: Record<CategoryId, ListItemWithImage[]> = {} as Record<CategoryId, ListItemWithImage[]>
+    const groups: Record<CategoryId, ListItem[]> = {} as Record<CategoryId, ListItem[]>
 
     // Inicializar grupos vacíos para mantener orden
     Object.keys(CATEGORIES).forEach(key => { groups[key as CategoryId] = [] })
@@ -231,7 +239,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     })
 
     // Filtrar grupos vacíos y retornar
-    return Object.entries(groups).filter(([_, items]) => items.length > 0) as [CategoryId, ListItemWithImage[]][]
+    return Object.entries(groups).filter(([_, items]) => items.length > 0) as [CategoryId, ListItem[]][]
   }, [uncheckedItems, viewMode, normalizeCategory])
 
   // Sugerencias inteligentes basadas en items de la lista
@@ -282,7 +290,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
         .order('created_at', { ascending: true })
 
       if (!error && data && isMounted) {
-        setItems(data as ListItemWithImage[])
+        setItems(data as ListItem[])
       }
       if (isMounted) setIsLoading(false)
     }
@@ -378,7 +386,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
       const { data, error } = await supabase.from('list_items').insert(itemData).select().single()
       
       if (!error && data) {
-        addItem(data as ListItemWithImage)
+        addItem(data as ListItem)
         sendPushNotification({
           listId: list.id, listName: list.name, action: 'item_added',
           actorName: user.name || 'Alguien', itemName: name, excludeUserId: user.id,
@@ -427,7 +435,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
         list_id: item.list_id, name: item.name, quantity: item.quantity, category: item.category, 
         added_by: item.added_by, image_url: item.image_url, position: item.position
       }).select().single()
-      if (data) addItem(data as ListItemWithImage)
+      if (data) addItem(data as ListItem)
     }
 
     showUndoToast(`Eliminado: ${item.name}`, undoAction)
@@ -460,7 +468,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleAddFromFavorite = useCallback(async (favorite: typeof favoriteItems[0]) => {
     const result = await addItemToListFromFavorite(favorite, list.id)
     if (result) {
-      if (result.action === 'created') addItem(result.item as ListItemWithImage)
+      if (result.action === 'created') addItem(result.item as ListItem)
       else updateItem(result.item.id, { quantity: result.item.quantity, checked: result.item.checked })
     }
   }, [addItemToListFromFavorite, list.id, addItem, updateItem])
@@ -489,6 +497,75 @@ export function ShoppingList({ list }: ShoppingListProps) {
       updateItem(itemId, { assigned_to: item.assigned_to } as any)
     }
   }, [items, updateItem, supabase])
+
+  // Abrir modal para añadir/editar imagen de un item
+  const handleAddImage = useCallback((itemId: string) => {
+    setEditingItemId(itemId)
+    setShowImageModal(true)
+    // Trigger file input
+    setTimeout(() => imageInputRef.current?.click(), 100)
+  }, [])
+
+  // Subir imagen para un item
+  const handleImageSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !editingItemId) return
+
+    const item = items.find(i => i.id === editingItemId)
+    if (!item) return
+
+    // Subir imagen
+    const path = `items/${Date.now()}_${Math.random().toString(36).slice(2)}`
+    const imageUrl = await uploadImage(file, path)
+
+    if (imageUrl) {
+      // Actualizar en store
+      updateItem(editingItemId, { image_url: imageUrl } as any)
+
+      // Actualizar en DB
+      await supabase
+        .from('list_items')
+        .update({ image_url: imageUrl })
+        .eq('id', editingItemId)
+    }
+
+    // Cerrar y limpiar
+    setShowImageModal(false)
+    setEditingItemId(null)
+    if (imageInputRef.current) imageInputRef.current.value = ''
+  }, [editingItemId, items, uploadImage, updateItem, supabase])
+
+  // Abrir modal para añadir/editar nota de un item
+  const handleAddNote = useCallback((itemId: string) => {
+    const item = items.find(i => i.id === itemId)
+    setEditingItemId(itemId)
+    setEditingItemNote(item?.note || '')
+    setShowNoteModal(true)
+  }, [items])
+
+  // Guardar nota de un item
+  const handleSaveNote = useCallback(async () => {
+    if (!editingItemId) return
+
+    const item = items.find(i => i.id === editingItemId)
+    if (!item) return
+
+    const noteValue = editingItemNote.trim() || null
+
+    // Actualizar en store
+    updateItem(editingItemId, { note: noteValue } as any)
+
+    // Actualizar en DB
+    await supabase
+      .from('list_items')
+      .update({ note: noteValue })
+      .eq('id', editingItemId)
+
+    // Cerrar modal
+    setShowNoteModal(false)
+    setEditingItemId(null)
+    setEditingItemNote('')
+  }, [editingItemId, editingItemNote, items, updateItem, supabase])
 
   // Drag and Drop
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
@@ -664,7 +741,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
           .select('*')
           .eq('list_id', list.id)
           .order('position', { ascending: true })
-        if (allItems) setItems(allItems as ListItemWithImage[])
+        if (allItems) setItems(allItems as ListItem[])
       }
     }
 
@@ -879,6 +956,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
                                onUpdateQuantity={handleUpdateQuantity}
                                onAddToFavorites={handleAddToFavorites}
                                onAssign={handleAssignItem}
+                               onAddImage={handleAddImage}
+                               onAddNote={handleAddNote}
                                assignablePeople={assignablePeople}
                                assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
                                addedByProfile={profilesCache.get(item.added_by)}
@@ -911,6 +990,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
                       onUpdateQuantity={handleUpdateQuantity}
                       onAddToFavorites={handleAddToFavorites}
                       onAssign={handleAssignItem}
+                      onAddImage={handleAddImage}
+                      onAddNote={handleAddNote}
                       assignablePeople={assignablePeople}
                       assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
                       addedByProfile={profilesCache.get(item.added_by)}
@@ -946,6 +1027,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
                         onUpdateQuantity={handleUpdateQuantity}
                         onAddToFavorites={handleAddToFavorites}
                         onAssign={handleAssignItem}
+                        onAddImage={handleAddImage}
+                        onAddNote={handleAddNote}
                         assignablePeople={assignablePeople}
                         assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
                         addedByProfile={profilesCache.get(item.added_by)}
@@ -1005,6 +1088,53 @@ export function ShoppingList({ list }: ShoppingListProps) {
        <Modal isOpen={activeModal === 'delete'} onClose={closeModal} title="Eliminar Lista">
           <div className="text-center"><p className="mb-4">¿Seguro?</p><Button variant="danger" onClick={handleDeleteList}>Eliminar</Button></div>
       </Modal>
+
+      {/* Modal de Nota */}
+      <Modal
+        isOpen={showNoteModal}
+        onClose={() => { setShowNoteModal(false); setEditingItemId(null); setEditingItemNote(''); }}
+        title="Añadir nota"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            Añade una nota específica para este producto (ej: marca preferida, ubicación en tienda, etc.)
+          </p>
+          <textarea
+            value={editingItemNote}
+            onChange={(e) => setEditingItemNote(e.target.value)}
+            placeholder="Escribe tu nota aquí..."
+            className="w-full h-32 px-4 py-3 rounded-xl border-2 border-border bg-input-bg text-foreground placeholder:text-muted-light focus:outline-none focus:border-primary transition-colors resize-none"
+            autoFocus
+          />
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" onClick={() => { setShowNoteModal(false); setEditingItemId(null); setEditingItemNote(''); }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveNote}>
+              Guardar
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Input oculto para subir imagen */}
+      <input
+        type="file"
+        ref={imageInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handleImageSelected}
+      />
+
+      {/* Indicador de subida de imagen */}
+      {isUploadingImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-card p-6 rounded-2xl shadow-xl flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-foreground font-medium">Subiendo imagen...</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

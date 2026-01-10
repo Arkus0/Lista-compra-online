@@ -240,7 +240,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
   return (
-    <div className="sticky bottom-0 bg-background border-t border-border-light z-30 pb-safe">
+    <div className="sticky bottom-0 bg-card border-t border-border-light z-30 pb-safe">
       {/* Sugerencias Flotantes */}
       {showSuggestions && (
         <div className="absolute bottom-full left-4 right-4 mb-2 bg-card rounded-xl shadow-lg border border-border overflow-hidden animate-in slide-in-from-bottom-2 z-20">
@@ -283,7 +283,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
       {previewUrl && (
         <div className="absolute bottom-full right-4 mb-2 w-20 h-20 bg-card rounded-xl shadow-lg border border-border p-1 animate-in zoom-in-95 z-10">
           <img src={previewUrl} alt="Preview" className="w-full h-full object-cover rounded-lg" />
-          <button 
+          <button
             type="button"
             onClick={clearImage}
             className="absolute -top-2 -right-2 bg-danger text-white rounded-full p-1 shadow-md hover:scale-110 transition-transform"
@@ -323,27 +323,27 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
           </div>
         )}
 
-        <div className="flex gap-3">
+        {/* Layout principal */}
+        <div className="flex items-center gap-2">
           {/* Botón Trigger de Categoría */}
           <button
             type="button"
             onClick={toggleCategories}
             className={`
-              flex-shrink-0 w-12 h-12 rounded-xl border flex items-center justify-center transition-all duration-300 relative
-              ${showCategories ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200 hover:border-primary/50'}
+              flex-shrink-0 w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-300 relative
+              ${showCategories ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}
               ${CurrentCategoryConfig.color}
             `}
+            aria-label="Seleccionar categoría"
           >
-            <CurrentCategoryConfig.icon className="w-6 h-6" />
-
-            {/* Indicador pequeño */}
-            <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full shadow border border-gray-100 flex items-center justify-center">
-              <ChevronUp className="w-2.5 h-2.5 text-gray-400" />
+            <CurrentCategoryConfig.icon className="w-5 h-5" />
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-card rounded-full shadow border border-border-light flex items-center justify-center">
+              <ChevronUp className="w-2.5 h-2.5 text-muted" />
             </div>
           </button>
 
           {/* Input de Texto */}
-          <div className="flex-1 relative flex items-center">
+          <div className="flex-1 relative">
             <input
               ref={inputRef}
               type="text"
@@ -356,9 +356,61 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
                 }
               }}
               placeholder={isListening ? "Escuchando..." : "Añadir producto..."}
-              className={`w-full h-12 rounded-xl bg-secondary pl-4 pr-24 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-gray-400 ${isListening ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
+              className={`
+                w-full h-11 rounded-xl bg-secondary px-4
+                focus:outline-none focus:ring-2 focus:ring-primary/50
+                transition-all placeholder:text-muted-light
+                ${isListening ? 'ring-2 ring-red-500 bg-red-50 dark:bg-red-900/20' : ''}
+              `}
               autoComplete="off"
             />
+          </div>
+
+          {/* Botones auxiliares - FUERA del input */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Botón de Voz */}
+            {voiceSupported && (
+              <button
+                type="button"
+                onClick={handleVoiceButton}
+                className={`
+                  w-10 h-10 rounded-xl flex items-center justify-center transition-all
+                  ${isListening
+                    ? 'text-white bg-red-500 animate-pulse'
+                    : 'text-muted hover:text-primary hover:bg-secondary'
+                  }
+                `}
+                aria-label={isListening ? "Detener grabación" : "Añadir por voz"}
+              >
+                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
+            )}
+
+            {/* Botón de Escáner */}
+            <button
+              type="button"
+              onClick={() => setShowBarcodeScanner(true)}
+              className="w-10 h-10 rounded-xl text-muted hover:text-primary hover:bg-secondary flex items-center justify-center transition-colors"
+              aria-label="Escanear código de barras"
+            >
+              <ScanBarcode className="w-5 h-5" />
+            </button>
+
+            {/* Botón de Imagen */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={`
+                w-10 h-10 rounded-xl flex items-center justify-center transition-colors
+                ${imageFile
+                  ? 'text-primary bg-primary/10'
+                  : 'text-muted hover:text-primary hover:bg-secondary'
+                }
+              `}
+              aria-label="Añadir foto"
+            >
+              <ImageIcon className="w-5 h-5" />
+            </button>
 
             {/* Input File oculto */}
             <input
@@ -368,57 +420,19 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
               className="hidden"
               onChange={handleImageSelect}
             />
-
-            {/* Botones dentro del input */}
-            <div className="absolute right-2 flex items-center gap-1">
-              {/* Botón de Voz */}
-              {voiceSupported && (
-                <button
-                  type="button"
-                  onClick={handleVoiceButton}
-                  className={`p-2 rounded-lg transition-all ${
-                    isListening
-                      ? 'text-red-500 bg-red-100 animate-pulse'
-                      : 'text-gray-400 hover:text-primary hover:bg-primary/10'
-                  }`}
-                  title={isListening ? "Detener grabación" : "Añadir por voz"}
-                >
-                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                </button>
-              )}
-
-              {/* Botón de Escáner */}
-              <button
-                type="button"
-                onClick={() => setShowBarcodeScanner(true)}
-                className="p-2 rounded-lg text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors"
-                title="Escanear código de barras"
-              >
-                <ScanBarcode className="w-4 h-4" />
-              </button>
-
-              {/* Botón de Imagen */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className={`p-2 rounded-lg transition-colors ${imageFile ? 'text-primary bg-primary/10' : 'text-gray-400 hover:text-primary hover:bg-primary/10'}`}
-                title="Añadir foto"
-              >
-                <ImageIcon className="w-4 h-4" />
-              </button>
-            </div>
           </div>
 
           {/* Botón Submit */}
           <Button
             type="submit"
             disabled={!name.trim() || isUploading}
-            className="w-12 h-12 rounded-xl p-0 flex items-center justify-center shrink-0"
+            className="w-11 h-11 rounded-xl p-0 flex items-center justify-center shrink-0"
+            aria-label="Añadir producto"
           >
             {isUploading ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
-              <Plus className="w-6 h-6" />
+              <Plus className="w-5 h-5" />
             )}
           </Button>
         </div>
