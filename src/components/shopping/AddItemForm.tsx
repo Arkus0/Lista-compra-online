@@ -1,7 +1,8 @@
+// src/components/shopping/AddItemForm.tsx
 'use client'
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
-import { Plus, ChevronUp, Loader2, Mic, MicOff, ScanBarcode, Star, LayoutGrid } from 'lucide-react'
+import { Plus, ChevronUp, Loader2, Mic, MicOff, ScanBarcode, Star, LayoutGrid, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { CATEGORIES, detectCategory, CategoryId, searchProducts } from '@/lib/constants'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
@@ -12,8 +13,7 @@ interface AddItemFormProps {
   onAdd: (name: string, category: string, imageUrl?: string) => void | Promise<void>
   onOpenCatalog?: () => void
   suggestionsSource?: UserFavoriteItem[]
-  isVisible?: boolean
-  onFocusChange?: (isFocused: boolean) => void
+  // Eliminamos props de visibilidad externa ya que el Drawer controla eso
 }
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -28,9 +28,7 @@ function useDebounce<T>(value: T, delay: number): T {
 function AddItemFormComponent({ 
   onAdd, 
   onOpenCatalog,
-  suggestionsSource = [], 
-  isVisible = true, 
-  onFocusChange 
+  suggestionsSource = []
 }: AddItemFormProps) {
   const [name, setName] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('other')
@@ -39,49 +37,11 @@ function AddItemFormComponent({
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
-  const [isInputFocused, setIsInputFocused] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  // Estado para controlar la posición del teclado
-  const [bottomOffset, setBottomOffset] = useState(0)
-
   const inputRef = useRef<HTMLInputElement>(null)
-  const formRef = useRef<HTMLFormElement>(null)
   
-  // Comunicar cambio de foco al padre
-  useEffect(() => {
-    onFocusChange?.(isInputFocused)
-  }, [isInputFocused, onFocusChange])
-
-  // --- SOLUCIÓN GAP 0: Manejo robusto del Teclado Virtual ---
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.visualViewport) {
-      const handleResize = () => {
-        if (!window.visualViewport) return
-        
-        // Si el viewport visual es más pequeño que la ventana, el teclado probablemente está abierto
-        const isKeyboardOpen = window.visualViewport.height < window.innerHeight
-        
-        if (isKeyboardOpen && isInputFocused) {
-          // Calculamos cuánto espacio ocupa el teclado
-          // Ajustamos un poco (10px) para dar aire
-          const offset = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop
-          setBottomOffset(Math.max(0, offset))
-        } else {
-          setBottomOffset(0)
-        }
-      }
-
-      window.visualViewport.addEventListener('resize', handleResize)
-      window.visualViewport.addEventListener('scroll', handleResize)
-      
-      return () => {
-        window.visualViewport?.removeEventListener('resize', handleResize)
-        window.visualViewport?.removeEventListener('scroll', handleResize)
-      }
-    }
-  }, [isInputFocused])
-
+  // Voice Input Hook
   const { isListening, transcript, isSupported: voiceSupported, startListening, stopListening } = useVoiceInput()
 
   useEffect(() => {
@@ -90,7 +50,7 @@ function AddItemFormComponent({
 
   const debouncedName = useDebounce(name, 300)
 
-  // Lógica de sugerencias (sin cambios mayores)
+  // Lógica de sugerencias (Simplificada)
   useEffect(() => {
     if (name.trim().length >= 2) {
       const normalizedName = name.toLowerCase()
@@ -132,28 +92,14 @@ function AddItemFormComponent({
     }
   }, [debouncedName, manuallySelected, name, suggestionsSource])
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (formRef.current && !formRef.current.contains(e.target as Node)) {
-        setShowCategories(false)
-        setShowSuggestions(false)
-      }
-    }
-    document.addEventListener('click', handleClickOutside)
-    return () => document.removeEventListener('click', handleClickOutside)
-  }, [])
-
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (name.trim() && !isSubmitting) {
       setIsSubmitting(true)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50)
       
-      // Feedback háptico al enviar
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(50)
-      }
-
       await onAdd(name.trim(), selectedCategory, undefined)
+      
       setName('')
       setSelectedCategory('other')
       setShowCategories(false)
@@ -161,8 +107,8 @@ function AddItemFormComponent({
       setShowSuggestions(false)
       setIsSubmitting(false)
       
-      // Mantener foco para añadir múltiples items rápido
-      inputRef.current?.focus()
+      // Mantener foco es buena UX en listas rápidas
+      setTimeout(() => inputRef.current?.focus(), 10)
     }
   }, [name, selectedCategory, onAdd, isSubmitting])
 
@@ -176,7 +122,6 @@ function AddItemFormComponent({
       setSelectedCategory('other')
       setManuallySelected(false)
       setIsSubmitting(false)
-      inputRef.current?.focus()
     }
   }
 
@@ -185,11 +130,6 @@ function AddItemFormComponent({
     setShowCategories(false)
     setManuallySelected(true)
     inputRef.current?.focus()
-  }, [])
-
-  const toggleCategories = useCallback(() => {
-    setShowCategories(prev => !prev)
-    setShowSuggestions(false)
   }, [])
 
   const handleBarcodeProductFound = useCallback((productName: string, category?: string) => {
@@ -208,22 +148,11 @@ function AddItemFormComponent({
 
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
-  // Si tiene foco, forzamos visibilidad ignorando al padre
-  const shouldBeVisible = isVisible || isInputFocused
-
   return (
-    <div 
-      className={`fixed left-0 right-0 w-full bg-card border-t border-border-light z-30 transition-all duration-300 ease-out shadow-[0_-4px_20px_rgba(0,0,0,0.1)] ${
-        shouldBeVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'
-      }`}
-      style={{ 
-        bottom: `${bottomOffset}px`,
-        paddingBottom: bottomOffset > 0 ? '10px' : 'env(safe-area-inset-bottom)' 
-      }}
-    >
-      {/* Sugerencias Flotantes */}
+    <div className="w-full bg-card pt-2 pb-4">
+      {/* Sugerencias integradas en el flujo */}
       {showSuggestions && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 px-4 flex gap-2 overflow-x-auto pb-2 z-20 scrollbar-hide mask-fade-sides">
+        <div className="mb-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide mask-fade-sides">
           {suggestions.map((suggestion) => {
             const CategoryConfig = suggestion.category ? CATEGORIES[suggestion.category as CategoryId] : null
             return (
@@ -231,11 +160,10 @@ function AddItemFormComponent({
                 key={suggestion.id}
                 type="button"
                 onClick={() => handleSuggestionClick(suggestion)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-card rounded-xl shadow-md border border-border/50 hover:bg-secondary whitespace-nowrap transition-transform active:scale-95 flex-shrink-0 animate-in zoom-in-95 duration-200"
+                className="flex items-center gap-1.5 px-3 py-2 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary whitespace-nowrap active:scale-95 transition-transform"
               >
                 {suggestion.source === 'favorite' && <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />}
                 <span className="font-medium text-sm text-foreground">{suggestion.name}</span>
-                {suggestion.quantity && suggestion.quantity > 1 && <span className="text-[10px] text-muted bg-secondary px-1 py-0.5 rounded">x{suggestion.quantity}</span>}
                 {CategoryConfig && <div className={`w-2 h-2 rounded-full ${CategoryConfig.color.split(' ')[0].replace('text-', 'bg-')}`} />}
               </button>
             )
@@ -243,41 +171,51 @@ function AddItemFormComponent({
         </div>
       )}
 
-      <form ref={formRef} onSubmit={handleSubmit} className="p-3 sm:p-4 max-w-2xl mx-auto relative">
+      <form onSubmit={handleSubmit} className="relative">
+        {/* Selector de Categorías (Overlay relativo) */}
         {showCategories && (
-          <div className="absolute bottom-full left-4 right-4 mb-2 bg-card rounded-xl shadow-xl border border-border p-3 grid grid-cols-5 gap-2 animate-in slide-in-from-bottom-2 z-40">
+          <div className="absolute bottom-full left-0 right-0 mb-2 bg-popover rounded-xl shadow-xl border border-border p-3 grid grid-cols-5 gap-2 animate-in slide-in-from-bottom-2 z-50">
             {Object.values(CATEGORIES).map((cat) => (
               <button
                 key={cat.id}
                 type="button"
                 onClick={() => handleCategorySelect(cat.id)}
-                className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${selectedCategory === cat.id ? 'bg-primary/10 text-primary ring-2 ring-primary/20 scale-105' : 'hover:bg-hover text-muted'}`}
+                className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${selectedCategory === cat.id ? 'bg-primary/10 text-primary ring-1 ring-primary/20' : 'hover:bg-muted text-muted-foreground'}`}
               >
-                <cat.icon className="w-6 h-6 mb-1.5" />
-                <span className="text-[10px] truncate w-full text-center font-medium leading-tight">{cat.label.split(' ')[0]}</span>
+                <cat.icon className="w-5 h-5 mb-1" />
+                <span className="text-[10px] truncate w-full text-center leading-tight">{cat.label.split(' ')[0]}</span>
               </button>
             ))}
+            <button type="button" onClick={() => setShowCategories(false)} className="col-span-5 flex items-center justify-center pt-2 border-t border-border mt-1">
+                <ChevronUp className="w-4 h-4 rotate-180 text-muted-foreground"/>
+            </button>
           </div>
         )}
 
         <div className="flex items-center gap-2">
-          {/* Botón Catálogo (Nuevo Gap 1) */}
-          {!isInputFocused && onOpenCatalog && (
+           {/* Botón Catálogo */}
+           {onOpenCatalog && (
              <button
                type="button"
                onClick={onOpenCatalog}
                className="flex-shrink-0 w-11 h-11 rounded-xl bg-secondary text-foreground hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-center"
-               aria-label="Abrir catálogo rápido"
+               title="Catálogo"
              >
                <LayoutGrid className="w-5 h-5" />
              </button>
           )}
 
-          <button type="button" onClick={toggleCategories} className={`flex-shrink-0 w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-300 relative ${showCategories ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'} ${CurrentCategoryConfig.color}`}>
+          {/* Botón Categoría */}
+          <button 
+            type="button" 
+            onClick={() => setShowCategories(!showCategories)} 
+            className={`flex-shrink-0 w-11 h-11 rounded-xl border flex items-center justify-center transition-all relative ${showCategories ? 'border-primary ring-2 ring-primary/20' : 'border-border'} ${CurrentCategoryConfig.color}`}
+          >
             <CurrentCategoryConfig.icon className="w-5 h-5" />
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-card rounded-full shadow border border-border-light flex items-center justify-center"><ChevronUp className="w-2.5 h-2.5 text-muted" /></div>
           </button>
 
+          {/* Input Principal */}
           <div className="flex-1 relative">
             <input
               ref={inputRef}
@@ -287,24 +225,31 @@ function AddItemFormComponent({
                 setName(e.target.value)
                 if (e.target.value.trim() === '') { setManuallySelected(false); setSelectedCategory('other') }
               }}
-              onFocus={() => setIsInputFocused(true)}
-              onBlur={() => setTimeout(() => setIsInputFocused(false), 200)}
-              placeholder={isListening ? "Escuchando..." : "Añadir producto..."}
-              className={`w-full h-11 rounded-xl bg-secondary px-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-light ${isListening ? 'ring-2 ring-red-500 bg-red-50 dark:bg-red-900/20' : ''}`}
+              placeholder={isListening ? "Escuchando..." : "Añadir item..."}
+              className={`w-full h-11 rounded-xl bg-secondary px-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground ${isListening ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
               autoComplete="off"
+              // AutoFocus es seguro dentro de un Drawer abierto
+              autoFocus 
             />
           </div>
 
-          {isInputFocused && (
-            <div className="flex items-center gap-1 flex-shrink-0 animate-in fade-in slide-in-from-right-2 duration-200">
-              {voiceSupported && <button type="button" onClick={handleVoiceButton} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isListening ? 'text-white bg-red-500 animate-pulse' : 'text-muted hover:text-primary hover:bg-secondary'}`}>{isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}</button>}
-              <button type="button" onClick={() => setShowBarcodeScanner(true)} className="w-10 h-10 rounded-xl text-muted hover:text-primary hover:bg-secondary flex items-center justify-center transition-colors"><ScanBarcode className="w-5 h-5" /></button>
-            </div>
+          {/* Botones de acción derecha */}
+          {!name && (
+            <>
+              {voiceSupported && (
+                <button type="button" onClick={handleVoiceButton} className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isListening ? 'text-white bg-red-500 animate-pulse' : 'text-muted-foreground bg-secondary hover:text-primary'}`}>
+                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                </button>
+              )}
+              <button type="button" onClick={() => setShowBarcodeScanner(true)} className="w-11 h-11 rounded-xl bg-secondary text-muted-foreground hover:text-primary flex items-center justify-center"><ScanBarcode className="w-5 h-5" /></button>
+            </>
           )}
 
-          <Button type="submit" disabled={!name.trim() || isSubmitting} className="w-11 h-11 rounded-xl p-0 flex items-center justify-center shrink-0 shadow-sm">
-            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-6 h-6" />}
-          </Button>
+          {name && (
+            <Button type="submit" disabled={isSubmitting} className="w-11 h-11 rounded-xl p-0 flex items-center justify-center shrink-0 shadow-sm animate-in zoom-in">
+                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-6 h-6" />}
+            </Button>
+          )}
         </div>
       </form>
 
@@ -314,4 +259,3 @@ function AddItemFormComponent({
 }
 
 export const AddItemForm = memo(AddItemFormComponent)
-AddItemForm.displayName = 'AddItemForm'
