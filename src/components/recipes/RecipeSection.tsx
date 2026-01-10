@@ -172,6 +172,11 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
         </button>
       </div>
 
+      {/* Ayuda traducción */}
+      <p className="text-xs text-muted-foreground bg-secondary/50 px-3 py-2 rounded-lg">
+        Puedes traducir la receta con tu móvil o tablet pinchando en la opción de traducir de tu navegador 😊
+      </p>
+
       {/* Buscador */}
       <form onSubmit={handleSearch} className="flex gap-2">
         <div className="flex-1 relative">
