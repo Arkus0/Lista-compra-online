@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, memo, useCallback, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Check, Trash2, GripVertical, Minus, Plus, User, Star,
   UserPlus, X, MoreVertical, StickyNote, Camera, Tag
@@ -75,11 +76,18 @@ function ShoppingItemComponent({
   const menuRef = useRef<HTMLDivElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const menuContentRef = useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Cerrar menú al hacer clic fuera o con Escape
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node
+      // Si el menú está montado en el portal, menuContentRef estará fuera del DOM del componente
+      // pero debemos comprobar si el clic fue en el botón original o en el contenido del portal
       const isOutsideButton = !menuRef.current || !menuRef.current.contains(target)
       const isOutsideMenu = !menuContentRef.current || !menuContentRef.current.contains(target)
 
@@ -149,10 +157,6 @@ function ShoppingItemComponent({
       await onAddToFavorites(item)
     }
   }, [item, onAddToFavorites])
-
-  const categoryColor = item.category
-    ? categoryColors[item.category.toLowerCase()] || categoryColors.otros
-    : null
 
   return (
     <>
@@ -298,7 +302,7 @@ function ShoppingItemComponent({
       </div>
 
       {/* Menú contextual - Portal con posición fija */}
-      {showActionMenu && menuPosition && (
+      {showActionMenu && menuPosition && mounted && createPortal(
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => { setShowActionMenu(false); setShowAssignSubmenu(false) }} />
           <div
@@ -307,6 +311,7 @@ function ShoppingItemComponent({
             aria-label={`Acciones para ${item.name}`}
             className="fixed w-52 bg-card border border-border rounded-xl shadow-2xl z-[9999] py-1 animate-in fade-in slide-in-from-top-2 duration-150"
             style={{ top: menuPosition.top, right: menuPosition.right }}
+            onClick={(e) => e.stopPropagation()}
           >
             {onAssign && assignablePeople.length > 0 && (
               <div className="relative">
@@ -321,7 +326,7 @@ function ShoppingItemComponent({
                   <span className="flex-1">Asignar a...</span>
                 </button>
                 {showAssignSubmenu && (
-                  <div role="menu" aria-label="Personas disponibles" className="absolute left-full top-0 ml-1 w-48 bg-card border border-border rounded-xl shadow-xl z-[9999] py-1 animate-in fade-in slide-in-from-left-2 duration-150">
+                  <div role="menu" aria-label="Personas disponibles" className="absolute left-full top-0 ml-1 w-48 bg-card border border-border rounded-xl shadow-xl z-[9999] py-1 animate-in fade-in slide-in-from-left-2 duration-150" onClick={(e) => e.stopPropagation()}>
                     {assignedToProfile && (
                        <button role="menuitem" onClick={() => handleAssign(null)} className="w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 text-danger"><X className="w-4 h-4" /> Quitar</button>
                     )}
@@ -350,7 +355,8 @@ function ShoppingItemComponent({
             <div role="separator" className="h-px bg-border-light my-1" />
             <button role="menuitem" onClick={handleDelete} className="w-full px-3 py-2.5 text-left text-sm hover:bg-danger/10 flex items-center gap-3 text-danger"><Trash2 className="w-4 h-4" /> <span>Eliminar</span></button>
           </div>
-        </>
+        </>,
+        document.body
       )}
 
       {showImageModal && item.image_url && (

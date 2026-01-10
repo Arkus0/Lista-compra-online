@@ -3,18 +3,36 @@
 import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { useFavorites } from '@/hooks/useFavorites'
-import { useUser } from '@/store/useStore'
+import { useUser, useSetUser } from '@/store/useStore'
+import { createClient } from '@/lib/supabase/client'
 import { Star, Plus, Trash2, Loader2, Edit2, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { UserFavoriteItem } from '@/lib/supabase/types'
 import { CATEGORIES, CategoryId } from '@/lib/constants'
 
 export default function FavoritesPage() {
   const user = useUser()
+  const setUser = useSetUser()
   const { favoriteItems, isLoading, addFavoriteItem, removeFavoriteItem } = useFavorites(user?.id)
+  
+  // Efecto para hidratar el usuario si no existe (recarga de página)
+  useEffect(() => {
+    const checkUser = async () => {
+      if (!user) {
+        const supabase = createClient()
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (authUser) {
+           const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single()
+           if (profile) setUser(profile)
+        }
+      }
+    }
+    checkUser()
+  }, [user, setUser])
+
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [editingItem, setEditingItem] = useState<UserFavoriteItem | null>(null)
   const [isAdding, setIsAdding] = useState(false)
