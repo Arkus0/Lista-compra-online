@@ -35,6 +35,7 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
   const [ingredientsToExport, setIngredientsToExport] = useState<RecipeIngredient[]>([])
   const [isExporting, setIsExporting] = useState(false)
   const [exportSuccess, setExportSuccess] = useState(false)
+  const [exportMessage, setExportMessage] = useState('')
 
   const supabase = createClient()
 
@@ -76,18 +77,45 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
     setIsExporting(true)
 
     try {
-      // Obtener items existentes para calcular posición
+      // Obtener items existentes de la lista (nombre y posición)
       const { data: existingItems } = await supabase
         .from('list_items')
-        .select('position')
+        .select('name, position')
         .eq('list_id', listId)
-        .order('position', { ascending: false })
-        .limit(1)
 
-      let maxPosition = existingItems?.[0]?.position ?? -1
+      // Crear set de nombres existentes (lowercase para comparación)
+      const existingNames = new Set(
+        (existingItems || []).map(item => item.name.toLowerCase().trim())
+      )
+
+      // Filtrar ingredientes que NO están en la lista
+      const newIngredients = ingredientsToExport.filter(
+        ing => !existingNames.has(ing.name.toLowerCase().trim())
+      )
+
+      const skippedCount = ingredientsToExport.length - newIngredients.length
+
+      if (newIngredients.length === 0) {
+        // Todos los ingredientes ya están en la lista
+        setExportSuccess(true)
+        setExportMessage('Todos los ingredientes ya están en la lista')
+        setTimeout(() => {
+          setShowListSelector(false)
+          setIngredientsToExport([])
+          setExportSuccess(false)
+          setExportMessage('')
+        }, 2000)
+        return
+      }
+
+      // Calcular posición máxima
+      let maxPosition = (existingItems || []).reduce(
+        (max, item) => Math.max(max, item.position ?? 0),
+        -1
+      )
 
       // Preparar items para insertar
-      const itemsToInsert = ingredientsToExport.map((ing) => {
+      const itemsToInsert = newIngredients.map((ing) => {
         maxPosition++
         return {
           list_id: listId,
@@ -100,7 +128,7 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
         }
       })
 
-      // Insertar todos los items
+      // Insertar los items nuevos
       const { error } = await supabase
         .from('list_items')
         .insert(itemsToInsert)
@@ -108,11 +136,17 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
       if (error) throw error
 
       setExportSuccess(true)
+      setExportMessage(
+        skippedCount > 0
+          ? `¡${newIngredients.length} añadidos! (${skippedCount} ya estaban)`
+          : `¡${newIngredients.length} ingredientes añadidos!`
+      )
       setTimeout(() => {
         setShowListSelector(false)
         setIngredientsToExport([])
         setExportSuccess(false)
-      }, 1500)
+        setExportMessage('')
+      }, 2000)
 
     } catch (err) {
       console.error('Error exporting ingredients:', err)
@@ -306,7 +340,7 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
             <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-3">
               <ChefHat className="w-8 h-8 text-green-600" />
             </div>
-            <p className="font-semibold text-green-600">¡Ingredientes añadidos!</p>
+            <p className="font-semibold text-green-600">{exportMessage}</p>
           </div>
         ) : (
           <div className="space-y-3">

@@ -1,10 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { X, ChefHat, Clock, Users, ShoppingCart, Check, ExternalLink } from 'lucide-react'
+import { X, ChefHat, ShoppingCart } from 'lucide-react'
 import { TheMealDBRecipe, RecipeIngredient } from '@/lib/supabase/types'
 import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
 
 interface RecipeDetailProps {
   recipe: TheMealDBRecipe | null
@@ -13,39 +11,11 @@ interface RecipeDetailProps {
 }
 
 export function RecipeDetail({ recipe, onClose, onExportToList }: RecipeDetailProps) {
-  const [selectedIngredients, setSelectedIngredients] = useState<Set<number>>(new Set())
-  const [showExportConfirm, setShowExportConfirm] = useState(false)
-
   if (!recipe) return null
 
-  const toggleIngredient = (index: number) => {
-    const newSelected = new Set(selectedIngredients)
-    if (newSelected.has(index)) {
-      newSelected.delete(index)
-    } else {
-      newSelected.add(index)
-    }
-    setSelectedIngredients(newSelected)
-  }
-
-  const selectAll = () => {
-    setSelectedIngredients(new Set(recipe.ingredients.map((_, i) => i)))
-  }
-
-  const deselectAll = () => {
-    setSelectedIngredients(new Set())
-  }
-
   const handleExport = () => {
-    const ingredientsToExport = recipe.ingredients.filter((_, i) => selectedIngredients.has(i))
-    if (ingredientsToExport.length > 0) {
-      onExportToList(ingredientsToExport)
-      setShowExportConfirm(true)
-      setTimeout(() => {
-        setShowExportConfirm(false)
-        onClose()
-      }, 1500)
-    }
+    // Exportar TODOS los ingredientes
+    onExportToList(recipe.ingredients)
   }
 
   return (
@@ -93,54 +63,18 @@ export function RecipeDetail({ recipe, onClose, onExportToList }: RecipeDetailPr
       <div className="flex-1 overflow-y-auto">
         {/* Ingredientes */}
         <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-lg flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5 text-primary" />
-              Ingredientes ({recipe.ingredients.length})
-            </h2>
-            <div className="flex gap-2">
-              <button
-                onClick={selectAll}
-                className="text-xs text-primary hover:underline"
-              >
-                Todos
-              </button>
-              <span className="text-muted">|</span>
-              <button
-                onClick={deselectAll}
-                className="text-xs text-muted-foreground hover:underline"
-              >
-                Ninguno
-              </button>
-            </div>
-          </div>
+          <h2 className="font-bold text-lg flex items-center gap-2 mb-3">
+            <ShoppingCart className="w-5 h-5 text-primary" />
+            Ingredientes ({recipe.ingredients.length})
+          </h2>
 
           <div className="space-y-1">
             {recipe.ingredients.map((ing, index) => (
-              <button
+              <div
                 key={index}
-                onClick={() => toggleIngredient(index)}
-                className={`
-                  w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-colors
-                  ${selectedIngredients.has(index)
-                    ? 'bg-primary/10 border border-primary/30'
-                    : 'bg-secondary/50 hover:bg-secondary border border-transparent'
-                  }
-                `}
+                className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/50"
               >
-                <div
-                  className={`
-                    w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors
-                    ${selectedIngredients.has(index)
-                      ? 'bg-primary border-primary'
-                      : 'border-gray-300 dark:border-gray-600'
-                    }
-                  `}
-                >
-                  {selectedIngredients.has(index) && (
-                    <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                  )}
-                </div>
+                <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
                 <span className="flex-1 text-sm">
                   <span className="font-medium">{ing.name}</span>
                   {(ing.quantity || ing.unit) && (
@@ -149,7 +83,7 @@ export function RecipeDetail({ recipe, onClose, onExportToList }: RecipeDetailPr
                     </span>
                   )}
                 </span>
-              </button>
+              </div>
             ))}
           </div>
         </div>
@@ -179,21 +113,14 @@ export function RecipeDetail({ recipe, onClose, onExportToList }: RecipeDetailPr
 
       {/* Botón de exportar fijo */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-md border-t border-border">
-        {showExportConfirm ? (
-          <div className="flex items-center justify-center gap-2 text-green-600 py-3">
-            <Check className="w-5 h-5" />
-            <span className="font-medium">¡Ingredientes añadidos!</span>
-          </div>
-        ) : (
-          <Button
-            onClick={handleExport}
-            disabled={selectedIngredients.size === 0}
-            className="w-full h-12 text-base font-semibold"
-          >
-            <ShoppingCart className="w-5 h-5 mr-2" />
-            Añadir {selectedIngredients.size} ingrediente{selectedIngredients.size !== 1 ? 's' : ''} a la lista
-          </Button>
-        )}
+        <Button
+          onClick={handleExport}
+          disabled={recipe.ingredients.length === 0}
+          className="w-full h-12 text-base font-semibold"
+        >
+          <ShoppingCart className="w-5 h-5 mr-2" />
+          Añadir ingredientes a lista
+        </Button>
       </div>
     </div>
   )
