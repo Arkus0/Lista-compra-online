@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ShoppingBag, Users, Share2, MoreVertical,
-  Trash2, Edit2, Copy, Check, Link as LinkIcon,
+  Trash2, Edit2, Check, Link as LinkIcon,
   ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, Undo2,
   Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X,
   FileText, Store
@@ -134,7 +134,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   
-  // ESTADOS NUEVOS
   const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list')
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
@@ -148,8 +147,10 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   // Estados para scroll y visibilidad de controles
   const [isControlsVisible, setIsControlsVisible] = useState(true)
-  const [isInputActive, setIsInputActive] = useState(false) // Nuevo estado para favoritos
-  const lastScrollY = useRef(0)
+  const [isInputActive, setIsInputActive] = useState(false)
+  
+  // Ref para el timeout del scroll
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Estados para funcionalidades especificas
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
@@ -181,27 +182,34 @@ export function ShoppingList({ list }: ShoppingListProps) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  // Control de scroll para ocultar UI (con fix de rebote)
-  const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-    
-    // Fix: Si estamos cerca del final, forzar mostrar controles
-    // Esto evita el "baile" o vibración cuando el footer desaparece/aparece cambiando la altura del viewport
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
-
-    if (isNearBottom) {
-      if (!isControlsVisible) setIsControlsVisible(true)
-      lastScrollY.current = scrollTop
+  // LOGICA DE SCROLL CORREGIDA: Ocultar al mover, mostrar al parar (0.5s)
+  const handleListScroll = useCallback(() => {
+    // Si estamos escribiendo, NO ocultamos nada para evitar problemas con el teclado
+    if (isInputActive) {
+      setIsControlsVisible(true)
       return
     }
 
-    if (scrollTop > lastScrollY.current && scrollTop > 20) {
-      setIsControlsVisible(false)
-    } else if (scrollTop < lastScrollY.current || scrollTop < 20) {
-      setIsControlsVisible(true)
+    // 1. Ocultar inmediatamente al detectar scroll
+    setIsControlsVisible(false)
+
+    // 2. Limpiar timeout anterior si existe
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current)
     }
-    lastScrollY.current = scrollTop
-  }
+
+    // 3. Programar reaparición tras 0.5s de inactividad
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsControlsVisible(true)
+    }, 500)
+  }, [isInputActive])
+
+  // Limpiar timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+    }
+  }, [])
 
   // Filtrar items por búsqueda
   const filteredItems = useMemo(() => {
@@ -216,14 +224,11 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const uncheckedItems = useMemo(() => filteredItems.filter((item) => !item.checked), [filteredItems])
   const checkedItems = useMemo(() => filteredItems.filter((item) => item.checked), [filteredItems])
   
-  // Función para normalizar categoría (manejar legacy y autodetectar)
+  // Función para normalizar categoría
   const normalizeCategory = useCallback((item: ListItem): CategoryId => {
-    // Si tiene categoría válida del sistema, usarla
     if (item.category && CATEGORIES[item.category as CategoryId]) {
       return item.category as CategoryId
     }
-
-    // Mapeo de categorías legacy a nuevas
     const legacyMapping: Record<string, CategoryId> = {
       'Frutas': 'fruits-veg',
       'Verduras': 'fruits-veg',
@@ -235,51 +240,37 @@ export function ShoppingList({ list }: ShoppingListProps) {
       'Limpieza': 'household',
       'Otros': 'other',
     }
-
     if (item.category && legacyMapping[item.category]) {
       return legacyMapping[item.category]
     }
-
-    // Autodetectar categoría basándose en el nombre del producto
     return detectCategory(item.name)
   }, [])
 
-  // Agrupación de Items mejorada
+  // Agrupación de Items
   const groupedItems = useMemo(() => {
     if (viewMode === 'list') return null
-
-    // Orden definido en constants.ts
     const groups: Record<CategoryId, ListItem[]> = {} as Record<CategoryId, ListItem[]>
-
-    // Inicializar grupos vacíos para mantener orden
     Object.keys(CATEGORIES).forEach(key => { groups[key as CategoryId] = [] })
-
     uncheckedItems.forEach(item => {
       const cat = normalizeCategory(item)
       groups[cat].push(item)
     })
-
-    // Ordenar items dentro de cada grupo por posición
     Object.keys(groups).forEach(key => {
       groups[key as CategoryId].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
     })
-
-    // Filtrar grupos vacíos y retornar
     return Object.entries(groups).filter(([_, items]) => items.length > 0) as [CategoryId, ListItem[]][]
   }, [uncheckedItems, viewMode, normalizeCategory])
 
-  // Sugerencias inteligentes basadas en items de la lista
+  // Sugerencias inteligentes (Ahora se usarán dentro de la lista)
   const smartSuggestions = useMemo(() => {
     const itemNames = items.map(item => item.name)
     return getSmartSuggestions(itemNames, 4)
   }, [items])
 
-  // Lista de personas asignables (usuario actual + colaboradores)
+  // Lista de personas asignables
   const assignablePeople = useMemo((): AssignablePerson[] => {
     const people: AssignablePerson[] = []
     const addedIds = new Set<string>()
-
-    // Añadir usuario actual primero
     if (user) {
       people.push({
         id: user.id,
@@ -288,8 +279,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
       })
       addedIds.add(user.id)
     }
-
-    // Añadir colaboradores (evitando duplicados)
     collaborators.forEach(collab => {
       if (collab.profiles && collab.user_id && !addedIds.has(collab.user_id)) {
         people.push({
@@ -300,7 +289,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
         addedIds.add(collab.user_id)
       }
     })
-
     return people
   }, [user, collaborators])
 
@@ -324,7 +312,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     return () => { isMounted = false }
   }, [list.id, setItems, supabase])
 
-  // Cargar colaboradores al montar (para asignación de items)
+  // Cargar colaboradores
   useEffect(() => {
     const loadCollaborators = async () => {
       const { data } = await supabase
@@ -339,6 +327,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     if (!collaboratorsLoaded) loadCollaborators()
   }, [list.id, supabase, collaboratorsLoaded])
 
+  // Cargar perfiles
   useEffect(() => {
     const loadProfiles = async () => {
       const userIds = new Set<string>()
@@ -363,12 +352,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
   // --- UNDO SYSTEM ---
   const showUndoToast = (message: string, undoAction: () => Promise<void> | void) => {
     if (undoState.timer) clearTimeout(undoState.timer)
-    
-    // TIEMPO REDUCIDO A 2 SEGUNDOS
     const timer = setTimeout(() => {
       setUndoState(prev => ({ ...prev, isVisible: false }))
     }, 2000)
-
     setUndoState({ isVisible: true, message, action: undoAction, timer })
   }
 
@@ -381,7 +367,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
   }
 
   // --- HANDLERS ---
-
   const handleAddItem = useCallback(async (name: string, category?: string, imageUrl?: string) => {
     if (!user) return
     const normalizedName = name.trim().toLowerCase()
@@ -407,10 +392,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
       const itemData = {
         list_id: list.id, name: name.trim(), category, added_by: user.id, position: maxPosition + 1, image_url: imageUrl
       }
-      
-      // Primero insertamos para obtener el ID real
       const { data, error } = await supabase.from('list_items').insert(itemData).select().single()
-      
       if (!error && data) {
         addItem(data as ListItem)
         sendPushNotification({
@@ -424,22 +406,16 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleToggleItem = useCallback(async (id: string) => {
     const item = items.find((i) => i.id === id)
     if (!item || !user) return
-
     const newChecked = !item.checked
     toggleItemChecked(id) 
-
-    // Definir UNDO
     const undoAction = async () => {
        toggleItemChecked(id) 
        await supabase.from('list_items').update({ checked: !newChecked, checked_by: !newChecked ? null : user.id }).eq('id', id)
     }
-
     if (newChecked) showUndoToast(`Completado: ${item.name}`, undoAction)
-
     const { error } = await supabase.from('list_items').update({
         checked: newChecked, checked_by: newChecked ? user.id : null,
       }).eq('id', id)
-
     if (error) toggleItemChecked(id)
     else if (newChecked) {
       sendPushNotification({
@@ -452,20 +428,15 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleDeleteItem = useCallback(async (id: string) => {
     const item = items.find((i) => i.id === id)
     if (!item || !user) return
-
     removeItem(id)
-
     const undoAction = async () => {
-      // Recreamos el item (perderá su ID original, pero para el usuario es igual)
       const { data } = await supabase.from('list_items').insert({
         list_id: item.list_id, name: item.name, quantity: item.quantity, category: item.category, 
         added_by: item.added_by, image_url: item.image_url, position: item.position
       }).select().single()
       if (data) addItem(data as ListItem)
     }
-
     showUndoToast(`Eliminado: ${item.name}`, undoAction)
-
     const { error } = await supabase.from('list_items').delete().eq('id', id)
     if (error) addItem(item)
     else {
@@ -499,69 +470,43 @@ export function ShoppingList({ list }: ShoppingListProps) {
     }
   }, [addItemToListFromFavorite, list.id, addItem, updateItem])
 
-  // Añadir item desde sugerencia inteligente
   const handleAddFromSuggestion = useCallback((suggestion: CommonProduct) => {
     handleAddItem(suggestion.name, suggestion.category)
   }, [handleAddItem])
 
-  // Asignar item a una persona
   const handleAssignItem = useCallback(async (itemId: string, userId: string | null) => {
     const item = items.find(i => i.id === itemId)
     if (!item) return
-
-    // Actualizar en store
     updateItem(itemId, { assigned_to: userId } as any)
-
-    // Actualizar en DB
     const { error } = await supabase
       .from('list_items')
       .update({ assigned_to: userId })
       .eq('id', itemId)
-
-    if (error) {
-      // Revertir en caso de error
-      updateItem(itemId, { assigned_to: item.assigned_to } as any)
-    }
+    if (error) updateItem(itemId, { assigned_to: item.assigned_to } as any)
   }, [items, updateItem, supabase])
 
-  // Abrir modal para añadir/editar imagen de un item
   const handleAddImage = useCallback((itemId: string) => {
     setEditingItemId(itemId)
     setShowImageModal(true)
-    // Trigger file input
     setTimeout(() => imageInputRef.current?.click(), 100)
   }, [])
 
-  // Subir imagen para un item
   const handleImageSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !editingItemId) return
-
     const item = items.find(i => i.id === editingItemId)
     if (!item) return
-
-    // Subir imagen
     const path = `items/${Date.now()}_${Math.random().toString(36).slice(2)}`
     const imageUrl = await uploadImage(file, path)
-
     if (imageUrl) {
-      // Actualizar en store
       updateItem(editingItemId, { image_url: imageUrl } as any)
-
-      // Actualizar en DB
-      await supabase
-        .from('list_items')
-        .update({ image_url: imageUrl })
-        .eq('id', editingItemId)
+      await supabase.from('list_items').update({ image_url: imageUrl }).eq('id', editingItemId)
     }
-
-    // Cerrar y limpiar
     setShowImageModal(false)
     setEditingItemId(null)
     if (imageInputRef.current) imageInputRef.current.value = ''
   }, [editingItemId, items, uploadImage, updateItem, supabase])
 
-  // Abrir modal para añadir/editar nota de un item
   const handleAddNote = useCallback((itemId: string) => {
     const item = items.find(i => i.id === itemId)
     setEditingItemId(itemId)
@@ -569,238 +514,121 @@ export function ShoppingList({ list }: ShoppingListProps) {
     setShowNoteModal(true)
   }, [items])
 
-  // Guardar nota de un item
   const handleSaveNote = useCallback(async () => {
     if (!editingItemId) return
-
-    const item = items.find(i => i.id === editingItemId)
-    if (!item) return
-
     const noteValue = editingItemNote.trim() || null
-
-    // Actualizar en store
     updateItem(editingItemId, { note: noteValue } as any)
-
-    // Actualizar en DB
-    await supabase
-      .from('list_items')
-      .update({ note: noteValue })
-      .eq('id', editingItemId)
-
-    // Cerrar modal
+    await supabase.from('list_items').update({ note: noteValue }).eq('id', editingItemId)
     setShowNoteModal(false)
     setEditingItemId(null)
     setEditingItemNote('')
-  }, [editingItemId, editingItemNote, items, updateItem, supabase])
+  }, [editingItemId, editingItemNote, updateItem, supabase])
 
-  // Drag and Drop
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
     const oldIndex = uncheckedItems.findIndex((item) => item.id === active.id)
     const newIndex = uncheckedItems.findIndex((item) => item.id === over.id)
     if (oldIndex === -1 || newIndex === -1) return
-
     const reorderedUnchecked = arrayMove(uncheckedItems, oldIndex, newIndex)
     const allItems = [...reorderedUnchecked, ...checkedItems]
     setItems(allItems)
-
     const updates = reorderedUnchecked.map((item, index) => ({ id: item.id, position: index }))
     updateItemsPositions(updates)
-    
-    // Background update
     await Promise.all(updates.map(u => supabase.from('list_items').update({ position: u.position }).eq('id', u.id)))
   }, [uncheckedItems, checkedItems, setItems, updateItemsPositions, supabase])
 
-  // --- FUNCIONES DE MODALES Y ACCIONES ---
+  // --- ACCIONES MODALES ---
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl)
     setIsCopied(true)
     setTimeout(() => setIsCopied(false), 2000)
   }
-
   const closeModal = useCallback(() => setActiveModal(null), [])
-
   const handleUpdateName = async () => {
     if (!newName.trim()) return
     await supabase.from('shopping_lists').update({ name: newName }).eq('id', list.id)
     closeModal()
     router.refresh()
   }
-
   const handleDeleteList = async () => {
     await supabase.from('shopping_lists').delete().eq('id', list.id)
     router.push('/lists')
   }
-
   const handleArchiveList = async () => {
     await supabase.from('shopping_lists').update({ is_archived: true }).eq('id', list.id)
     router.push('/lists')
   }
-
   const handleDuplicateList = async () => {
     if (isDuplicating) return
     setIsDuplicating(true)
-
-    // Crear nueva lista
-    const { data: newList, error: listError } = await supabase
-      .from('shopping_lists')
-      .insert({
-        name: `${list.name} (copia)`,
-        owner_id: user?.id,
-        share_code: null
-      })
-      .select()
-      .single()
-
-    if (listError || !newList) {
-      setIsDuplicating(false)
-      return
-    }
-
-    // Copiar items
+    const { data: newList, error: listError } = await supabase.from('shopping_lists').insert({
+        name: `${list.name} (copia)`, owner_id: user?.id, share_code: null
+      }).select().single()
+    if (listError || !newList) { setIsDuplicating(false); return }
     if (items.length > 0) {
       const itemsCopy = items.map((item, index) => ({
-        list_id: newList.id,
-        name: item.name,
-        quantity: item.quantity,
-        unit: item.unit,
-        category: item.category,
-        checked: false,
-        added_by: user?.id,
-        position: index
+        list_id: newList.id, name: item.name, quantity: item.quantity, unit: item.unit, category: item.category,
+        checked: false, added_by: user?.id, position: index
       }))
-
       await supabase.from('list_items').insert(itemsCopy)
     }
-
     setIsDuplicating(false)
     setShowMenu(false)
     router.push(`/lists/${newList.id}`)
   }
-
   const handleSaveAsTemplate = async () => {
     if (!user) return
-
-    // Crear lista como plantilla
-    const { data: newTemplate, error } = await supabase
-      .from('shopping_lists')
-      .insert({
-        name: `${list.name} (plantilla)`,
-        owner_id: user.id,
-        is_template: true
-      })
-      .select()
-      .single()
-
+    const { data: newTemplate, error } = await supabase.from('shopping_lists').insert({
+        name: `${list.name} (plantilla)`, owner_id: user.id, is_template: true
+      }).select().single()
     if (error || !newTemplate) return
-
-    // Copiar items
     if (items.length > 0) {
       const itemsCopy = items.map((item, index) => ({
-        list_id: newTemplate.id,
-        name: item.name,
-        quantity: item.quantity,
-        unit: item.unit,
-        category: item.category,
-        checked: false,
-        added_by: user.id,
-        position: index
+        list_id: newTemplate.id, name: item.name, quantity: item.quantity, unit: item.unit, category: item.category,
+        checked: false, added_by: user.id, position: index
       }))
-
       await supabase.from('list_items').insert(itemsCopy)
     }
-
     setShowMenu(false)
-    // Mostrar feedback
-    showUndoToast('Plantilla creada correctamente', () => {
-      router.push('/lists/templates')
-    })
+    showUndoToast('Plantilla creada correctamente', () => { router.push('/lists/templates') })
   }
-
-  // --- ACCIONES MASIVAS ---
   const handleMarkAllComplete = async () => {
     if (!user) return
-
-    // Actualizar en store
-    const updates = uncheckedItems.map(item => ({
-      ...item,
-      checked: true,
-      checked_by: user.id
-    }))
+    const updates = uncheckedItems.map(item => ({ ...item, checked: true, checked_by: user.id }))
     setItems([...updates, ...checkedItems])
-
-    // Actualizar en DB
-    await supabase
-      .from('list_items')
-      .update({ checked: true, checked_by: user.id })
-      .eq('list_id', list.id)
-      .eq('checked', false)
-
+    await supabase.from('list_items').update({ checked: true, checked_by: user.id }).eq('list_id', list.id).eq('checked', false)
     setShowMenu(false)
   }
-
   const handleClearCompleted = async () => {
     if (checkedItems.length === 0) return
-
-    // Guardar para undo
     const itemsToDelete = [...checkedItems]
-
-    // Actualizar store
     setItems(uncheckedItems)
-
-    // Mostrar undo
     const undoAction = async () => {
-      // Restaurar items
       const itemsToRestore = itemsToDelete.map(item => ({
-        list_id: item.list_id,
-        name: item.name,
-        quantity: item.quantity,
-        category: item.category,
-        added_by: item.added_by,
-        checked: true,
-        position: item.position
+        list_id: item.list_id, name: item.name, quantity: item.quantity, category: item.category,
+        added_by: item.added_by, checked: true, position: item.position
       }))
       const { data } = await supabase.from('list_items').insert(itemsToRestore).select()
       if (data) {
-        // Recargar todos los items desde la DB para tener el estado actualizado
-        const { data: allItems } = await supabase
-          .from('list_items')
-          .select('*')
-          .eq('list_id', list.id)
-          .order('position', { ascending: true })
+        const { data: allItems } = await supabase.from('list_items').select('*').eq('list_id', list.id).order('position', { ascending: true })
         if (allItems) setItems(allItems as ListItem[])
       }
     }
-
     showUndoToast(`${itemsToDelete.length} items eliminados`, undoAction)
-
-    // Eliminar de DB
-    await supabase
-      .from('list_items')
-      .delete()
-      .eq('list_id', list.id)
-      .eq('checked', true)
-
+    await supabase.from('list_items').delete().eq('list_id', list.id).eq('checked', true)
     setShowMenu(false)
   }
 
   const openShareModal = () => setActiveModal('share')
   const openCollaboratorsModal = () => setActiveModal('collaborators')
   const toggleMenu = () => setShowMenu(p => !p)
-  
-  // Handler memoizado para cerrar modal de notas
-  const handleCloseNoteModal = useCallback(() => {
-    setShowNoteModal(false)
-    setEditingItemId(null)
-    setEditingItemNote('')
-  }, [])
+  const handleCloseNoteModal = useCallback(() => { setShowNoteModal(false); setEditingItemId(null); setEditingItemNote('') }, [])
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Header sin barra de progreso */}
+      {/* Header */}
       <header className="p-4 border-b border-gray-100 bg-background z-10 flex-shrink-0">
-        {/* Barra de búsqueda expandible */}
         {showSearch ? (
           <div className="flex items-center gap-2 mb-3 animate-in slide-in-from-top-2">
             <div className="flex-1 relative">
@@ -815,18 +643,12 @@ export function ShoppingList({ list }: ShoppingListProps) {
                 autoFocus
               />
               {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                >
+                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
                   <X className="w-3 h-3 text-muted" />
                 </button>
               )}
             </div>
-            <button
-              onClick={() => { setShowSearch(false); setSearchQuery('') }}
-              className="p-2 hover:bg-secondary rounded-lg text-muted"
-            >
+            <button onClick={() => { setShowSearch(false); setSearchQuery('') }} className="p-2 hover:bg-secondary rounded-lg text-muted">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -846,23 +668,12 @@ export function ShoppingList({ list }: ShoppingListProps) {
             </div>
 
             <div className="flex items-center gap-2 relative">
-              {/* Botón de búsqueda */}
-              <button
-                onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }}
-                className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"
-                title="Buscar"
-              >
+              <button onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted" title="Buscar">
                 <Search className="w-5 h-5" />
               </button>
-             {/* TOGGLE VIEW BUTTON */}
-             <button 
-                onClick={() => setViewMode(prev => prev === 'list' ? 'grouped' : 'list')}
-                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${viewMode === 'grouped' ? 'bg-primary/10 text-primary' : 'hover:bg-secondary text-muted'}`}
-                title={viewMode === 'list' ? "Ver por categorías" : "Ver lista simple"}
-              >
+             <button onClick={() => setViewMode(prev => prev === 'list' ? 'grouped' : 'list')} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${viewMode === 'grouped' ? 'bg-primary/10 text-primary' : 'hover:bg-secondary text-muted'}`} title={viewMode === 'list' ? "Ver por categorías" : "Ver lista simple"}>
                 {viewMode === 'list' ? <LayoutGrid className="w-5 h-5" /> : <ListIcon className="w-5 h-5" />}
               </button>
-
             {presenceUsers.length > 0 && <PresenceIndicator users={presenceUsers} maxVisible={3} />}
             <button onClick={openCollaboratorsModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><Users className="w-5 h-5" /></button>
             <button onClick={openShareModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><Share2 className="w-5 h-5" /></button>
@@ -872,57 +683,36 @@ export function ShoppingList({ list }: ShoppingListProps) {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
                 <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-20 py-2">
-                  {/* Acciones masivas */}
                   {uncheckedItems.length > 0 && (
                     <button onClick={handleMarkAllComplete} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
-                      <CheckCheck className="w-4 h-4 text-green-500" />
-                      Marcar todo completado
+                      <CheckCheck className="w-4 h-4 text-green-500" /> Marcar todo completado
                     </button>
                   )}
                   {checkedItems.length > 0 && (
                     <button onClick={handleClearCompleted} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
-                      <Eraser className="w-4 h-4 text-orange-500" />
-                      Limpiar completados ({checkedItems.length})
+                      <Eraser className="w-4 h-4 text-orange-500" /> Limpiar completados ({checkedItems.length})
                     </button>
                   )}
                   {(uncheckedItems.length > 0 || checkedItems.length > 0) && <div className="border-t border-border my-1" />}
-
-                  {/* Acciones de lista */}
                   <button onClick={handleDuplicateList} disabled={isDuplicating} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2 disabled:opacity-50">
-                    <CopyIcon className="w-4 h-4 text-blue-500" />
-                    {isDuplicating ? 'Duplicando...' : 'Duplicar lista'}
+                    <CopyIcon className="w-4 h-4 text-blue-500" /> {isDuplicating ? 'Duplicando...' : 'Duplicar lista'}
                   </button>
                   <button onClick={handleSaveAsTemplate} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-purple-500" />
-                    Guardar como plantilla
+                    <FileText className="w-4 h-4 text-purple-500" /> Guardar como plantilla
                   </button>
                   <button onClick={() => {setActiveModal('edit'); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
-                    <Edit2 className="w-4 h-4 text-muted" />
-                    Editar nombre
+                    <Edit2 className="w-4 h-4 text-muted" /> Editar nombre
                   </button>
-
                   <div className="border-t border-border my-1" />
-
-                  {/* Modo Super (placeholder) */}
-                  <button
-                    onClick={() => { setShowMenu(false); alert('¡Próximamente! El modo super te permitirá organizar tu compra por pasillos del supermercado.') }}
-                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2 opacity-60"
-                  >
-                    <Store className="w-4 h-4 text-emerald-500" />
-                    <span>Modo en el super</span>
-                    <span className="ml-auto text-[10px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded">Pronto</span>
+                  <button onClick={() => { setShowMenu(false); alert('¡Próximamente!') }} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2 opacity-60">
+                    <Store className="w-4 h-4 text-emerald-500" /> <span>Modo en el super</span>
                   </button>
-
                   <div className="border-t border-border my-1" />
-
-                  {/* Zona peligrosa */}
                   <button onClick={() => {handleArchiveList(); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
-                    <Archive className="w-4 h-4 text-gray-500" />
-                    Archivar lista
+                    <Archive className="w-4 h-4 text-gray-500" /> Archivar lista
                   </button>
                   <button onClick={() => {setActiveModal('delete'); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2">
-                    <Trash2 className="w-4 h-4" />
-                    Eliminar lista
+                    <Trash2 className="w-4 h-4" /> Eliminar lista
                   </button>
                 </div>
               </>
@@ -930,19 +720,10 @@ export function ShoppingList({ list }: ShoppingListProps) {
             </div>
           </div>
         )}
-
-        {/* Indicador de búsqueda activa */}
         {searchQuery && (
           <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-xs text-muted">
-              {filteredItems.length} resultados para "{searchQuery}"
-            </span>
-            <button
-              onClick={() => setSearchQuery('')}
-              className="text-xs text-primary hover:underline"
-            >
-              Limpiar
-            </button>
+            <span className="text-xs text-muted">{filteredItems.length} resultados para "{searchQuery}"</span>
+            <button onClick={() => setSearchQuery('')} className="text-xs text-primary hover:underline">Limpiar</button>
           </div>
         )}
       </header>
@@ -953,7 +734,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
         </div>
       )}
 
-      {/* AQUÍ ES DONDE OCURRE EL SCROLL: AÑADIDO onScroll */}
+      {/* LISTA SCROLLABLE */}
       <div 
         className="flex-1 overflow-y-auto p-4 space-y-2 pb-40"
         onScroll={handleListScroll}
@@ -962,14 +743,13 @@ export function ShoppingList({ list }: ShoppingListProps) {
           <div className="space-y-2"><ItemSkeleton /><ItemSkeleton /></div>
         ) : (
           <>
-            {/* VISTA POR CATEGORÍAS (Sin Drag&Drop entre grupos) */}
+            {/* VISTA POR CATEGORÍAS */}
             {viewMode === 'grouped' && groupedItems ? (
                <div className="space-y-4 pb-4">
                  {groupedItems.map(([catId, groupItems]) => {
                    const CategoryConfig = CATEGORIES[catId] || CATEGORIES['other']
                    return (
                      <div key={catId} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                       {/* Cabecera de categoría sticky */}
                        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2 mb-2">
                          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${CategoryConfig.color}`}>
                            <CategoryConfig.icon className="w-5 h-5" />
@@ -979,7 +759,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
                            </span>
                          </div>
                        </div>
-                       {/* Items de la categoría */}
                        <div className="space-y-2 ml-1 pl-3 border-l-2 border-gray-100 dark:border-gray-800">
                           {groupItems.map(item => (
                              <ShoppingItem
@@ -1003,16 +782,10 @@ export function ShoppingList({ list }: ShoppingListProps) {
                      </div>
                    )
                  })}
-
-                 {/* Mensaje si no hay items */}
-                 {groupedItems.length === 0 && (
-                   <div className="text-center py-12 text-muted">
-                     <p>No hay items pendientes</p>
-                   </div>
-                 )}
+                 {groupedItems.length === 0 && <div className="text-center py-12 text-muted"><p>No hay items pendientes</p></div>}
                </div>
             ) : (
-              /* VISTA DE LISTA (Drag&Drop habilitado) */
+              /* VISTA DE LISTA */
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={uncheckedItems.map(item => item.id)} strategy={verticalListSortingStrategy}>
                   {uncheckedItems.map((item) => (
@@ -1036,7 +809,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
               </DndContext>
             )}
 
-            {/* COMPLETADOS REDISEÑADOS */}
+            {/* COMPLETADOS */}
             {checkedItems.length > 0 && (
               <div className="mt-8 pt-6 border-t-2 border-dashed border-border/50 bg-secondary/10 -mx-4 px-4 pb-10 rounded-t-3xl">
                 <button
@@ -1073,65 +846,63 @@ export function ShoppingList({ list }: ShoppingListProps) {
                 )}
               </div>
             )}
+            
+            {/* SUGERENCIAS MOVIDAS AQUÍ: EL ÚLTIMO ELEMENTO DE LA LISTA */}
+            {smartSuggestions.length > 0 && (
+              <div className="mt-8 mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs font-medium text-muted uppercase tracking-wider">Sugerencias rápidas</span>
+                  <div className="h-px bg-border flex-1" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {smartSuggestions.map((suggestion, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleAddFromSuggestion(suggestion)}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 rounded-full border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-sm group shadow-sm"
+                    >
+                      <span className="text-lg leading-none">+</span>
+                      <span>{suggestion.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
 
       <UndoToast message={undoState.message} isVisible={undoState.isVisible} onUndo={handleUndo} />
 
+      {/* FOOTER FIXED - AHORA CON ORDEN CORRECTO Y VISIBILIDAD FORZADA SI HAY FOCO */}
       <div className="fixed bottom-0 left-0 right-0 bg-background z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-border/50">
-        {/* Sugerencias inteligentes */}
-        {smartSuggestions.length > 0 && (
-          <div className="px-4 py-2 border-b border-border/30 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-900/10 dark:to-purple-900/10">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-medium text-muted">✨ Sugerido para ti</span>
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {smartSuggestions.map((suggestion, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleAddFromSuggestion(suggestion)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-full border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-sm whitespace-nowrap group"
-                >
-                  <span className="text-xs opacity-60 group-hover:opacity-100">+</span>
-                  <span>{suggestion.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
         
         {/* Favoritos: Solo visibles si el input está activo */}
         <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isInputActive ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
           <FavoriteItems favorites={favoriteItems} isLoading={favoritesLoading} onAddToList={handleAddFromFavorite} onRemove={removeFavoriteItem} />
         </div>
 
-        {/* Pasamos la prop de visibilidad */}
+        {/* Pasamos isVisible forzado a true si hay foco (isInputActive) */}
         <AddItemForm 
           onAdd={handleAddItem} 
           suggestionsSource={favoriteItems} 
-          isVisible={isControlsVisible} 
+          isVisible={isControlsVisible || isInputActive} 
           onFocusChange={setIsInputActive}
         />
       </div>
 
-      {/* MODALES DE SOPORTE */}
+      {/* MODALES */}
       <Modal isOpen={activeModal === 'share'} onClose={closeModal} title="Compartir Lista">
          <div className="flex flex-col items-center gap-4 py-2">
            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl)}`} alt="QR Code" className="rounded-xl border shadow-sm" />
-           
            <div className="w-full space-y-2">
              <div className="text-xs text-muted font-medium uppercase tracking-wider text-center">Código de acceso</div>
              <p className="font-mono text-2xl text-center font-bold tracking-widest bg-secondary py-3 rounded-lg border border-border">{list.share_code}</p>
            </div>
-
-           <p className="text-sm text-center text-muted px-4">
-             Comparte este código o escanea el QR para que otros se unan a esta lista.
-           </p>
-
+           <p className="text-sm text-center text-muted px-4">Comparte este código o escanea el QR.</p>
            <Button onClick={handleCopyLink} className="w-full flex items-center justify-center gap-2">
              {isCopied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
-             {isCopied ? 'Enlace Copiado' : 'Copiar Enlace de Invitación'}
+             {isCopied ? 'Enlace Copiado' : 'Copiar Enlace'}
            </Button>
          </div>
       </Modal>
@@ -1146,15 +917,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
       </Modal>
 
       {/* Modal de Nota */}
-      <Modal
-        isOpen={showNoteModal}
-        onClose={handleCloseNoteModal}
-        title="Añadir nota"
-      >
+      <Modal isOpen={showNoteModal} onClose={handleCloseNoteModal} title="Añadir nota">
         <div className="space-y-4">
-          <p className="text-sm text-muted">
-            Añade una nota específica para este producto (ej: marca preferida, ubicación en tienda, etc.)
-          </p>
+          <p className="text-sm text-muted">Añade una nota para este producto.</p>
           <textarea
             value={editingItemNote}
             onChange={(e) => setEditingItemNote(e.target.value)}
@@ -1163,26 +928,13 @@ export function ShoppingList({ list }: ShoppingListProps) {
             autoFocus
           />
           <div className="flex gap-3 justify-end">
-            <Button variant="secondary" onClick={handleCloseNoteModal}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveNote}>
-              Guardar
-            </Button>
+            <Button variant="secondary" onClick={handleCloseNoteModal}>Cancelar</Button>
+            <Button onClick={handleSaveNote}>Guardar</Button>
           </div>
         </div>
       </Modal>
 
-      {/* Input oculto para subir imagen */}
-      <input
-        type="file"
-        ref={imageInputRef}
-        accept="image/*"
-        className="hidden"
-        onChange={handleImageSelected}
-      />
-
-      {/* Indicador de subida de imagen */}
+      <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleImageSelected} />
       {isUploadingImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-card p-6 rounded-2xl shadow-xl flex flex-col items-center gap-4">
