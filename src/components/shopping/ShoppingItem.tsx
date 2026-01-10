@@ -69,7 +69,9 @@ function ShoppingItemComponent({
   const [showImageModal, setShowImageModal] = useState(false)
   const [showActionMenu, setShowActionMenu] = useState(false)
   const [showAssignSubmenu, setShowAssignSubmenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
 
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
@@ -233,55 +235,72 @@ function ShoppingItemComponent({
         </div>
 
         {/* Menú */}
-        <div className="relative" ref={menuRef}>
+        <div ref={menuRef}>
           <button
-            onClick={() => setShowActionMenu(!showActionMenu)}
+            ref={menuButtonRef}
+            onClick={() => {
+              if (!showActionMenu && menuButtonRef.current) {
+                const rect = menuButtonRef.current.getBoundingClientRect()
+                setMenuPosition({
+                  top: rect.bottom + 4,
+                  right: window.innerWidth - rect.right
+                })
+              }
+              setShowActionMenu(!showActionMenu)
+            }}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-secondary"
           >
             <MoreVertical className="w-5 h-5" />
           </button>
-
-          {showActionMenu && (
-            <div className="absolute top-full right-0 mt-1 w-52 bg-card border border-border rounded-xl shadow-xl z-[100] py-1 animate-in fade-in slide-in-from-top-2 duration-150">
-              {onAssign && assignablePeople.length > 0 && (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowAssignSubmenu(!showAssignSubmenu)}
-                    className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"
-                  >
-                    <UserPlus className="w-4 h-4 text-muted" />
-                    <span className="flex-1">Asignar a...</span>
-                  </button>
-                  {showAssignSubmenu && (
-                    <div className="absolute left-full top-0 ml-1 w-48 bg-card border border-border rounded-xl shadow-xl z-[100] py-1 animate-in fade-in slide-in-from-left-2 duration-150">
-                      {assignedToProfile && (
-                         <button onClick={() => handleAssign(null)} className="w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 text-danger"><X className="w-4 h-4" /> Quitar</button>
-                      )}
-                      {assignablePeople.map(person => (
-                        <button key={person.id} onClick={() => handleAssign(person.id)} className={`w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 ${item.assigned_to === person.id ? 'bg-primary/10' : ''}`}>
-                          <span className="truncate flex-1">{person.name}</span>
-                          {item.assigned_to === person.id && <Check className="w-4 h-4 text-primary" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              {onAddToFavorites && (
-                <button onClick={handleAddToFavorites} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Star className="w-4 h-4 text-amber-500" /> <span>Favoritos</span></button>
-              )}
-              {onAddImage && (
-                <button onClick={() => { onAddImage(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Camera className="w-4 h-4 text-muted" /> <span>{item.image_url ? 'Cambiar img' : 'Añadir img'}</span></button>
-              )}
-              {onAddNote && (
-                <button onClick={() => { onAddNote(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><StickyNote className="w-4 h-4 text-muted" /> <span>{item.note ? 'Editar nota' : 'Añadir nota'}</span></button>
-              )}
-              <div className="h-px bg-border-light my-1" />
-              <button onClick={handleDelete} className="w-full px-3 py-2.5 text-left text-sm hover:bg-danger/10 flex items-center gap-3 text-danger"><Trash2 className="w-4 h-4" /> <span>Eliminar</span></button>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Menú contextual - Portal con posición fija */}
+      {showActionMenu && menuPosition && (
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => { setShowActionMenu(false); setShowAssignSubmenu(false) }} />
+          <div
+            className="fixed w-52 bg-card border border-border rounded-xl shadow-2xl z-[9999] py-1 animate-in fade-in slide-in-from-top-2 duration-150"
+            style={{ top: menuPosition.top, right: menuPosition.right }}
+          >
+            {onAssign && assignablePeople.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowAssignSubmenu(!showAssignSubmenu)}
+                  className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"
+                >
+                  <UserPlus className="w-4 h-4 text-muted" />
+                  <span className="flex-1">Asignar a...</span>
+                </button>
+                {showAssignSubmenu && (
+                  <div className="absolute left-full top-0 ml-1 w-48 bg-card border border-border rounded-xl shadow-xl z-[9999] py-1 animate-in fade-in slide-in-from-left-2 duration-150">
+                    {assignedToProfile && (
+                       <button onClick={() => handleAssign(null)} className="w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 text-danger"><X className="w-4 h-4" /> Quitar</button>
+                    )}
+                    {assignablePeople.map(person => (
+                      <button key={person.id} onClick={() => handleAssign(person.id)} className={`w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 ${item.assigned_to === person.id ? 'bg-primary/10' : ''}`}>
+                        <span className="truncate flex-1">{person.name}</span>
+                        {item.assigned_to === person.id && <Check className="w-4 h-4 text-primary" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {onAddToFavorites && (
+              <button onClick={handleAddToFavorites} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Star className="w-4 h-4 text-amber-500" /> <span>Favoritos</span></button>
+            )}
+            {onAddImage && (
+              <button onClick={() => { onAddImage(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Camera className="w-4 h-4 text-muted" /> <span>{item.image_url ? 'Cambiar img' : 'Añadir img'}</span></button>
+            )}
+            {onAddNote && (
+              <button onClick={() => { onAddNote(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><StickyNote className="w-4 h-4 text-muted" /> <span>{item.note ? 'Editar nota' : 'Añadir nota'}</span></button>
+            )}
+            <div className="h-px bg-border-light my-1" />
+            <button onClick={handleDelete} className="w-full px-3 py-2.5 text-left text-sm hover:bg-danger/10 flex items-center gap-3 text-danger"><Trash2 className="w-4 h-4" /> <span>Eliminar</span></button>
+          </div>
+        </>
+      )}
 
       {showImageModal && item.image_url && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowImageModal(false)}>

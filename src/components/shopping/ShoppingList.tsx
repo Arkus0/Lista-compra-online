@@ -600,13 +600,11 @@ export function ShoppingList({ list }: ShoppingListProps) {
                   <ShoppingBag className="w-5 h-5 text-primary" />
                   <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-background ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
                 </div>
-                <div>
-                  <h1 className="font-bold text-lg">{list.name}</h1>
-                  <p className="text-xs text-muted-foreground">{items.length} productos</p>
-                </div>
+                <h1 className="font-bold text-lg truncate max-w-[140px]">{list.name}</h1>
+                {presenceUsers.length > 0 && <PresenceIndicator users={presenceUsers} maxVisible={2} />}
               </div>
 
-              <div className="flex items-center gap-2 relative">
+              <div className="flex items-center gap-1 relative">
                 <Link
                   href={`/lists/${list.id}/super`}
                   className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-green-500 flex items-center justify-center text-white shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all"
@@ -615,25 +613,21 @@ export function ShoppingList({ list }: ShoppingListProps) {
                   <Zap className="w-5 h-5" />
                 </Link>
                 <button onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted" title="Buscar"><Search className="w-5 h-5" /></button>
-                
-                {/* BOTÓN TOGGLE NOTAS (REUTILIZADO) */}
-                <button 
-                  onClick={() => setShowNotes(!showNotes)} 
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${showNotes ? 'bg-primary/10 text-primary' : 'hover:bg-secondary text-muted'}`}
-                  title={showNotes ? "Ocultar notas" : "Mostrar notas"}
-                >
-                  {showNotes ? <FileText className="w-5 h-5" /> : <FileText className="w-5 h-5 opacity-50" />}
-                </button>
-
-                {presenceUsers.length > 0 && <PresenceIndicator users={presenceUsers} maxVisible={3} />}
                 <button onClick={openShareModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted" title="Compartir"><Share2 className="w-5 h-5" /></button>
                 <button onClick={toggleMenu} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><MoreVertical className="w-5 h-5" /></button>
-                
+
                 {showMenu && (
                   <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                    <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-20 py-2 animate-in fade-in slide-in-from-top-2">
+                    <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                    <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-2">
                        <button onClick={() => { openCollaboratorsModal(); setShowMenu(false) }} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" /> Colaboradores</button>
+                       <button
+                         onClick={() => { setShowNotes(!showNotes); setShowMenu(false) }}
+                         className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"
+                       >
+                         <FileText className={`w-4 h-4 ${showNotes ? 'text-primary' : 'text-muted'}`} />
+                         {showNotes ? 'Ocultar notas' : 'Mostrar notas'}
+                       </button>
                        <div className="border-t border-border my-1" />
                        {uncheckedItems.length > 0 && <button onClick={handleMarkAllComplete} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><CheckCheck className="w-4 h-4 text-green-500" /> Marcar todo completado</button>}
                        {checkedItems.length > 0 && <button onClick={handleClearCompleted} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><Eraser className="w-4 h-4 text-orange-500" /> Limpiar completados ({checkedItems.length})</button>}
