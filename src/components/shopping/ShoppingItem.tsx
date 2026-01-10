@@ -127,6 +127,7 @@ function ShoppingItemComponent({
             : 'bg-card border-border-light hover:border-primary/30 scale-100'
           }
           ${isDeleting ? 'scale-90 opacity-0' : ''}
+          ${showActionMenu ? 'z-50' : 'z-auto'} 
         `}
         role="listitem"
       >
