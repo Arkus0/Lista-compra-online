@@ -49,11 +49,14 @@ export default function FavoritesPage() {
     setIsAdding(true)
   }
 
+  const [error, setError] = useState<string | null>(null)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.name.trim()) return
 
     setIsSaving(true)
+    setError(null)
 
     if (editingItem) {
       // Si estamos editando, eliminamos el viejo y creamos uno nuevo
@@ -71,6 +74,8 @@ export default function FavoritesPage() {
 
     if (success) {
       resetForm()
+    } else {
+      setError('No se pudo guardar el favorito. Inténtalo de nuevo.')
     }
   }
 
@@ -168,6 +173,12 @@ export default function FavoritesPage() {
                   ))}
                 </div>
               </div>
+
+              {error && (
+                <div className="p-3 rounded-lg bg-danger/10 text-danger text-sm">
+                  {error}
+                </div>
+              )}
 
               <div className="flex gap-2 justify-end pt-2">
                 <Button type="button" variant="ghost" onClick={resetForm}>
