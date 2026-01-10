@@ -298,7 +298,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
     return () => { isMounted = false }
   }, [list.id, setItems, supabase])
 
-  // Cargar perfiles y colaboradores (se mantiene igual...)
   // Cargar colaboradores al montar (para asignación de items)
   useEffect(() => {
     const loadCollaborators = async () => {
@@ -593,6 +592,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
     setTimeout(() => setIsCopied(false), 2000)
   }
 
+  const closeModal = useCallback(() => setActiveModal(null), [])
+
   const handleUpdateName = async () => {
     if (!newName.trim()) return
     await supabase.from('shopping_lists').update({ name: newName }).eq('id', list.id)
@@ -757,10 +758,16 @@ export function ShoppingList({ list }: ShoppingListProps) {
     setShowMenu(false)
   }
 
-  const closeModal = () => setActiveModal(null)
   const openShareModal = () => setActiveModal('share')
   const openCollaboratorsModal = () => setActiveModal('collaborators')
   const toggleMenu = () => setShowMenu(p => !p)
+  
+  // Handler memoizado para cerrar modal de notas y evitar perdida de foco
+  const handleCloseNoteModal = useCallback(() => {
+    setShowNoteModal(false)
+    setEditingItemId(null)
+    setEditingItemNote('')
+  }, [])
 
   return (
     <div className="flex flex-col h-full relative">
@@ -1092,7 +1099,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
       {/* Modal de Nota */}
       <Modal
         isOpen={showNoteModal}
-        onClose={() => { setShowNoteModal(false); setEditingItemId(null); setEditingItemNote(''); }}
+        onClose={handleCloseNoteModal}
         title="Añadir nota"
       >
         <div className="space-y-4">
@@ -1107,7 +1114,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
             autoFocus
           />
           <div className="flex gap-3 justify-end">
-            <Button variant="secondary" onClick={() => { setShowNoteModal(false); setEditingItemId(null); setEditingItemNote(''); }}>
+            <Button variant="secondary" onClick={handleCloseNoteModal}>
               Cancelar
             </Button>
             <Button onClick={handleSaveNote}>
