@@ -7,7 +7,6 @@ import {
 } from 'lucide-react'
 import { ListItem, Profile } from '@/lib/supabase/types'
 
-// Tipo simple para personas asignables
 export interface AssignablePerson {
   id: string
   name: string
@@ -29,21 +28,8 @@ interface ShoppingItemProps {
   addedByProfile?: Profile | null
   checkedByProfile?: Profile | null
   isDragEnabled?: boolean
-  isNoteVisible?: boolean // Controla si se ve la nota
-  domId?: string          // ID para el scroll automático
-}
-
-// Colores de categoría
-const categoryColors: Record<string, string> = {
-  frutas: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  verduras: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  carnes: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  pescados: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  lacteos: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  panaderia: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  bebidas: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
-  limpieza: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  otros: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
+  isNoteVisible?: boolean
+  domId?: string
 }
 
 function ShoppingItemComponent({
@@ -72,7 +58,6 @@ function ShoppingItemComponent({
   const [showAssignSubmenu, setShowAssignSubmenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Cerrar menú al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -129,14 +114,10 @@ function ShoppingItemComponent({
     setShowActionMenu(false)
   }, [item, onAddToFavorites])
 
-  const categoryColor = item.category
-    ? categoryColors[item.category.toLowerCase()] || categoryColors.otros
-    : null
-
   return (
     <>
       <div
-        id={domId} // ID CRÍTICO PARA EL SCROLL
+        id={domId}
         className={`
           flex items-center gap-2 sm:gap-3 p-3 bg-card rounded-xl border
           transition-all duration-300 group relative scroll-mt-32
@@ -184,7 +165,7 @@ function ShoppingItemComponent({
           </button>
         )}
 
-        {/* Contenido */}
+        {/* Contenido: Nombre y Notas (Sin etiquetas de categoría) */}
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex items-center gap-2 flex-wrap">
             <p className={`text-base font-medium truncate transition-all ${item.checked ? 'line-through text-muted' : 'text-foreground'}`}>
@@ -206,18 +187,11 @@ function ShoppingItemComponent({
             )}
           </div>
 
-          {/* NOTA VISIBLE (si activado) */}
+          {/* NOTA VISIBLE (si activado globalmente) */}
           {isNoteVisible && item.note && (
-             <p className="text-xs text-muted-foreground mt-0.5 leading-tight break-words pr-2">
+             <p className="text-xs text-muted-foreground mt-0.5 leading-tight break-words pr-2 animate-in fade-in slide-in-from-top-1 duration-200">
                {item.note}
              </p>
-          )}
-
-          {/* Categoría (si nota oculta) */}
-          {categoryColor && !item.checked && !isNoteVisible && (
-            <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-md mt-0.5 w-fit ${categoryColor}`}>
-              {item.category}
-            </span>
           )}
         </div>
 
@@ -314,7 +288,7 @@ export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) =
     prevProps.item.note === nextProps.item.note &&
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onDelete === nextProps.onDelete &&
-    prevProps.isNoteVisible === nextProps.isNoteVisible // Comparación importante
+    prevProps.isNoteVisible === nextProps.isNoteVisible
   )
 })
 
