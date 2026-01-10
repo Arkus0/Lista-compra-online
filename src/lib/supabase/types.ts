@@ -72,6 +72,7 @@ export interface Database {
           position?: number
           image_url: string | null
           note: string | null
+          tags: string[]
           created_at: string
           updated_at: string
         }
@@ -89,6 +90,7 @@ export interface Database {
           position?: number
           image_url?: string | null
           note?: string | null
+          tags?: string[]
           created_at?: string
           updated_at?: string
         }
@@ -103,6 +105,7 @@ export interface Database {
           position?: number
           image_url?: string | null
           note?: string | null
+          tags?: string[]
           updated_at?: string
         }
       }
@@ -344,6 +347,57 @@ export interface Database {
       // por ahora el role se maneja como string literal en las tablas.
     }
   }
+}
+
+// Tipos para Recetas (tabla user_recipes)
+export interface RecipeIngredient {
+  name: string
+  quantity: string
+  unit: string
+  category?: string
+}
+
+export interface UserRecipe {
+  id: string
+  owner_id: string
+  title: string
+  description: string | null
+  image_url: string | null
+  source_url: string | null
+  source_type: 'themealdb' | 'url' | 'manual'
+  external_id: string | null
+  servings: number
+  prep_time: number | null
+  cook_time: number | null
+  ingredients: RecipeIngredient[]
+  instructions: string | null
+  category: string | null
+  cuisine: string | null
+  share_code: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RecipeCollaborator {
+  id: string
+  recipe_id: string
+  user_id: string
+  role: 'viewer' | 'editor'
+  created_at: string
+}
+
+export type UserRecipeWithOwner = UserRecipe & {
+  owner?: Profile
+}
+
+export interface TheMealDBRecipe {
+  id: string
+  title: string
+  category: string
+  cuisine: string
+  instructions: string
+  image_url: string
+  ingredients: RecipeIngredient[]
 }
 
 // Tipos helpers
