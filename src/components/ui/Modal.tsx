@@ -40,32 +40,33 @@ export function Modal({
   const modalRef = useRef<HTMLDivElement>(null)
   const previousActiveElement = useRef<Element | null>(null)
 
-  // Handle escape key and body scroll lock
+  // Effect 1: Focus management - only runs when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      // Store previously focused element when modal opens
+      previousActiveElement.current = document.activeElement
+    } else if (previousActiveElement.current instanceof HTMLElement) {
+      // Restore focus when modal closes
+      previousActiveElement.current.focus()
+      previousActiveElement.current = null
+    }
+  }, [isOpen])
+
+  // Effect 2: Event handlers and body scroll lock
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && closeOnEscape) onClose()
     }
 
     if (isOpen) {
-      // Store previously focused element
-      previousActiveElement.current = document.activeElement
-
       // Lock body scroll
       document.body.style.overflow = 'hidden'
       window.addEventListener('keydown', handleEscape)
-
-      // Don't force focus on the modal container to allow natural focus on form inputs
-      // This prevents the textarea from being deselected when typing
     }
 
     return () => {
       document.body.style.overflow = 'unset'
       window.removeEventListener('keydown', handleEscape)
-
-      // Restore focus to previous element
-      if (previousActiveElement.current instanceof HTMLElement) {
-        previousActiveElement.current.focus()
-      }
     }
   }, [isOpen, onClose, closeOnEscape])
 
