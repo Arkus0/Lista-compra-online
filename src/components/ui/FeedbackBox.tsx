@@ -160,7 +160,6 @@ function FeedbackModal({
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Escribe tu sugerencia aquí..."
               className="w-full h-32 px-4 py-3 rounded-xl border-2 border-border bg-input-bg text-foreground placeholder:text-muted-light focus:outline-none focus:border-primary transition-colors resize-none"
-              autoFocus
             />
           </div>
 

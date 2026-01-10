@@ -2,7 +2,21 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+### 1. Environment Setup
+
+Copy `.env.example` to `.env.local` and configure the required variables:
+
+```bash
+cp .env.example .env.local
+```
+
+**Required variables:**
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` - For database connection
+
+**Optional variables:**
+- `RESEND_API_KEY` - For email notifications (suggestions box). Without this, the app will fallback to opening the user's email client. Get a free API key at [resend.com](https://resend.com) (100 emails/day free tier).
+
+### 2. Run the development server
 
 ```bash
 npm run dev
