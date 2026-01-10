@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   X, ChevronDown, ChevronUp, Plus, ShoppingCart,
-  AlertCircle, Check, Loader2
+  AlertCircle, Check, Loader2, Ban
 } from 'lucide-react'
 import { ShoppingList as ShoppingListType, ListItem, Profile } from '@/lib/supabase/types'
 import { createClient } from '@/lib/supabase/client'
@@ -449,7 +449,6 @@ function SuperItem({
       className={`
         px-4 py-3 flex items-center gap-3
         transition-all duration-200
-        ${isCompleted ? 'opacity-60' : ''}
         ${isUnavailable ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}
       `}
       onClick={() => setShowActions(!showActions)}
@@ -461,15 +460,15 @@ function SuperItem({
           onToggle()
         }}
         className={`
-          w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0
+          w-8 h-8 rounded-lg border-2 flex items-center justify-center flex-shrink-0
           transition-all active:scale-90
           ${isCompleted
-            ? 'bg-green-500 border-green-500'
+            ? 'bg-green-500 border-green-500 shadow-md shadow-green-500/30'
             : 'border-gray-300 dark:border-gray-600 hover:border-primary'
           }
         `}
       >
-        {isCompleted && <Check className="w-5 h-5 text-white" />}
+        {isCompleted && <Check className="w-5 h-5 text-white" strokeWidth={3} />}
       </button>
 
       {/* Emoji + Nombre */}
@@ -501,15 +500,15 @@ function SuperItem({
           }}
           className={`
             w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
-            transition-colors text-lg
+            transition-colors
             ${isUnavailable
               ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-600'
               : 'bg-secondary text-muted-foreground hover:bg-amber-100 hover:text-amber-600'
             }
           `}
-          title={isUnavailable ? 'Quitar marca' : 'No había'}
+          title={isUnavailable ? 'Volver a pendiente' : 'No había'}
         >
-          {isUnavailable ? '✓' : '✗'}
+          <Ban className={`w-5 h-5 ${isUnavailable ? 'opacity-100' : 'opacity-50'}`} />
         </button>
       )}
     </div>
