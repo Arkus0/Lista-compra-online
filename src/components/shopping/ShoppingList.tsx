@@ -267,7 +267,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleToggleItem = async (id: string) => { const item = items.find(i => i.id === id); if(!item) return; toggleItemChecked(id); await supabase.from('list_items').update({ checked: !item.checked }).eq('id', id) }
   const handleDeleteItem = async (id: string) => { removeItem(id); await supabase.from('list_items').delete().eq('id', id) }
   const handleUpdateQuantity = async (id: string, q: number) => { updateItem(id, { quantity: q }); await supabase.from('list_items').update({ quantity: q }).eq('id', id) }
-  const handleAddToFavorites = async (item: ListItem) => { await addFavoriteItem({ name: item.name, quantity: item.quantity, category: item.category }) }
+  const handleAddToFavorites = async (item: ListItem) => { await addFavoriteItem({ name: item.name, quantity: item.quantity, unit: item.unit, category: item.category }) }
   const handleAddFromSuggestion = (s: CommonProduct) => handleAddItem(s.name, s.category)
   const handleAssignItem = async (itemId: string, userId: string | null) => { updateItem(itemId, { assigned_to: userId } as any); await supabase.from('list_items').update({ assigned_to: userId }).eq('id', itemId) }
   const handleAddImage = (itemId: string) => { setEditingItemId(itemId); setShowImageModal(true); setTimeout(() => imageInputRef.current?.click(), 100) }
