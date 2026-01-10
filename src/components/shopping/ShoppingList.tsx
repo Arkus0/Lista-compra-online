@@ -182,11 +182,12 @@ export function ShoppingList({ list }: ShoppingListProps) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  // LOGICA DE SCROLL CORREGIDA: Ocultar al mover, mostrar al parar (0.5s)
+  // LOGICA DE SCROLL: Ocultar al mover, mostrar al parar (0.5s)
+  // Ahora también afecta al Header
   const handleListScroll = useCallback(() => {
-    // Si estamos escribiendo, NO ocultamos nada para evitar problemas con el teclado
+    // Si estamos escribiendo, NO ocultamos nada para evitar cierre de teclado
     if (isInputActive) {
-      setIsControlsVisible(true)
+      if (!isControlsVisible) setIsControlsVisible(true)
       return
     }
 
@@ -202,7 +203,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     scrollTimeoutRef.current = setTimeout(() => {
       setIsControlsVisible(true)
     }, 500)
-  }, [isInputActive])
+  }, [isInputActive, isControlsVisible])
 
   // Limpiar timeout al desmontar
   useEffect(() => {
@@ -261,7 +262,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
     return Object.entries(groups).filter(([_, items]) => items.length > 0) as [CategoryId, ListItem[]][]
   }, [uncheckedItems, viewMode, normalizeCategory])
 
-  // Sugerencias inteligentes (Ahora se usarán dentro de la lista)
+  // Sugerencias inteligentes
   const smartSuggestions = useMemo(() => {
     const itemNames = items.map(item => item.name)
     return getSmartSuggestions(itemNames, 4)
@@ -627,118 +628,120 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Header */}
-      <header className="p-4 border-b border-gray-100 bg-background z-10 flex-shrink-0">
-        {showSearch ? (
-          <div className="flex items-center gap-2 mb-3 animate-in slide-in-from-top-2">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar en la lista..."
-                className="w-full h-10 pl-10 pr-10 rounded-xl bg-secondary focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
-                autoFocus
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
-                  <X className="w-3 h-3 text-muted" />
-                </button>
-              )}
-            </div>
-            <button onClick={() => { setShowSearch(false); setSearchQuery('') }} className="p-2 hover:bg-secondary rounded-lg text-muted">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center relative">
-                <ShoppingBag className="w-5 h-5 text-primary" />
-                <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-background ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+      {/* Header FLOTANTE */}
+      <header className={`fixed top-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-md border-b border-border transition-transform duration-300 ${isControlsVisible ? 'translate-y-0' : '-translate-y-full'}`}>
+        <div className="p-4">
+          {showSearch ? (
+            <div className="flex items-center gap-2 animate-in slide-in-from-top-2">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar en la lista..."
+                  className="w-full h-10 pl-10 pr-10 rounded-xl bg-secondary focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
+                    <X className="w-3 h-3 text-muted" />
+                  </button>
+                )}
               </div>
-              <div>
-                <h1 className="font-bold text-lg">{list.name}</h1>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-gray-500">{items.length} productos</p>
+              <button onClick={() => { setShowSearch(false); setSearchQuery('') }} className="p-2 hover:bg-secondary rounded-lg text-muted">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center relative">
+                  <ShoppingBag className="w-5 h-5 text-primary" />
+                  <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-background ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+                </div>
+                <div>
+                  <h1 className="font-bold text-lg">{list.name}</h1>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-500">{items.length} productos</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2 relative">
-              <button onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted" title="Buscar">
-                <Search className="w-5 h-5" />
-              </button>
-             <button onClick={() => setViewMode(prev => prev === 'list' ? 'grouped' : 'list')} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${viewMode === 'grouped' ? 'bg-primary/10 text-primary' : 'hover:bg-secondary text-muted'}`} title={viewMode === 'list' ? "Ver por categorías" : "Ver lista simple"}>
-                {viewMode === 'list' ? <LayoutGrid className="w-5 h-5" /> : <ListIcon className="w-5 h-5" />}
-              </button>
-            {presenceUsers.length > 0 && <PresenceIndicator users={presenceUsers} maxVisible={3} />}
-            <button onClick={openCollaboratorsModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><Users className="w-5 h-5" /></button>
-            <button onClick={openShareModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><Share2 className="w-5 h-5" /></button>
-            <button onClick={toggleMenu} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><MoreVertical className="w-5 h-5" /></button>
-            
-            {showMenu && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-20 py-2">
-                  {uncheckedItems.length > 0 && (
-                    <button onClick={handleMarkAllComplete} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
-                      <CheckCheck className="w-4 h-4 text-green-500" /> Marcar todo completado
+              <div className="flex items-center gap-2 relative">
+                <button onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted" title="Buscar">
+                  <Search className="w-5 h-5" />
+                </button>
+              <button onClick={() => setViewMode(prev => prev === 'list' ? 'grouped' : 'list')} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${viewMode === 'grouped' ? 'bg-primary/10 text-primary' : 'hover:bg-secondary text-muted'}`} title={viewMode === 'list' ? "Ver por categorías" : "Ver lista simple"}>
+                  {viewMode === 'list' ? <LayoutGrid className="w-5 h-5" /> : <ListIcon className="w-5 h-5" />}
+                </button>
+              {presenceUsers.length > 0 && <PresenceIndicator users={presenceUsers} maxVisible={3} />}
+              <button onClick={openCollaboratorsModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><Users className="w-5 h-5" /></button>
+              <button onClick={openShareModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><Share2 className="w-5 h-5" /></button>
+              <button onClick={toggleMenu} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><MoreVertical className="w-5 h-5" /></button>
+              
+              {showMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
+                  <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-20 py-2">
+                    {uncheckedItems.length > 0 && (
+                      <button onClick={handleMarkAllComplete} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
+                        <CheckCheck className="w-4 h-4 text-green-500" /> Marcar todo completado
+                      </button>
+                    )}
+                    {checkedItems.length > 0 && (
+                      <button onClick={handleClearCompleted} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
+                        <Eraser className="w-4 h-4 text-orange-500" /> Limpiar completados ({checkedItems.length})
+                      </button>
+                    )}
+                    {(uncheckedItems.length > 0 || checkedItems.length > 0) && <div className="border-t border-border my-1" />}
+                    <button onClick={handleDuplicateList} disabled={isDuplicating} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2 disabled:opacity-50">
+                      <CopyIcon className="w-4 h-4 text-blue-500" /> {isDuplicating ? 'Duplicando...' : 'Duplicar lista'}
                     </button>
-                  )}
-                  {checkedItems.length > 0 && (
-                    <button onClick={handleClearCompleted} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
-                      <Eraser className="w-4 h-4 text-orange-500" /> Limpiar completados ({checkedItems.length})
+                    <button onClick={handleSaveAsTemplate} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-purple-500" /> Guardar como plantilla
                     </button>
-                  )}
-                  {(uncheckedItems.length > 0 || checkedItems.length > 0) && <div className="border-t border-border my-1" />}
-                  <button onClick={handleDuplicateList} disabled={isDuplicating} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2 disabled:opacity-50">
-                    <CopyIcon className="w-4 h-4 text-blue-500" /> {isDuplicating ? 'Duplicando...' : 'Duplicar lista'}
-                  </button>
-                  <button onClick={handleSaveAsTemplate} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-purple-500" /> Guardar como plantilla
-                  </button>
-                  <button onClick={() => {setActiveModal('edit'); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
-                    <Edit2 className="w-4 h-4 text-muted" /> Editar nombre
-                  </button>
-                  <div className="border-t border-border my-1" />
-                  <button onClick={() => { setShowMenu(false); alert('¡Próximamente!') }} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2 opacity-60">
-                    <Store className="w-4 h-4 text-emerald-500" /> <span>Modo en el super</span>
-                  </button>
-                  <div className="border-t border-border my-1" />
-                  <button onClick={() => {handleArchiveList(); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
-                    <Archive className="w-4 h-4 text-gray-500" /> Archivar lista
-                  </button>
-                  <button onClick={() => {setActiveModal('delete'); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2">
-                    <Trash2 className="w-4 h-4" /> Eliminar lista
-                  </button>
-                </div>
-              </>
-            )}
+                    <button onClick={() => {setActiveModal('edit'); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
+                      <Edit2 className="w-4 h-4 text-muted" /> Editar nombre
+                    </button>
+                    <div className="border-t border-border my-1" />
+                    <button onClick={() => { setShowMenu(false); alert('¡Próximamente!') }} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2 opacity-60">
+                      <Store className="w-4 h-4 text-emerald-500" /> <span>Modo en el super</span>
+                    </button>
+                    <div className="border-t border-border my-1" />
+                    <button onClick={() => {handleArchiveList(); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2">
+                      <Archive className="w-4 h-4 text-gray-500" /> Archivar lista
+                    </button>
+                    <button onClick={() => {setActiveModal('delete'); setShowMenu(false)}} className="w-full px-4 py-2.5 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2">
+                      <Trash2 className="w-4 h-4" /> Eliminar lista
+                    </button>
+                  </div>
+                </>
+              )}
+              </div>
             </div>
-          </div>
-        )}
-        {searchQuery && (
-          <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-xs text-muted">{filteredItems.length} resultados para "{searchQuery}"</span>
-            <button onClick={() => setSearchQuery('')} className="text-xs text-primary hover:underline">Limpiar</button>
-          </div>
-        )}
+          )}
+          {searchQuery && (
+            <div className="flex items-center justify-between mt-2 px-1">
+              <span className="text-xs text-muted">{filteredItems.length} resultados para "{searchQuery}"</span>
+              <button onClick={() => setSearchQuery('')} className="text-xs text-primary hover:underline">Limpiar</button>
+            </div>
+          )}
+        </div>
       </header>
 
-      {user && (
-        <div className="flex-shrink-0">
-          <ListNotes listId={list.id} listName={list.name} currentUser={user} isCollaborative={collaborators.length > 0 || list.share_code !== null} />
-        </div>
-      )}
-
-      {/* LISTA SCROLLABLE */}
+      {/* LISTA DE COMPRA - pt-32 para compensar el header fixed */}
       <div 
-        className="flex-1 overflow-y-auto p-4 space-y-2 pb-40"
+        className="flex-1 overflow-y-auto p-4 space-y-2 pb-40 pt-32"
         onScroll={handleListScroll}
       >
+        {user && (
+          <div className="flex-shrink-0 mb-4">
+            <ListNotes listId={list.id} listName={list.name} currentUser={user} isCollaborative={collaborators.length > 0 || list.share_code !== null} />
+          </div>
+        )}
+
         {isLoading ? (
           <div className="space-y-2"><ItemSkeleton /><ItemSkeleton /></div>
         ) : (
@@ -847,7 +850,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
               </div>
             )}
             
-            {/* SUGERENCIAS MOVIDAS AQUÍ: EL ÚLTIMO ELEMENTO DE LA LISTA */}
+            {/* SUGERENCIAS MOVIDAS AQUÍ */}
             {smartSuggestions.length > 0 && (
               <div className="mt-8 mb-4">
                 <div className="flex items-center gap-2 mb-3">
@@ -874,7 +877,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
       <UndoToast message={undoState.message} isVisible={undoState.isVisible} onUndo={handleUndo} />
 
-      {/* FOOTER FIXED - AHORA CON ORDEN CORRECTO Y VISIBILIDAD FORZADA SI HAY FOCO */}
+      {/* FOOTER FIXED - Controlado por isControlsVisible PERO anulado si isInputActive */}
       <div className="fixed bottom-0 left-0 right-0 bg-background z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-border/50">
         
         {/* Favoritos: Solo visibles si el input está activo */}
@@ -882,7 +885,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
           <FavoriteItems favorites={favoriteItems} isLoading={favoritesLoading} onAddToList={handleAddFromFavorite} onRemove={removeFavoriteItem} />
         </div>
 
-        {/* Pasamos isVisible forzado a true si hay foco (isInputActive) */}
+        {/* Pasamos isVisible. El componente interno decide ignorarlo si tiene foco. */}
         <AddItemForm 
           onAdd={handleAddItem} 
           suggestionsSource={favoriteItems} 
