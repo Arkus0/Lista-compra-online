@@ -1,17 +1,16 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
-import { Plus, ChevronUp, Image as ImageIcon, X, Loader2, Mic, MicOff, ScanBarcode, Star, Sparkles } from 'lucide-react'
+import { Plus, ChevronUp, Loader2, Mic, MicOff, ScanBarcode, Star, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { CATEGORIES, detectCategory, CategoryId, searchProducts, CommonProduct } from '@/lib/constants'
-import { useImageUpload } from '@/hooks/useImageUpload'
+import { CATEGORIES, detectCategory, CategoryId, searchProducts } from '@/lib/constants'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
 import { UserFavoriteItem } from '@/lib/supabase/types'
 import { BarcodeScannerModal } from './BarcodeScannerModal'
 
 interface AddItemFormProps {
   onAdd: (name: string, category: string, imageUrl?: string) => void | Promise<void>
-  suggestionsSource?: UserFavoriteItem[] // Fuente para el autocompletado
+  suggestionsSource?: UserFavoriteItem[]
 }
 
 // Hook personalizado para debounce
@@ -37,12 +36,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
   const [showCategories, setShowCategories] = useState(false)
   const [manuallySelected, setManuallySelected] = useState(false)
 
-  // Estados para Imagen
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Estados para Sugerencias - tipo unificado para favoritos y productos comunes
+  // Estados para Sugerencias
   type Suggestion = {
     id: string
     name: string
@@ -56,10 +50,14 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
   // Estados para Escáner de código de barras
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
 
+  // Estados para control de visibilidad y UI
+  const [isInputFocused, setIsInputFocused] = useState(false)
+  const [isFormVisible, setIsFormVisible] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   const inputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
-
-  const { upload, isUploading } = useImageUpload({ bucket: 'list-images' })
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Hook de reconocimiento de voz
   const {
@@ -68,7 +66,6 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
     isSupported: voiceSupported,
     startListening,
     stopListening,
-    error: voiceError
   } = useVoiceInput()
 
   // Actualizar el nombre cuando se detecta voz
@@ -78,18 +75,17 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
     }
   }, [transcript])
 
-  // Debounce del nombre para detección de categoría y sugerencias (300ms)
+  // Debounce del nombre para detección de categoría y sugerencias
   const debouncedName = useDebounce(name, 300)
 
   // Autodetección de categoría y Filtrado de Sugerencias
   useEffect(() => {
-    // 1. Filtrar Sugerencias combinando favoritos y productos comunes
     if (name.trim().length >= 2) {
       const normalizedName = name.toLowerCase()
       const combinedSuggestions: Suggestion[] = []
       const addedNames = new Set<string>()
 
-      // Primero añadir favoritos (tienen prioridad)
+      // 1. Favoritos
       suggestionsSource
         .filter(item =>
           item.name.toLowerCase().includes(normalizedName) &&
@@ -109,7 +105,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
           }
         })
 
-      // Luego añadir productos comunes que no estén ya
+      // 2. Productos comunes
       const commonMatches = searchProducts(name, 5)
       commonMatches.forEach(product => {
         if (!addedNames.has(product.name.toLowerCase())) {
@@ -123,7 +119,6 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
         }
       })
 
-      // Limitar a 5 sugerencias totales
       setSuggestions(combinedSuggestions.slice(0, 5))
       setShowSuggestions(combinedSuggestions.length > 0)
     } else {
@@ -131,7 +126,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
       setSuggestions([])
     }
 
-    // 2. Autodetectar categoría (si no es manual)
+    // Autodetectar categoría
     if (!manuallySelected && debouncedName.trim().length > 2) {
       const detected = detectCategory(debouncedName)
       if (detected !== 'other') {
@@ -148,61 +143,76 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
         setShowSuggestions(false)
       }
     }
-
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setImageFile(file)
-      setPreviewUrl(URL.createObjectURL(file))
-    }
-  }
+  // Ocultar formulario al hacer scroll
+  useEffect(() => {
+    let lastScrollY = window.scrollY
 
-  const clearImage = useCallback(() => {
-    setImageFile(null)
-    setPreviewUrl(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      // Ocultar si bajamos scroll (>50px)
+      if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        setIsFormVisible(false)
+      } else {
+        setIsFormVisible(true)
+      }
+      lastScrollY = currentScrollY
+
+      // Resetear timer para volver a mostrarlo
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+      
+      scrollTimeoutRef.current = setTimeout(() => {
+        setIsFormVisible(true)
+      }, 1000)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+    }
   }, [])
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (name.trim()) {
-      let finalImageUrl = undefined
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (name.trim() && !isSubmitting) {
+      setIsSubmitting(true)
 
-      // Subir imagen si existe
-      if (imageFile) {
-        // Generar nombre único: items/TIMESTAMP_RANDOM.jpg
-        const path = `items/${Date.now()}_${Math.random().toString(36).slice(2)}`
-        const uploadedUrl = await upload(imageFile, path)
-        if (uploadedUrl) finalImageUrl = uploadedUrl
-      }
-
-      await onAdd(name.trim(), selectedCategory, finalImageUrl)
+      await onAdd(name.trim(), selectedCategory, undefined)
 
       // Resetear estados
       setName('')
       setSelectedCategory('other')
       setShowCategories(false)
       setManuallySelected(false)
-      clearImage()
       setShowSuggestions(false)
+      setIsSubmitting(false)
 
-      // Mantener foco para añadir productos rápido
+      // Mantener foco
       inputRef.current?.focus()
     }
-  }, [name, selectedCategory, imageFile, onAdd, upload, clearImage])
+  }, [name, selectedCategory, onAdd, isSubmitting])
 
-  const handleSuggestionClick = (suggestion: Suggestion) => {
-    setName(suggestion.name)
-    if (suggestion.category) {
-      setSelectedCategory(suggestion.category as CategoryId)
-      setManuallySelected(true)
-    }
+  const handleSuggestionClick = async (suggestion: Suggestion) => {
+    const categoryToUse = suggestion.category ? (suggestion.category as CategoryId) : 'other'
+    
     setShowSuggestions(false)
-    inputRef.current?.focus()
+
+    // Añadir inmediatamente
+    if (!isSubmitting) {
+      setIsSubmitting(true)
+      await onAdd(suggestion.name, categoryToUse, undefined)
+
+      setName('')
+      setSelectedCategory('other')
+      setManuallySelected(false)
+      setIsSubmitting(false)
+      
+      inputRef.current?.focus()
+    }
   }
 
   const handleCategorySelect = useCallback((categoryId: CategoryId) => {
@@ -217,7 +227,6 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
     setShowSuggestions(false)
   }, [])
 
-  // Handler para cuando el escáner encuentra un producto
   const handleBarcodeProductFound = useCallback((productName: string, category?: string) => {
     setName(productName)
     if (category) {
@@ -227,7 +236,6 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
     inputRef.current?.focus()
   }, [])
 
-  // Handler para el botón de voz
   const handleVoiceButton = useCallback(() => {
     if (isListening) {
       stopListening()
@@ -236,11 +244,14 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
     }
   }, [isListening, startListening, stopListening])
 
-  // Obtener la configuración visual de la categoría actual
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
   return (
-    <div className="sticky bottom-0 bg-card border-t border-border-light z-30 pb-safe">
+    <div 
+      className={`sticky bottom-0 bg-card border-t border-border-light z-30 pb-safe transition-transform duration-300 ${
+        isFormVisible ? 'translate-y-0' : 'translate-y-full'
+      }`}
+    >
       {/* Sugerencias Flotantes */}
       {showSuggestions && (
         <div className="absolute bottom-full left-4 right-4 mb-2 bg-card rounded-xl shadow-lg border border-border overflow-hidden animate-in slide-in-from-bottom-2 z-20">
@@ -266,30 +277,14 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
                     <span className="text-xs text-muted bg-secondary px-1.5 py-0.5 rounded">x{suggestion.quantity}</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  {CategoryConfig && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${CategoryConfig.color}`}>
-                      {CategoryConfig.label.split(' ')[0]}
-                    </span>
-                  )}
-                </div>
+                {CategoryConfig && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${CategoryConfig.color}`}>
+                    {CategoryConfig.label.split(' ')[0]}
+                  </span>
+                )}
               </button>
             )
           })}
-        </div>
-      )}
-
-      {/* Previsualización de Imagen */}
-      {previewUrl && (
-        <div className="absolute bottom-full right-4 mb-2 w-20 h-20 bg-card rounded-xl shadow-lg border border-border p-1 animate-in zoom-in-95 z-10">
-          <img src={previewUrl} alt="Preview" className="w-full h-full object-cover rounded-lg" />
-          <button
-            type="button"
-            onClick={clearImage}
-            className="absolute -top-2 -right-2 bg-danger text-white rounded-full p-1 shadow-md hover:scale-110 transition-transform"
-          >
-            <X className="w-3 h-3" />
-          </button>
         </div>
       )}
 
@@ -355,6 +350,11 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
                   setSelectedCategory('other')
                 }
               }}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => {
+                // Retrasar blur para permitir clicks en botones
+                setTimeout(() => setIsInputFocused(false), 200)
+              }}
               placeholder={isListening ? "Escuchando..." : "Añadir producto..."}
               className={`
                 w-full h-11 rounded-xl bg-secondary px-4
@@ -366,70 +366,47 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
             />
           </div>
 
-          {/* Botones auxiliares - FUERA del input */}
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {/* Botón de Voz */}
-            {voiceSupported && (
+          {/* Botones auxiliares - Solo visibles en focus */}
+          {isInputFocused && (
+            <div className="flex items-center gap-1 flex-shrink-0 animate-in fade-in slide-in-from-right-2 duration-200">
+              {/* Botón de Voz */}
+              {voiceSupported && (
+                <button
+                  type="button"
+                  onClick={handleVoiceButton}
+                  className={`
+                    w-10 h-10 rounded-xl flex items-center justify-center transition-all
+                    ${isListening
+                      ? 'text-white bg-red-500 animate-pulse'
+                      : 'text-muted hover:text-primary hover:bg-secondary'
+                    }
+                  `}
+                  aria-label={isListening ? "Detener grabación" : "Añadir por voz"}
+                >
+                  {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                </button>
+              )}
+
+              {/* Botón de Escáner */}
               <button
                 type="button"
-                onClick={handleVoiceButton}
-                className={`
-                  w-10 h-10 rounded-xl flex items-center justify-center transition-all
-                  ${isListening
-                    ? 'text-white bg-red-500 animate-pulse'
-                    : 'text-muted hover:text-primary hover:bg-secondary'
-                  }
-                `}
-                aria-label={isListening ? "Detener grabación" : "Añadir por voz"}
+                onClick={() => setShowBarcodeScanner(true)}
+                className="w-10 h-10 rounded-xl text-muted hover:text-primary hover:bg-secondary flex items-center justify-center transition-colors"
+                aria-label="Escanear código de barras"
               >
-                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                <ScanBarcode className="w-5 h-5" />
               </button>
-            )}
-
-            {/* Botón de Escáner */}
-            <button
-              type="button"
-              onClick={() => setShowBarcodeScanner(true)}
-              className="w-10 h-10 rounded-xl text-muted hover:text-primary hover:bg-secondary flex items-center justify-center transition-colors"
-              aria-label="Escanear código de barras"
-            >
-              <ScanBarcode className="w-5 h-5" />
-            </button>
-
-            {/* Botón de Imagen */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className={`
-                w-10 h-10 rounded-xl flex items-center justify-center transition-colors
-                ${imageFile
-                  ? 'text-primary bg-primary/10'
-                  : 'text-muted hover:text-primary hover:bg-secondary'
-                }
-              `}
-              aria-label="Añadir foto"
-            >
-              <ImageIcon className="w-5 h-5" />
-            </button>
-
-            {/* Input File oculto */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/*"
-              className="hidden"
-              onChange={handleImageSelect}
-            />
-          </div>
+            </div>
+          )}
 
           {/* Botón Submit */}
           <Button
             type="submit"
-            disabled={!name.trim() || isUploading}
+            disabled={!name.trim() || isSubmitting}
             className="w-11 h-11 rounded-xl p-0 flex items-center justify-center shrink-0"
             aria-label="Añadir producto"
           >
-            {isUploading ? (
+            {isSubmitting ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <Plus className="w-5 h-5" />
@@ -438,7 +415,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
         </div>
       </form>
 
-      {/* Modal del escáner de código de barras */}
+      {/* Modal del escáner */}
       <BarcodeScannerModal
         isOpen={showBarcodeScanner}
         onClose={() => setShowBarcodeScanner(false)}
