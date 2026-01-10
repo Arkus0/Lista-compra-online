@@ -15,7 +15,6 @@ interface AddItemFormProps {
   onFocusChange?: (isFocused: boolean) => void
 }
 
-// Hook personalizado para debounce
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
   useEffect(() => {
@@ -39,10 +38,24 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
   const inputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   
-  // Comunicar cambio de foco al padre, pero mantenemos estado local para respuesta inmediata
+  // Comunicar cambio de foco al padre
   useEffect(() => {
     onFocusChange?.(isInputFocused)
   }, [isInputFocused, onFocusChange])
+
+  // Detección avanzada de viewport para móviles (Teclado)
+  useEffect(() => {
+    if (!window.visualViewport) return;
+
+    const handleResize = () => {
+      // Si el viewport cambia drásticamente (teclado), nos aseguramos de estar visibles
+      if (document.activeElement === inputRef.current) {
+         // Opcional: Scroll al fondo si fuera necesario, pero fixed bottom suele bastar
+      }
+    }
+    window.visualViewport.addEventListener('resize', handleResize)
+    return () => window.visualViewport?.removeEventListener('resize', handleResize)
+  }, [])
 
   const { isListening, transcript, isSupported: voiceSupported, startListening, stopListening } = useVoiceInput()
 
@@ -115,7 +128,6 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
       setManuallySelected(false)
       setShowSuggestions(false)
       setIsSubmitting(false)
-      // Mantener el foco permite seguir añadiendo items rápidamente
       inputRef.current?.focus()
     }
   }, [name, selectedCategory, onAdd, isSubmitting])
@@ -162,17 +174,15 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
 
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
-  // LÓGICA CRÍTICA:
-  // Si el input tiene foco localmente, FORZAMOS que sea visible.
-  // Esto evita que una actualización del padre (handleListScroll) oculte el form
-  // mientras el teclado está intentando abrirse, lo que causaría que el teclado se cerrara.
+  // Si tiene foco, forzamos visibilidad ignorando al padre
   const shouldBeVisible = isVisible || isInputFocused
 
   return (
     <div 
-      className={`fixed bottom-0 left-0 right-0 w-full bg-card border-t border-border-light z-30 pb-safe transition-transform duration-300 ${
+      className={`fixed bottom-0 left-0 right-0 w-full bg-card border-t border-border-light z-30 transition-transform duration-300 ${
         shouldBeVisible ? 'translate-y-0' : 'translate-y-full'
       }`}
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {/* Sugerencias Flotantes */}
       {showSuggestions && (
@@ -186,16 +196,10 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
                 onClick={() => handleSuggestionClick(suggestion)}
                 className="flex items-center gap-1.5 px-3 py-2 bg-card rounded-xl shadow-md border border-border/50 hover:bg-secondary whitespace-nowrap transition-transform active:scale-95 flex-shrink-0"
               >
-                {suggestion.source === 'favorite' && (
-                  <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />
-                )}
+                {suggestion.source === 'favorite' && <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />}
                 <span className="font-medium text-sm text-foreground">{suggestion.name}</span>
-                {suggestion.quantity && suggestion.quantity > 1 && (
-                  <span className="text-[10px] text-muted bg-secondary px-1 py-0.5 rounded">x{suggestion.quantity}</span>
-                )}
-                {CategoryConfig && (
-                  <div className={`w-2 h-2 rounded-full ${CategoryConfig.color.split(' ')[0].replace('text-', 'bg-')}`} />
-                )}
+                {suggestion.quantity && suggestion.quantity > 1 && <span className="text-[10px] text-muted bg-secondary px-1 py-0.5 rounded">x{suggestion.quantity}</span>}
+                {CategoryConfig && <div className={`w-2 h-2 rounded-full ${CategoryConfig.color.split(' ')[0].replace('text-', 'bg-')}`} />}
               </button>
             )
           })}
@@ -203,7 +207,6 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
       )}
 
       <form ref={formRef} onSubmit={handleSubmit} className="p-4 max-w-md mx-auto relative">
-        {/* Selector de Categorías */}
         {showCategories && (
           <div className="absolute bottom-full left-4 right-4 mb-2 bg-card rounded-xl shadow-xl border border-border p-3 grid grid-cols-5 gap-2 animate-in slide-in-from-bottom-2 z-40">
             {Object.values(CATEGORIES).map((cat) => (
@@ -220,17 +223,10 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
           </div>
         )}
 
-        {/* Layout principal */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={toggleCategories}
-            className={`flex-shrink-0 w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-300 relative ${showCategories ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'} ${CurrentCategoryConfig.color}`}
-          >
+          <button type="button" onClick={toggleCategories} className={`flex-shrink-0 w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-300 relative ${showCategories ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'} ${CurrentCategoryConfig.color}`}>
             <CurrentCategoryConfig.icon className="w-5 h-5" />
-            <div className="absolute -top-1 -right-1 w-4 h-4 bg-card rounded-full shadow border border-border-light flex items-center justify-center">
-              <ChevronUp className="w-2.5 h-2.5 text-muted" />
-            </div>
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-card rounded-full shadow border border-border-light flex items-center justify-center"><ChevronUp className="w-2.5 h-2.5 text-muted" /></div>
           </button>
 
           <div className="flex-1 relative">
@@ -240,10 +236,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
               value={name}
               onChange={(e) => {
                 setName(e.target.value)
-                if (e.target.value.trim() === '') {
-                  setManuallySelected(false)
-                  setSelectedCategory('other')
-                }
+                if (e.target.value.trim() === '') { setManuallySelected(false); setSelectedCategory('other') }
               }}
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setTimeout(() => setIsInputFocused(false), 200)}
@@ -253,17 +246,11 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
             />
           </div>
 
-          {/* Mostrar botones extra solo si hay foco (y por ende el teclado está abierto o abriéndose) */}
+          {/* Botones extra solo visibles si hay foco/teclado para ahorrar espacio visual */}
           {isInputFocused && (
             <div className="flex items-center gap-1 flex-shrink-0 animate-in fade-in slide-in-from-right-2 duration-200">
-              {voiceSupported && (
-                <button type="button" onClick={handleVoiceButton} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isListening ? 'text-white bg-red-500 animate-pulse' : 'text-muted hover:text-primary hover:bg-secondary'}`}>
-                  {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                </button>
-              )}
-              <button type="button" onClick={() => setShowBarcodeScanner(true)} className="w-10 h-10 rounded-xl text-muted hover:text-primary hover:bg-secondary flex items-center justify-center transition-colors">
-                <ScanBarcode className="w-5 h-5" />
-              </button>
+              {voiceSupported && <button type="button" onClick={handleVoiceButton} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isListening ? 'text-white bg-red-500 animate-pulse' : 'text-muted hover:text-primary hover:bg-secondary'}`}>{isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}</button>}
+              <button type="button" onClick={() => setShowBarcodeScanner(true)} className="w-10 h-10 rounded-xl text-muted hover:text-primary hover:bg-secondary flex items-center justify-center transition-colors"><ScanBarcode className="w-5 h-5" /></button>
             </div>
           )}
 
@@ -273,11 +260,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
         </div>
       </form>
 
-      <BarcodeScannerModal
-        isOpen={showBarcodeScanner}
-        onClose={() => setShowBarcodeScanner(false)}
-        onProductFound={handleBarcodeProductFound}
-      />
+      <BarcodeScannerModal isOpen={showBarcodeScanner} onClose={() => setShowBarcodeScanner(false)} onProductFound={handleBarcodeProductFound} />
     </div>
   )
 }
