@@ -146,6 +146,10 @@ export function ShoppingList({ list }: ShoppingListProps) {
     timer: NodeJS.Timeout | null
   }>({ isVisible: false, message: '', action: () => {}, timer: null })
 
+  // Estados para scroll y visibilidad de controles
+  const [isControlsVisible, setIsControlsVisible] = useState(true)
+  const lastScrollY = useRef(0)
+
   // Estados para funcionalidades especificas
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
   const [collaboratorsLoaded, setCollaboratorsLoaded] = useState(false)
@@ -175,6 +179,18 @@ export function ShoppingList({ list }: ShoppingListProps) {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
+
+  // Control de scroll para ocultar UI
+  const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const currentScrollY = e.currentTarget.scrollTop
+    // Ocultar si bajamos scroll (> 20px)
+    if (currentScrollY > lastScrollY.current && currentScrollY > 20) {
+      setIsControlsVisible(false)
+    } else if (currentScrollY < lastScrollY.current || currentScrollY < 20) {
+      setIsControlsVisible(true)
+    }
+    lastScrollY.current = currentScrollY
+  }
 
   // Filtrar items por búsqueda
   const filteredItems = useMemo(() => {
@@ -338,9 +354,10 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const showUndoToast = (message: string, undoAction: () => Promise<void> | void) => {
     if (undoState.timer) clearTimeout(undoState.timer)
     
+    // TIEMPO REDUCIDO A 2 SEGUNDOS
     const timer = setTimeout(() => {
       setUndoState(prev => ({ ...prev, isVisible: false }))
-    }, 4000)
+    }, 2000)
 
     setUndoState({ isVisible: true, message, action: undoAction, timer })
   }
@@ -762,7 +779,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const openCollaboratorsModal = () => setActiveModal('collaborators')
   const toggleMenu = () => setShowMenu(p => !p)
   
-  // Handler memoizado para cerrar modal de notas y evitar perdida de foco
+  // Handler memoizado para cerrar modal de notas
   const handleCloseNoteModal = useCallback(() => {
     setShowNoteModal(false)
     setEditingItemId(null)
@@ -930,7 +947,11 @@ export function ShoppingList({ list }: ShoppingListProps) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-40">
+      {/* AQUÍ ES DONDE OCURRE EL SCROLL: AÑADIDO onScroll */}
+      <div 
+        className="flex-1 overflow-y-auto p-4 space-y-2 pb-40"
+        onScroll={handleListScroll}
+      >
         {isLoading ? (
           <div className="space-y-2"><ItemSkeleton /><ItemSkeleton /></div>
         ) : (
@@ -1075,15 +1096,28 @@ export function ShoppingList({ list }: ShoppingListProps) {
           </div>
         )}
         <FavoriteItems favorites={favoriteItems} isLoading={favoritesLoading} onAddToList={handleAddFromFavorite} onRemove={removeFavoriteItem} />
-        <AddItemForm onAdd={handleAddItem} suggestionsSource={favoriteItems} />
+        {/* Pasamos la prop de visibilidad */}
+        <AddItemForm onAdd={handleAddItem} suggestionsSource={favoriteItems} isVisible={isControlsVisible} />
       </div>
 
       {/* MODALES DE SOPORTE */}
-      <Modal isOpen={activeModal === 'share'} onClose={closeModal} title="Compartir">
-         <div className="flex flex-col items-center gap-4">
-           <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shareUrl)}`} alt="QR" className="rounded-xl border" />
-           <p className="font-mono text-sm bg-secondary p-2 rounded">{shareUrl}</p>
-           <Button onClick={handleCopyLink}>{isCopied ? 'Copiado' : 'Copiar Enlace'}</Button>
+      <Modal isOpen={activeModal === 'share'} onClose={closeModal} title="Compartir Lista">
+         <div className="flex flex-col items-center gap-4 py-2">
+           <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl)}`} alt="QR Code" className="rounded-xl border shadow-sm" />
+           
+           <div className="w-full space-y-2">
+             <div className="text-xs text-muted font-medium uppercase tracking-wider text-center">Código de acceso</div>
+             <p className="font-mono text-2xl text-center font-bold tracking-widest bg-secondary py-3 rounded-lg border border-border">{list.share_code}</p>
+           </div>
+
+           <p className="text-sm text-center text-muted px-4">
+             Comparte este código o escanea el QR para que otros se unan a esta lista.
+           </p>
+
+           <Button onClick={handleCopyLink} className="w-full flex items-center justify-center gap-2">
+             {isCopied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
+             {isCopied ? 'Enlace Copiado' : 'Copiar Enlace de Invitación'}
+           </Button>
          </div>
       </Modal>
       <Modal isOpen={activeModal === 'collaborators'} onClose={closeModal} title="Colaboradores">
