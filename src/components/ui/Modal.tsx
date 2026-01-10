@@ -54,10 +54,8 @@ export function Modal({
       document.body.style.overflow = 'hidden'
       window.addEventListener('keydown', handleEscape)
 
-      // Focus the modal
-      setTimeout(() => {
-        modalRef.current?.focus()
-      }, 100)
+      // Don't force focus on the modal container to allow natural focus on form inputs
+      // This prevents the textarea from being deselected when typing
     }
 
     return () => {
