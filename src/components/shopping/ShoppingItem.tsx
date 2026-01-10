@@ -29,7 +29,6 @@ interface ShoppingItemProps {
   addedByProfile?: Profile | null
   checkedByProfile?: Profile | null
   isDragEnabled?: boolean
-  isNoteVisible?: boolean // Controla si se ve la nota
   domId?: string          // ID para el scroll automático
 }
 
@@ -63,7 +62,6 @@ function ShoppingItemComponent({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   checkedByProfile,
   isDragEnabled = true,
-  isNoteVisible = false,
   domId
 }: ShoppingItemProps) {
   const [isDeleting, setIsDeleting] = useState(false)
@@ -206,18 +204,11 @@ function ShoppingItemComponent({
             )}
           </div>
 
-          {/* NOTA VISIBLE (si activado) */}
-          {isNoteVisible && item.note && (
+          {/* NOTA VISIBLE SIEMPRE (si existe) */}
+          {item.note && (
              <p className="text-xs text-muted-foreground mt-0.5 leading-tight break-words pr-2">
                {item.note}
              </p>
-          )}
-
-          {/* Categoría (si nota oculta) */}
-          {categoryColor && !item.checked && !isNoteVisible && (
-            <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-md mt-0.5 w-fit ${categoryColor}`}>
-              {item.category}
-            </span>
           )}
         </div>
 
@@ -249,7 +240,7 @@ function ShoppingItemComponent({
           </button>
 
           {showActionMenu && (
-            <div className="absolute top-full right-0 mt-1 w-52 bg-card border border-border rounded-xl shadow-xl z-40 py-1 animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="absolute top-full right-0 mt-1 w-52 bg-card border border-border rounded-xl shadow-xl z-50 py-1 animate-in fade-in slide-in-from-top-2 duration-150">
               {onAssign && assignablePeople.length > 0 && (
                 <div className="relative">
                   <button
@@ -313,8 +304,7 @@ export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) =
     prevProps.item.assigned_to === nextProps.item.assigned_to &&
     prevProps.item.note === nextProps.item.note &&
     prevProps.onToggle === nextProps.onToggle &&
-    prevProps.onDelete === nextProps.onDelete &&
-    prevProps.isNoteVisible === nextProps.isNoteVisible // Comparación importante
+    prevProps.onDelete === nextProps.onDelete
   )
 })
 

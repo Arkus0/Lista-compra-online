@@ -226,11 +226,26 @@ function AddItemFormComponent({
                 if (e.target.value.trim() === '') { setManuallySelected(false); setSelectedCategory('other') }
               }}
               placeholder={isListening ? "Escuchando..." : "Añadir item..."}
-              className={`w-full h-11 rounded-xl bg-secondary px-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground ${isListening ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
+              className={`w-full h-11 rounded-xl bg-secondary px-4 pr-10 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground ${isListening ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
               autoComplete="off"
               // AutoFocus es seguro dentro de un Drawer abierto
-              autoFocus 
+              autoFocus
             />
+            {/* Botón X para limpiar el texto */}
+            {name && (
+              <button
+                type="button"
+                onClick={() => {
+                  setName('')
+                  setManuallySelected(false)
+                  setSelectedCategory('other')
+                  inputRef.current?.focus()
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
           </div>
 
           {/* Botones de acción derecha */}

@@ -239,8 +239,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   
-  // ESTADO NUEVO: Controla la visibilidad de las notas globalmente
-  const [showNotes, setShowNotes] = useState(false)
+  // ESTADO: Controla la visibilidad de las notas GENERALES de la lista (ListNotes)
+  const [showListNotes, setShowListNotes] = useState(true)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
@@ -454,13 +454,13 @@ export function ShoppingList({ list }: ShoppingListProps) {
               <div className="flex items-center gap-2 relative">
                 <button onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted" title="Buscar"><Search className="w-5 h-5" /></button>
                 
-                {/* BOTÓN TOGGLE NOTAS (REUTILIZADO) */}
-                <button 
-                  onClick={() => setShowNotes(!showNotes)} 
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${showNotes ? 'bg-primary/10 text-primary' : 'hover:bg-secondary text-muted'}`}
-                  title={showNotes ? "Ocultar notas" : "Mostrar notas"}
+                {/* BOTÓN TOGGLE NOTAS GENERALES DE LA LISTA */}
+                <button
+                  onClick={() => setShowListNotes(!showListNotes)}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${showListNotes ? 'bg-primary/10 text-primary' : 'hover:bg-secondary text-muted'}`}
+                  title={showListNotes ? "Ocultar notas generales" : "Mostrar notas generales"}
                 >
-                  {showNotes ? <FileText className="w-5 h-5" /> : <FileText className="w-5 h-5 opacity-50" />}
+                  {showListNotes ? <FileText className="w-5 h-5" /> : <FileText className="w-5 h-5 opacity-50" />}
                 </button>
 
                 {presenceUsers.length > 0 && <PresenceIndicator users={presenceUsers} maxVisible={3} />}
@@ -495,8 +495,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
           )}
         </div>
 
-        {/* NOTAS EN HEADER */}
-        {user && (
+        {/* NOTAS GENERALES DE LA LISTA EN HEADER (condicional) */}
+        {user && showListNotes && (
           <div className="px-4 pb-2">
              <ListNotes listId={list.id} listName={list.name} currentUser={user} isCollaborative={collaborators.length > 0 || list.share_code !== null} />
           </div>
@@ -530,22 +530,21 @@ export function ShoppingList({ list }: ShoppingListProps) {
                        </div>
                        <div className="space-y-2 ml-1 pl-3 border-l-2 border-gray-100 dark:border-gray-800">
                           {groupItems.map(item => (
-                             <ShoppingItem 
-                                key={item.id} 
-                                item={item} 
-                                onToggle={handleToggleItem} 
-                                onDelete={handleDeleteItem} 
-                                onUpdateQuantity={handleUpdateQuantity} 
-                                onAddToFavorites={handleAddToFavorites} 
-                                onAssign={handleAssignItem} 
-                                onAddImage={handleAddImage} 
-                                onAddNote={handleAddNote} 
-                                assignablePeople={assignablePeople} 
-                                assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null} 
-                                addedByProfile={profilesCache.get(item.added_by)} 
-                                checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null} 
+                             <ShoppingItem
+                                key={item.id}
+                                item={item}
+                                onToggle={handleToggleItem}
+                                onDelete={handleDeleteItem}
+                                onUpdateQuantity={handleUpdateQuantity}
+                                onAddToFavorites={handleAddToFavorites}
+                                onAssign={handleAssignItem}
+                                onAddImage={handleAddImage}
+                                onAddNote={handleAddNote}
+                                assignablePeople={assignablePeople}
+                                assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
+                                addedByProfile={profilesCache.get(item.added_by)}
+                                checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null}
                                 isDragEnabled={false}
-                                isNoteVisible={showNotes} // PROP NUEVA
                              />
                           ))}
                        </div>
@@ -563,22 +562,21 @@ export function ShoppingList({ list }: ShoppingListProps) {
                   <span>Productos comprados ({checkedItems.length})</span>
                 </button>
                 {showCompleted && <div className="space-y-2 opacity-75 grayscale-[0.3] transition-all duration-300">{checkedItems.map((item) => (
-                      <ShoppingItem 
-                        key={item.id} 
-                        item={item} 
-                        onToggle={handleToggleItem} 
-                        onDelete={handleDeleteItem} 
-                        onUpdateQuantity={handleUpdateQuantity} 
-                        onAddToFavorites={handleAddToFavorites} 
-                        onAssign={handleAssignItem} 
-                        onAddImage={handleAddImage} 
-                        onAddNote={handleAddNote} 
-                        assignablePeople={assignablePeople} 
-                        assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null} 
-                        addedByProfile={profilesCache.get(item.added_by)} 
-                        checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null} 
+                      <ShoppingItem
+                        key={item.id}
+                        item={item}
+                        onToggle={handleToggleItem}
+                        onDelete={handleDeleteItem}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        onAddToFavorites={handleAddToFavorites}
+                        onAssign={handleAssignItem}
+                        onAddImage={handleAddImage}
+                        onAddNote={handleAddNote}
+                        assignablePeople={assignablePeople}
+                        assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
+                        addedByProfile={profilesCache.get(item.added_by)}
+                        checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null}
                         isDragEnabled={false}
-                        isNoteVisible={showNotes}
                       />
                     ))}</div>}
               </div>
