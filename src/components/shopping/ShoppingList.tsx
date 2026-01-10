@@ -4,10 +4,10 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ShoppingBag, Users, Share2, MoreVertical,
-  Trash2, Edit2, Copy, Check, QrCode, Link as LinkIcon,
+  Trash2, Edit2, Copy, Check, Link as LinkIcon,
   ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, Undo2,
-  Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X, ShoppingCart,
-  FileText, UserPlus, Store
+  Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X,
+  FileText, Store
 } from 'lucide-react'
 import { ShoppingItem, AssignablePerson } from './ShoppingItem'
 import { AddItemForm } from './AddItemForm'
@@ -148,6 +148,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   // Estados para scroll y visibilidad de controles
   const [isControlsVisible, setIsControlsVisible] = useState(true)
+  const [isInputActive, setIsInputActive] = useState(false) // Nuevo estado para favoritos
   const lastScrollY = useRef(0)
 
   // Estados para funcionalidades especificas
@@ -180,16 +181,26 @@ export function ShoppingList({ list }: ShoppingListProps) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  // Control de scroll para ocultar UI
+  // Control de scroll para ocultar UI (con fix de rebote)
   const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const currentScrollY = e.currentTarget.scrollTop
-    // Ocultar si bajamos scroll (> 20px)
-    if (currentScrollY > lastScrollY.current && currentScrollY > 20) {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    
+    // Fix: Si estamos cerca del final, forzar mostrar controles
+    // Esto evita el "baile" o vibración cuando el footer desaparece/aparece cambiando la altura del viewport
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+
+    if (isNearBottom) {
+      if (!isControlsVisible) setIsControlsVisible(true)
+      lastScrollY.current = scrollTop
+      return
+    }
+
+    if (scrollTop > lastScrollY.current && scrollTop > 20) {
       setIsControlsVisible(false)
-    } else if (currentScrollY < lastScrollY.current || currentScrollY < 20) {
+    } else if (scrollTop < lastScrollY.current || scrollTop < 20) {
       setIsControlsVisible(true)
     }
-    lastScrollY.current = currentScrollY
+    lastScrollY.current = scrollTop
   }
 
   // Filtrar items por búsqueda
@@ -204,8 +215,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   const uncheckedItems = useMemo(() => filteredItems.filter((item) => !item.checked), [filteredItems])
   const checkedItems = useMemo(() => filteredItems.filter((item) => item.checked), [filteredItems])
-  const progress = useMemo(() => items.length > 0 ? (items.filter(i => i.checked).length / items.length) * 100 : 0, [items])
-
+  
   // Función para normalizar categoría (manejar legacy y autodetectar)
   const normalizeCategory = useCallback((item: ListItem): CategoryId => {
     // Si tiene categoría válida del sistema, usarla
@@ -788,7 +798,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Header */}
+      {/* Header sin barra de progreso */}
       <header className="p-4 border-b border-gray-100 bg-background z-10 flex-shrink-0">
         {/* Barra de búsqueda expandible */}
         {showSearch ? (
@@ -821,7 +831,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
             </button>
           </div>
         ) : (
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center relative">
                 <ShoppingBag className="w-5 h-5 text-primary" />
@@ -935,10 +945,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
             </button>
           </div>
         )}
-
-        <div className="h-2 bg-secondary rounded-full overflow-hidden">
-          <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
-        </div>
       </header>
 
       {user && (
@@ -1030,22 +1036,21 @@ export function ShoppingList({ list }: ShoppingListProps) {
               </DndContext>
             )}
 
-            {/* COMPLETADOS */}
+            {/* COMPLETADOS REDISEÑADOS */}
             {checkedItems.length > 0 && (
-              <div className="mt-6 border-t border-dashed border-gray-100 pt-4">
+              <div className="mt-8 pt-6 border-t-2 border-dashed border-border/50 bg-secondary/10 -mx-4 px-4 pb-10 rounded-t-3xl">
                 <button
                   onClick={() => setShowCompleted(!showCompleted)}
-                  className="flex items-center gap-2 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors w-full mb-3"
+                  className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors w-full mb-4"
                 >
-                  <div className="p-1 rounded bg-gray-100">
+                  <div className={`p-1.5 rounded-lg transition-colors ${showCompleted ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted'}`}>
                     {showCompleted ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </div>
-                  <span>Completados ({checkedItems.length})</span>
-                  <div className="h-px flex-1 bg-gray-100 ml-2" />
+                  <span>Productos comprados ({checkedItems.length})</span>
                 </button>
 
                 {showCompleted && (
-                  <div className="space-y-2 opacity-60">
+                  <div className="space-y-2 opacity-75 grayscale-[0.3] transition-all duration-300">
                     {checkedItems.map((item) => (
                       <ShoppingItem
                         key={item.id}
@@ -1095,9 +1100,19 @@ export function ShoppingList({ list }: ShoppingListProps) {
             </div>
           </div>
         )}
-        <FavoriteItems favorites={favoriteItems} isLoading={favoritesLoading} onAddToList={handleAddFromFavorite} onRemove={removeFavoriteItem} />
+        
+        {/* Favoritos: Solo visibles si el input está activo */}
+        <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isInputActive ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
+          <FavoriteItems favorites={favoriteItems} isLoading={favoritesLoading} onAddToList={handleAddFromFavorite} onRemove={removeFavoriteItem} />
+        </div>
+
         {/* Pasamos la prop de visibilidad */}
-        <AddItemForm onAdd={handleAddItem} suggestionsSource={favoriteItems} isVisible={isControlsVisible} />
+        <AddItemForm 
+          onAdd={handleAddItem} 
+          suggestionsSource={favoriteItems} 
+          isVisible={isControlsVisible} 
+          onFocusChange={setIsInputActive}
+        />
       </div>
 
       {/* MODALES DE SOPORTE */}
