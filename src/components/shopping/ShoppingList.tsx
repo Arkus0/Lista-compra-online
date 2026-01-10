@@ -8,7 +8,7 @@ import {
   Trash2, Edit2, Check, Link as LinkIcon,
   ChevronDown, ChevronRight, LayoutGrid, Undo2,
   Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X,
-  FileText, Zap, Plus, Eye, EyeOff, Star, Minus
+  FileText, Zap, Plus, Eye, EyeOff, Star, Minus, ArrowLeft
 } from 'lucide-react'
 import { ShoppingItem, AssignablePerson } from './ShoppingItem'
 import { AddItemDrawer } from './AddItemDrawer'
@@ -589,14 +589,20 @@ export function ShoppingList({ list }: ShoppingListProps) {
             </div>
           ) : (
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/lists"
+                  className="w-10 h-10 rounded-xl bg-secondary hover:bg-hover flex items-center justify-center text-muted transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Link>
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center relative">
                   <ShoppingBag className="w-5 h-5 text-primary" />
                   <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-background ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
                 </div>
                 <div>
                   <h1 className="font-bold text-lg">{list.name}</h1>
-                  <div className="flex items-center gap-2"><p className="text-sm text-gray-500">{items.length} productos</p></div>
+                  <p className="text-xs text-muted-foreground">{items.length} productos</p>
                 </div>
               </div>
 
@@ -620,14 +626,15 @@ export function ShoppingList({ list }: ShoppingListProps) {
                 </button>
 
                 {presenceUsers.length > 0 && <PresenceIndicator users={presenceUsers} maxVisible={3} />}
-                <button onClick={openCollaboratorsModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><Users className="w-5 h-5" /></button>
-                <button onClick={openShareModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><Share2 className="w-5 h-5" /></button>
+                <button onClick={openShareModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted" title="Compartir"><Share2 className="w-5 h-5" /></button>
                 <button onClick={toggleMenu} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><MoreVertical className="w-5 h-5" /></button>
                 
                 {showMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
                     <div className="absolute top-12 right-0 w-56 bg-card border border-border rounded-xl shadow-xl z-20 py-2 animate-in fade-in slide-in-from-top-2">
+                       <button onClick={() => { openCollaboratorsModal(); setShowMenu(false) }} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" /> Colaboradores</button>
+                       <div className="border-t border-border my-1" />
                        {uncheckedItems.length > 0 && <button onClick={handleMarkAllComplete} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><CheckCheck className="w-4 h-4 text-green-500" /> Marcar todo completado</button>}
                        {checkedItems.length > 0 && <button onClick={handleClearCompleted} className="w-full px-4 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-2"><Eraser className="w-4 h-4 text-orange-500" /> Limpiar completados ({checkedItems.length})</button>}
                        {(uncheckedItems.length > 0 || checkedItems.length > 0) && <div className="border-t border-border my-1" />}
