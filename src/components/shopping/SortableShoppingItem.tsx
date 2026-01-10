@@ -6,16 +6,15 @@ import { CSS } from '@dnd-kit/utilities'
 import { ShoppingItem, AssignablePerson } from './ShoppingItem'
 import { ListItem, Profile } from '@/lib/supabase/types'
 
-// Type extendido localmente
-type ListItemWithImage = ListItem & { image_url?: string | null }
-
 interface SortableShoppingItemProps {
-  item: ListItemWithImage
+  item: ListItem
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
   onAddToFavorites?: (item: ListItem) => void
   onAssign?: (itemId: string, userId: string | null) => void
+  onAddImage?: (itemId: string) => void
+  onAddNote?: (itemId: string) => void
   assignablePeople?: AssignablePerson[]
   assignedToProfile?: Profile | null
   addedByProfile?: Profile | null
@@ -29,6 +28,8 @@ function SortableShoppingItemComponent({
   onUpdateQuantity,
   onAddToFavorites,
   onAssign,
+  onAddImage,
+  onAddNote,
   assignablePeople,
   assignedToProfile,
   addedByProfile,
@@ -60,6 +61,8 @@ function SortableShoppingItemComponent({
         onUpdateQuantity={onUpdateQuantity}
         onAddToFavorites={onAddToFavorites}
         onAssign={onAssign}
+        onAddImage={onAddImage}
+        onAddNote={onAddNote}
         assignablePeople={assignablePeople}
         assignedToProfile={assignedToProfile}
         dragHandleProps={listeners}
@@ -80,6 +83,7 @@ export const SortableShoppingItem = memo(SortableShoppingItemComponent, (prevPro
     prevProps.item.quantity === nextProps.item.quantity &&
     prevProps.item.category === nextProps.item.category &&
     prevProps.item.image_url === nextProps.item.image_url &&
+    prevProps.item.note === nextProps.item.note &&
     prevProps.item.position === nextProps.item.position &&
     prevProps.item.checked_by === nextProps.item.checked_by &&
     prevProps.item.assigned_to === nextProps.item.assigned_to &&
@@ -88,6 +92,8 @@ export const SortableShoppingItem = memo(SortableShoppingItemComponent, (prevPro
     prevProps.onUpdateQuantity === nextProps.onUpdateQuantity &&
     prevProps.onAddToFavorites === nextProps.onAddToFavorites &&
     prevProps.onAssign === nextProps.onAssign &&
+    prevProps.onAddImage === nextProps.onAddImage &&
+    prevProps.onAddNote === nextProps.onAddNote &&
     prevProps.addedByProfile?.id === nextProps.addedByProfile?.id &&
     prevProps.checkedByProfile?.id === nextProps.checkedByProfile?.id &&
     prevProps.assignedToProfile?.id === nextProps.assignedToProfile?.id &&

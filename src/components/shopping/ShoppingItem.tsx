@@ -7,9 +7,6 @@ import {
 } from 'lucide-react'
 import { ListItem, Profile } from '@/lib/supabase/types'
 
-// Extendemos el tipo ListItem para incluir image_url y assigned_to
-type ListItemWithImage = ListItem & { image_url?: string | null }
-
 // Tipo simple para personas asignables
 export interface AssignablePerson {
   id: string
@@ -18,7 +15,7 @@ export interface AssignablePerson {
 }
 
 interface ShoppingItemProps {
-  item: ListItemWithImage
+  item: ListItem
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
