@@ -55,33 +55,30 @@ export function AddItemDrawer({
       
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-50 backdrop-blur-[2px]" />
-        <Drawer.Content className="bg-background flex flex-col rounded-t-[10px] h-fit mt-24 fixed bottom-0 left-0 right-0 z-50 outline-none max-h-[90vh]">
+        <Drawer.Content className="bg-background flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 z-50 outline-none max-h-[85vh]">
           {/* Handle visual */}
-          <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted-foreground/20 mt-4 mb-2" />
-          
-          <div className="p-4 overflow-y-auto">
-            <Drawer.Title className="font-bold text-lg mb-4 text-center">Añadir Productos</Drawer.Title>
-            
+          <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted-foreground/20 mt-3 mb-1" />
+
+          <div className="px-4 pt-2 pb-[env(safe-area-inset-bottom,8px)] overflow-y-auto">
+            <Drawer.Title className="font-bold text-lg mb-3 text-center">Añadir Productos</Drawer.Title>
+
             {/* Sección de Favoritos dentro del Drawer */}
-            <div className="mb-6">
+            <div className="mb-4">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Frecuentes</h3>
-                <FavoriteItems 
-                    favorites={favoriteItems} 
-                    isLoading={isLoadingFavorites} 
-                    onAddToList={onAddFromFavorite} 
-                    onRemove={onRemoveFavorite} 
+                <FavoriteItems
+                    favorites={favoriteItems}
+                    isLoading={isLoadingFavorites}
+                    onAddToList={onAddFromFavorite}
+                    onRemove={onRemoveFavorite}
                 />
             </div>
 
             {/* El formulario principal */}
-            <AddItemForm 
+            <AddItemForm
                 onAdd={handleAddWrapper}
                 onOpenCatalog={handleOpenCatalogWrapper}
                 suggestionsSource={favoriteItems}
             />
-            
-            {/* Espacio extra para teclados en iOS si fuera necesario, aunque Vaul lo maneja bien */}
-            <div className="h-4" />
           </div>
         </Drawer.Content>
       </Drawer.Portal>

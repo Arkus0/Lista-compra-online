@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
-import { Plus, ChevronUp, Loader2, Mic, MicOff, ScanBarcode, Star, LayoutGrid, X } from 'lucide-react'
+import { Plus, ChevronUp, Loader2, Mic, ScanBarcode, Star, LayoutGrid, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { CATEGORIES, detectCategory, CategoryId, searchProducts } from '@/lib/constants'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
@@ -141,10 +141,14 @@ function AddItemFormComponent({
     inputRef.current?.focus()
   }, [])
 
-  const handleVoiceButton = useCallback(() => {
+  // Push-to-talk: iniciar al presionar, detener al soltar
+  const handleVoiceStart = useCallback(() => {
+    if (!isListening) startListening()
+  }, [isListening, startListening])
+
+  const handleVoiceEnd = useCallback(() => {
     if (isListening) stopListening()
-    else startListening()
-  }, [isListening, startListening, stopListening])
+  }, [isListening, stopListening])
 
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
@@ -216,7 +220,7 @@ function AddItemFormComponent({
           </button>
 
           {/* Input Principal */}
-          <div className="flex-1 relative">
+          <div className="flex-1">
             <input
               ref={inputRef}
               type="text"
@@ -226,35 +230,43 @@ function AddItemFormComponent({
                 if (e.target.value.trim() === '') { setManuallySelected(false); setSelectedCategory('other') }
               }}
               placeholder={isListening ? "Escuchando..." : "Añadir item..."}
-              className={`w-full h-11 rounded-xl bg-secondary px-4 pr-10 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground ${isListening ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
+              className={`w-full h-11 rounded-xl bg-secondary px-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground ${isListening ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
               autoComplete="off"
-              // AutoFocus es seguro dentro de un Drawer abierto
               autoFocus
             />
-            {/* Botón X para limpiar el input */}
-            {name && (
-              <button
-                type="button"
-                onClick={() => {
-                  setName('')
-                  setManuallySelected(false)
-                  setSelectedCategory('other')
-                  setShowSuggestions(false)
-                  inputRef.current?.focus()
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted/50 transition-colors"
-              >
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
           </div>
+
+          {/* Botón X para limpiar (cuando hay texto) */}
+          {name && (
+            <button
+              type="button"
+              onClick={() => {
+                setName('')
+                setManuallySelected(false)
+                setSelectedCategory('other')
+                setShowSuggestions(false)
+                inputRef.current?.focus()
+              }}
+              className="flex-shrink-0 w-11 h-11 rounded-xl bg-secondary text-muted-foreground hover:text-danger hover:bg-danger/10 flex items-center justify-center transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
 
           {/* Botones de acción derecha */}
           {!name && (
             <>
               {voiceSupported && (
-                <button type="button" onClick={handleVoiceButton} className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isListening ? 'text-white bg-red-500 animate-pulse' : 'text-muted-foreground bg-secondary hover:text-primary'}`}>
-                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                <button
+                  type="button"
+                  onMouseDown={handleVoiceStart}
+                  onMouseUp={handleVoiceEnd}
+                  onMouseLeave={handleVoiceEnd}
+                  onTouchStart={handleVoiceStart}
+                  onTouchEnd={handleVoiceEnd}
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all select-none ${isListening ? 'text-white bg-red-500 animate-pulse scale-110' : 'text-muted-foreground bg-secondary hover:text-primary active:scale-95'}`}
+                >
+                  <Mic className="w-5 h-5" />
                 </button>
               )}
               <button type="button" onClick={() => setShowBarcodeScanner(true)} className="w-11 h-11 rounded-xl bg-secondary text-muted-foreground hover:text-primary flex items-center justify-center"><ScanBarcode className="w-5 h-5" /></button>
