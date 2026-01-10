@@ -359,7 +359,7 @@ export interface RecipeIngredient {
 
 export interface UserRecipe {
   id: string
-  user_id: string
+  owner_id: string
   title: string
   description: string | null
   image_url: string | null
@@ -367,12 +367,27 @@ export interface UserRecipe {
   source_type: 'themealdb' | 'url' | 'manual'
   external_id: string | null
   servings: number
+  prep_time: number | null
+  cook_time: number | null
   ingredients: RecipeIngredient[]
   instructions: string | null
   category: string | null
   cuisine: string | null
+  share_code: string | null
   created_at: string
   updated_at: string
+}
+
+export interface RecipeCollaborator {
+  id: string
+  recipe_id: string
+  user_id: string
+  role: 'viewer' | 'editor'
+  created_at: string
+}
+
+export type UserRecipeWithOwner = UserRecipe & {
+  owner?: Profile
 }
 
 export interface TheMealDBRecipe {

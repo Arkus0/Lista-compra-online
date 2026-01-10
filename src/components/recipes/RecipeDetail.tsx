@@ -1,6 +1,6 @@
 'use client'
 
-import { X, ChefHat, ShoppingCart } from 'lucide-react'
+import { X, ChefHat, ShoppingCart, BookmarkPlus } from 'lucide-react'
 import { TheMealDBRecipe, RecipeIngredient } from '@/lib/supabase/types'
 import { Button } from '@/components/ui/Button'
 
@@ -8,9 +8,10 @@ interface RecipeDetailProps {
   recipe: TheMealDBRecipe | null
   onClose: () => void
   onExportToList: (ingredients: RecipeIngredient[]) => void
+  onSave?: () => void
 }
 
-export function RecipeDetail({ recipe, onClose, onExportToList }: RecipeDetailProps) {
+export function RecipeDetail({ recipe, onClose, onExportToList, onSave }: RecipeDetailProps) {
   if (!recipe) return null
 
   const handleExport = () => {
@@ -111,16 +112,28 @@ export function RecipeDetail({ recipe, onClose, onExportToList }: RecipeDetailPr
         <div className="h-24" />
       </div>
 
-      {/* Botón de exportar fijo */}
+      {/* Botones fijos */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-md border-t border-border">
-        <Button
-          onClick={handleExport}
-          disabled={recipe.ingredients.length === 0}
-          className="w-full h-12 text-base font-semibold"
-        >
-          <ShoppingCart className="w-5 h-5 mr-2" />
-          Añadir ingredientes a lista
-        </Button>
+        <div className="flex gap-2">
+          {onSave && (
+            <Button
+              onClick={onSave}
+              variant="secondary"
+              className="h-12 px-4"
+            >
+              <BookmarkPlus className="w-5 h-5 mr-2" />
+              Guardar
+            </Button>
+          )}
+          <Button
+            onClick={handleExport}
+            disabled={recipe.ingredients.length === 0}
+            className={`h-12 text-base font-semibold ${onSave ? 'flex-1' : 'w-full'}`}
+          >
+            <ShoppingCart className="w-5 h-5 mr-2" />
+            Añadir a lista
+          </Button>
+        </div>
       </div>
     </div>
   )

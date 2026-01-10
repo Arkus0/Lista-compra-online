@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Search, ChefHat, Shuffle, Link2, Loader2, X, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+import { Search, ChefHat, Shuffle, Link2, Loader2, X, ArrowRight, BookOpen } from 'lucide-react'
 import { useRecipes } from '@/hooks/useRecipes'
 import { RecipeCard } from './RecipeCard'
 import { RecipeDetail } from './RecipeDetail'
@@ -163,13 +164,22 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
           <ChefHat className="w-5 h-5 text-primary" />
           Recetas
         </h3>
-        <button
-          onClick={() => setShowUrlImport(true)}
-          className="text-sm text-primary font-medium flex items-center gap-1 hover:underline"
-        >
-          <Link2 className="w-4 h-4" />
-          Importar URL
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowUrlImport(true)}
+            className="text-sm text-primary font-medium flex items-center gap-1 hover:underline"
+          >
+            <Link2 className="w-4 h-4" />
+            Importar
+          </button>
+          <Link
+            href="/recipes"
+            className="text-sm text-primary font-medium flex items-center gap-1 hover:underline"
+          >
+            <BookOpen className="w-4 h-4" />
+            Mis recetas
+          </Link>
+        </div>
       </div>
 
       {/* Ayuda traducción */}
