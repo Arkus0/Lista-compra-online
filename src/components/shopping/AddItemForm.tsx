@@ -45,16 +45,13 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
 
   // Detección avanzada de viewport para móviles (Teclado)
   useEffect(() => {
-    if (!window.visualViewport) return;
-
-    const handleResize = () => {
-      // Si el viewport cambia drásticamente (teclado), nos aseguramos de estar visibles
-      if (document.activeElement === inputRef.current) {
-         // Opcional: Scroll al fondo si fuera necesario, pero fixed bottom suele bastar
+    if (typeof window !== 'undefined' && window.visualViewport) {
+      const handleResize = () => {
+        // Forzar actualización si es necesario
       }
+      window.visualViewport.addEventListener('resize', handleResize)
+      return () => window.visualViewport?.removeEventListener('resize', handleResize)
     }
-    window.visualViewport.addEventListener('resize', handleResize)
-    return () => window.visualViewport?.removeEventListener('resize', handleResize)
   }, [])
 
   const { isListening, transcript, isSupported: voiceSupported, startListening, stopListening } = useVoiceInput()
@@ -146,8 +143,15 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
     }
   }
 
-  const handleSuggestionClick = async (suggestion: any) => {
-    const categoryToUse = suggestion.category ? (suggestion.category as CategoryId) : 'other'
+  const handleCategorySelect = useCallback((categoryId: CategoryId) => {
+    setSelectedCategory(categoryId)
+    setShowCategories(false)
+    setManuallySelected(true)
+    inputRef.current?.focus()
+  }, [])
+
+  const toggleCategories = useCallback(() => {
+    setShowCategories(prev => !prev)
     setShowSuggestions(false)
   }, [])
 
@@ -239,7 +243,6 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
             />
           </div>
 
-          {/* Botones extra solo visibles si hay foco/teclado para ahorrar espacio visual */}
           {isInputFocused && (
             <div className="flex items-center gap-1 flex-shrink-0 animate-in fade-in slide-in-from-right-2 duration-200">
               {voiceSupported && <button type="button" onClick={handleVoiceButton} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isListening ? 'text-white bg-red-500 animate-pulse' : 'text-muted hover:text-primary hover:bg-secondary'}`}>{isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}</button>}
