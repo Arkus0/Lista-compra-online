@@ -7,7 +7,7 @@ import {
   Trash2, Edit2, Check, Link as LinkIcon,
   ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, Undo2,
   Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X,
-  FileText, Store, Zap
+  FileText, Store, Zap, Plus
 } from 'lucide-react'
 import { ShoppingItem, AssignablePerson } from './ShoppingItem'
 import { AddItemForm } from './AddItemForm'
@@ -46,16 +46,50 @@ import { SortableShoppingItem } from './SortableShoppingItem'
 import { sendPushNotification } from '@/lib/notifications'
 import { CATEGORIES, CategoryId, detectCategory, getSmartSuggestions, CommonProduct } from '@/lib/constants'
 
-// --- DATOS DEL CATÁLOGO RÁPIDO (GAP 1) ---
-// En una app real esto podría venir de base de datos, pero para UI instantánea lo definimos aquí o en constantes
+// --- DATOS DEL CATÁLOGO RÁPIDO (CORREGIDO) ---
+// Se han añadido las claves faltantes para cumplir con Record<CategoryId, string[]>
 const QUICK_CATALOG: Record<CategoryId, string[]> = {
-  'fruits-veg': ['Manzanas', 'Plátanos', 'Lechuga', 'Tomates', 'Zanahorias', 'Cebollas', 'Patatas', 'Aguacate', 'Limones', 'Ajos'],
-  'meat-fish': ['Pollo', 'Ternera', 'Carne picada', 'Jamón', 'Pechuga de pavo', 'Salmón', 'Atún', 'Huevos', 'Bacon'],
-  'dairy': ['Leche', 'Queso', 'Yogur', 'Mantequilla', 'Nata', 'Queso rallado'],
-  'pantry': ['Pan', 'Arroz', 'Pasta', 'Aceite', 'Sal', 'Azúcar', 'Café', 'Cereales', 'Harina', 'Galletas'],
-  'beverages': ['Agua', 'Refrescos', 'Cerveza', 'Vino', 'Zumo', 'Té'],
-  'household': ['Papel higiénico', 'Detergente', 'Lavavajillas', 'Servilletas', 'Bolsas basura', 'Champú', 'Gel', 'Pasta dientes'],
-  'other': ['Pilas', 'Bombillas', 'Comida gato/perro']
+  'fruits-veg': [
+    'Manzanas', 'Plátanos', 'Lechuga', 'Tomates', 'Zanahorias', 
+    'Cebollas', 'Patatas', 'Aguacate', 'Limones', 'Ajos', 
+    'Pimientos', 'Naranjas', 'Calabacín', 'Pepino'
+  ],
+  'meat-fish': [
+    'Pollo', 'Ternera', 'Carne picada', 'Jamón serrano', 'Jamón cocido', 
+    'Pechuga de pavo', 'Salmón', 'Atún', 'Huevos', 'Bacon', 
+    'Lomo', 'Salchichas', 'Merluza', 'Gambas'
+  ],
+  'dairy': [
+    'Leche entera', 'Leche semi', 'Queso', 'Yogur natural', 'Yogur sabores', 
+    'Mantequilla', 'Nata cocinar', 'Queso rallado', 'Leche vegetal', 'Queso fresco'
+  ],
+  'pantry': [
+    'Arroz', 'Pasta', 'Pan', 'Aceite de oliva', 'Azúcar', 
+    'Sal', 'Harina', 'Tomate frito', 'Legumbres', 'Cereales', 
+    'Galletas', 'Café molido', 'Cacao en polvo', 'Especias'
+  ],
+  'frozen': [
+    'Pizza', 'Guisantes', 'Helado', 'Verduras salteadas', 'Croquetas', 
+    'Pescado congelado', 'Patatas fritas', 'Hielo', 'Frutos rojos'
+  ],
+  'beverages': [
+    'Agua mineral', 'Refrescos', 'Cerveza', 'Vino tinto', 'Vino blanco', 
+    'Zumo de naranja', 'Zumo de piña', 'Gaseosa', 'Aquarius'
+  ],
+  'household': [
+    'Papel higiénico', 'Detergente ropa', 'Suavizante', 'Pastillas lavavajillas', 
+    'Papel de cocina', 'Bolsas de basura', 'Fregasuelos', 'Lejía', 'Estropajos'
+  ],
+  'hygiene': [
+    'Gel de ducha', 'Champú', 'Pasta de dientes', 'Desodorante', 'Jabón de manos', 
+    'Compresas/Tampones', 'Espuma afeitar', 'Cuchillas', 'Crema hidratante'
+  ],
+  'pets': [
+    'Comida perro', 'Comida gato', 'Arena de gato', 'Premios mascotas', 'Bolsas caca'
+  ],
+  'other': [
+    'Pilas', 'Bombillas', 'Velas', 'Papel aluminio', 'Papel film'
+  ]
 }
 
 interface ShoppingListProps {
