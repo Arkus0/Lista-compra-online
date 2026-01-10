@@ -92,22 +92,33 @@ function ShoppingItemComponent({
   }
 
   const handleDelete = useCallback(() => {
+    // Gap 3: Haptic feedback al borrar
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(50) 
+    }
     setIsDeleting(true)
     setShowActionMenu(false)
     setTimeout(() => onDelete(item.id), 200)
   }, [item.id, onDelete])
 
   const handleToggle = useCallback(() => {
+    // Gap 3: Haptic feedback satisfactorio
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        // Doble vibración corta para éxito
+        navigator.vibrate([30, 50, 30]) 
+    }
     onToggle(item.id)
   }, [item.id, onToggle])
 
   const handleDecrement = useCallback(() => {
     if (item.quantity > 1) {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
       onUpdateQuantity(item.id, item.quantity - 1)
     }
   }, [item.id, item.quantity, onUpdateQuantity])
 
   const handleIncrement = useCallback(() => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
     onUpdateQuantity(item.id, item.quantity + 1)
   }, [item.id, item.quantity, onUpdateQuantity])
 
@@ -124,11 +135,14 @@ function ShoppingItemComponent({
     <>
       <div
         className={`
-          flex items-center gap-2 sm:gap-3 p-3 bg-card rounded-xl border border-border-light
-          transition-all duration-200 group relative
-          hover:border-border hover:shadow-sm
-          ${item.checked ? 'opacity-60 bg-secondary/20' : ''}
-          ${isDeleting ? 'scale-95 opacity-0' : ''}
+          flex items-center gap-2 sm:gap-3 p-3 bg-card rounded-xl border
+          transition-all duration-300 group relative
+          hover:shadow-md
+          ${item.checked 
+            ? 'opacity-60 bg-secondary/30 border-transparent scale-[0.98]' 
+            : 'bg-card border-border-light hover:border-primary/30 scale-100'
+          }
+          ${isDeleting ? 'scale-90 opacity-0' : ''}
         `}
         role="listitem"
         aria-label={`${item.name}${item.checked ? ', completado' : ''}`}
@@ -144,30 +158,30 @@ function ShoppingItemComponent({
           </div>
         )}
 
-        {/* Checkbox */}
+        {/* Checkbox Mejorado */}
         <button
           onClick={handleToggle}
           className={`
             w-6 h-6 rounded-lg border-2 flex items-center justify-center
-            transition-all duration-200 shrink-0
+            transition-all duration-300 shrink-0
             focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
             ${item.checked
-              ? 'bg-primary border-primary'
-              : 'border-muted-light hover:border-primary active:scale-95'
+              ? 'bg-primary border-primary rotate-0 scale-100'
+              : 'border-muted-light hover:border-primary active:scale-90 rotate-0'
             }
           `}
           aria-checked={item.checked}
           aria-label={`Marcar ${item.name} como ${item.checked ? 'pendiente' : 'completado'}`}
           role="checkbox"
         >
-          {item.checked && <Check className="w-3.5 h-3.5 text-white" />}
+          <Check className={`w-3.5 h-3.5 text-white transition-all duration-300 ${item.checked ? 'scale-100 opacity-100' : 'scale-50 opacity-0'}`} />
         </button>
 
         {/* Imagen miniatura (si existe) */}
         {item.image_url && (
           <button
             onClick={() => setShowImageModal(true)}
-            className="w-8 h-8 rounded-lg bg-secondary flex-shrink-0 overflow-hidden border border-border-light"
+            className="w-10 h-10 rounded-lg bg-secondary flex-shrink-0 overflow-hidden border border-border-light shadow-sm"
             aria-label="Ver imagen del producto"
           >
             <img src={item.image_url} alt="" className="w-full h-full object-cover" />
@@ -177,7 +191,7 @@ function ShoppingItemComponent({
         {/* Contenido principal: Nombre prominente */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className={`text-base font-medium truncate ${item.checked ? 'line-through text-muted' : 'text-foreground'}`}>
+            <p className={`text-base font-medium truncate transition-all ${item.checked ? 'line-through text-muted' : 'text-foreground'}`}>
               {item.name}
             </p>
             
@@ -215,7 +229,7 @@ function ShoppingItemComponent({
             )}
           </div>
           {/* Categoría debajo del nombre */}
-          {categoryColor && (
+          {categoryColor && !item.checked && (
             <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-md mt-0.5 ${categoryColor}`}>
               {item.category}
             </span>
@@ -226,20 +240,20 @@ function ShoppingItemComponent({
         <div className="flex items-center gap-0.5 bg-secondary rounded-lg p-0.5">
           <button
             onClick={handleDecrement}
-            className="w-6 h-6 rounded-md flex items-center justify-center
-                      hover:bg-hover transition-colors disabled:opacity-30"
+            className="w-7 h-7 rounded-md flex items-center justify-center
+                      hover:bg-hover transition-colors disabled:opacity-30 active:scale-95"
             disabled={item.quantity <= 1}
             aria-label="Disminuir cantidad"
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
-          <span className="w-7 text-center text-sm font-semibold tabular-nums">
+          <span className="w-6 text-center text-sm font-semibold tabular-nums">
             {item.quantity}
           </span>
           <button
             onClick={handleIncrement}
-            className="w-6 h-6 rounded-md flex items-center justify-center
-                      hover:bg-hover transition-colors"
+            className="w-7 h-7 rounded-md flex items-center justify-center
+                      hover:bg-hover transition-colors active:scale-95"
             aria-label="Aumentar cantidad"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -415,7 +429,7 @@ export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) =
     prevProps.item.unit === nextProps.item.unit &&
     prevProps.item.checked_by === nextProps.item.checked_by &&
     prevProps.item.assigned_to === nextProps.item.assigned_to &&
-    prevProps.item.note === nextProps.item.note && // <--- AÑADIDO CHEQUEO DE NOTA
+    prevProps.item.note === nextProps.item.note &&
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onDelete === nextProps.onDelete &&
     prevProps.onUpdateQuantity === nextProps.onUpdateQuantity &&
