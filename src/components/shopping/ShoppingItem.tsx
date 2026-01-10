@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, memo, useCallback, useRef, useEffect } from 'react'
-import { Check, Trash2, GripVertical, Minus, Plus, User, Star, Image as ImageIcon, ExternalLink, UserPlus, X } from 'lucide-react'
+import { Check, Trash2, GripVertical, Minus, Plus, User, Star, UserPlus, X } from 'lucide-react'
 import { ListItem, Profile } from '@/lib/supabase/types'
+import { Tooltip } from '@/components/ui/Tooltip'
 
 // Extendemos el tipo ListItem para incluir image_url y assigned_to
 type ListItemWithImage = ListItem & { image_url?: string | null }
@@ -118,32 +119,45 @@ function ShoppingItemComponent({
     <>
       <div
         className={`
-          flex items-center gap-3 p-3 bg-background rounded-xl border border-gray-100
+          flex items-center gap-3 p-3 bg-background rounded-xl border border-border-light
           transition-all duration-200 group relative overflow-hidden
-          ${item.checked ? 'opacity-60' : ''}
+          hover:border-border hover:shadow-sm
+          ${item.checked ? 'opacity-60 bg-secondary/30' : ''}
           ${isDeleting ? 'scale-95 opacity-0' : ''}
         `}
+        role="listitem"
+        aria-label={`${item.name}${item.checked ? ', completado' : ''}`}
       >
         {/* Drag handle - Solo si está habilitado */}
         {isDragEnabled && (
-          <div {...dragHandleProps} className="text-muted-light cursor-grab active:cursor-grabbing touch-none flex-shrink-0">
-            <GripVertical className="w-5 h-5" />
-          </div>
+          <Tooltip content="Arrastra para reordenar" position="right">
+            <div
+              {...dragHandleProps}
+              className="drag-hint text-muted-light cursor-grab active:cursor-grabbing touch-none flex-shrink-0 p-1 -ml-1 rounded hover:bg-secondary transition-colors"
+              aria-label="Arrastrar para reordenar"
+            >
+              <GripVertical className="w-5 h-5" />
+            </div>
+          </Tooltip>
         )}
 
-        {/* Checkbox */}
+        {/* Checkbox mejorado con animación */}
         <button
           onClick={handleToggle}
           className={`
-            w-6 h-6 rounded-lg border-2 flex items-center justify-center
-            transition-all duration-200 shrink-0
+            w-7 h-7 rounded-lg border-2 flex items-center justify-center
+            transition-all duration-200 shrink-0 ripple
+            focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
             ${item.checked
-              ? 'bg-primary border-primary'
-              : 'border-muted-light hover:border-primary'
+              ? 'bg-primary border-primary scale-100'
+              : 'border-muted-light hover:border-primary hover:bg-primary/5 active:scale-95'
             }
           `}
+          aria-checked={item.checked}
+          aria-label={`Marcar ${item.name} como ${item.checked ? 'pendiente' : 'completado'}`}
+          role="checkbox"
         >
-          {item.checked && <Check className="w-4 h-4 text-white" />}
+          {item.checked && <Check className="w-4 h-4 text-white check-bounce" />}
         </button>
 
         {/* IMAGEN DEL PRODUCTO (Miniatura) */}
@@ -186,32 +200,40 @@ function ShoppingItemComponent({
           </div>
         </div>
 
-        {/* Asignación de persona - Botón sutil */}
+        {/* Asignación de persona - Botón mejorado */}
         {onAssign && assignablePeople.length > 0 && (
           <div className="relative" ref={assignMenuRef}>
-            <button
-              onClick={() => setShowAssignMenu(!showAssignMenu)}
-              className={`
-                flex items-center justify-center rounded-full transition-all
-                ${assignedToProfile
-                  ? 'w-7 h-7 bg-blue-100 dark:bg-blue-900/30 hover:ring-2 hover:ring-blue-300'
-                  : 'w-7 h-7 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 opacity-50 hover:opacity-100'
-                }
-              `}
-              title={assignedToProfile ? `Asignado a ${assignedToProfile.name}` : 'Asignar a alguien'}
+            <Tooltip
+              content={assignedToProfile ? `Asignado a ${assignedToProfile.name}` : 'Asignar a alguien'}
+              position="top"
             >
-              {assignedToProfile ? (
-                assignedToProfile.avatar_url ? (
-                  <img src={assignedToProfile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+              <button
+                onClick={() => setShowAssignMenu(!showAssignMenu)}
+                className={`
+                  flex items-center justify-center rounded-full transition-all
+                  focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
+                  ${assignedToProfile
+                    ? 'w-8 h-8 bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-200 dark:ring-blue-700 hover:ring-blue-400'
+                    : 'w-8 h-8 bg-secondary hover:bg-hover border-2 border-dashed border-muted-light hover:border-primary'
+                  }
+                `}
+                aria-label={assignedToProfile ? `Asignado a ${assignedToProfile.name}. Pulsa para cambiar` : 'Asignar a alguien'}
+                aria-expanded={showAssignMenu}
+                aria-haspopup="listbox"
+              >
+                {assignedToProfile ? (
+                  assignedToProfile.avatar_url ? (
+                    <img src={assignedToProfile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                      {getInitials(assignedToProfile.name || 'U')}
+                    </span>
+                  )
                 ) : (
-                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                    {getInitials(assignedToProfile.name || 'U')}
-                  </span>
-                )
-              ) : (
-                <UserPlus className="w-3.5 h-3.5 text-gray-400" />
-              )}
-            </button>
+                  <UserPlus className="w-4 h-4 text-muted-light" />
+                )}
+              </button>
+            </Tooltip>
 
             {/* Menú de asignación */}
             {showAssignMenu && (
@@ -282,25 +304,31 @@ function ShoppingItemComponent({
         </div>
 
         {/* Action buttons - always visible on mobile, hover on desktop */}
-        <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           {onAddToFavorites && (
-            <button
-              onClick={handleAddToFavorites}
-              className="w-8 h-8 rounded-lg text-muted hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20
-                        flex items-center justify-center transition-colors active:scale-95"
-              title="Añadir a favoritos"
-            >
-              <Star className="w-4 h-4" />
-            </button>
+            <Tooltip content="Añadir a favoritos" position="top">
+              <button
+                onClick={handleAddToFavorites}
+                className="w-9 h-9 rounded-xl text-muted hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20
+                          flex items-center justify-center transition-all active:scale-90
+                          focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                aria-label="Añadir a favoritos"
+              >
+                <Star className="w-5 h-5" />
+              </button>
+            </Tooltip>
           )}
-          <button
-            onClick={handleDelete}
-            className="w-8 h-8 rounded-lg text-muted hover:text-danger hover:bg-danger/10
-                      flex items-center justify-center transition-colors active:scale-95"
-            title="Eliminar"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <Tooltip content="Eliminar" position="top">
+            <button
+              onClick={handleDelete}
+              className="w-9 h-9 rounded-xl text-muted hover:text-danger hover:bg-danger/10
+                        flex items-center justify-center transition-all active:scale-90
+                        focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2"
+              aria-label={`Eliminar ${item.name}`}
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
