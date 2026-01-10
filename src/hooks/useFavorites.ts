@@ -60,7 +60,10 @@ export function useFavorites(userId?: string): UseFavoritesReturn {
   // Añadir item favorito
   const addFavoriteItem = useCallback(
     async (item: Omit<UserFavoriteItem, 'id' | 'user_id' | 'created_at'>): Promise<boolean> => {
-      if (!userId) return false
+      if (!userId) {
+        console.error('addFavoriteItem: No user ID provided')
+        return false
+      }
 
       const supabase = createClient()
 
@@ -74,9 +77,12 @@ export function useFavorites(userId?: string): UseFavoritesReturn {
         .single()
 
       if (error) {
-        // Si ya existe, no es error
-        if (error.code === '23505') return true
-        console.error('Error adding favorite item:', error)
+        // Si ya existe (violación de constraint único), considerarlo éxito
+        if (error.code === '23505') {
+          console.log('Favorite item already exists:', item.name)
+          return true
+        }
+        console.error('Error adding favorite item:', error.message, error.details, error.hint)
         return false
       }
 

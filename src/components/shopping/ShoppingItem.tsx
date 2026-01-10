@@ -74,18 +74,34 @@ function ShoppingItemComponent({
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const menuContentRef = useRef<HTMLDivElement>(null)
 
-  // Cerrar menú al hacer clic fuera
+  // Cerrar menú al hacer clic fuera o con Escape
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      const isOutsideButton = !menuRef.current || !menuRef.current.contains(target)
+      const isOutsideMenu = !menuContentRef.current || !menuContentRef.current.contains(target)
+
+      if (isOutsideButton && isOutsideMenu) {
         setShowActionMenu(false)
         setShowAssignSubmenu(false)
       }
     }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowActionMenu(false)
+        setShowAssignSubmenu(false)
+        menuButtonRef.current?.focus()
+      }
+    }
     if (showActionMenu) {
       document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleKeyDown)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+        document.removeEventListener('keydown', handleKeyDown)
+      }
     }
   }, [showActionMenu])
 
@@ -127,9 +143,11 @@ function ShoppingItemComponent({
     onUpdateQuantity(item.id, item.quantity + 1)
   }, [item.id, item.quantity, onUpdateQuantity])
 
-  const handleAddToFavorites = useCallback(() => {
-    onAddToFavorites?.(item)
+  const handleAddToFavorites = useCallback(async () => {
     setShowActionMenu(false)
+    if (onAddToFavorites) {
+      await onAddToFavorites(item)
+    }
   }, [item, onAddToFavorites])
 
   const categoryColor = item.category
@@ -164,6 +182,8 @@ function ShoppingItemComponent({
         {/* Checkbox */}
         <button
           onClick={handleToggle}
+          aria-label={item.checked ? `Marcar ${item.name} como pendiente` : `Marcar ${item.name} como comprado`}
+          aria-pressed={item.checked}
           className={`
             w-6 h-6 rounded-lg border-2 flex items-center justify-center
             transition-all duration-300 shrink-0
@@ -267,6 +287,9 @@ function ShoppingItemComponent({
               }
               setShowActionMenu(!showActionMenu)
             }}
+            aria-label={`Opciones para ${item.name}`}
+            aria-haspopup="menu"
+            aria-expanded={showActionMenu}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-secondary"
           >
             <MoreVertical className="w-5 h-5" />
@@ -279,12 +302,18 @@ function ShoppingItemComponent({
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => { setShowActionMenu(false); setShowAssignSubmenu(false) }} />
           <div
+            ref={menuContentRef}
+            role="menu"
+            aria-label={`Acciones para ${item.name}`}
             className="fixed w-52 bg-card border border-border rounded-xl shadow-2xl z-[9999] py-1 animate-in fade-in slide-in-from-top-2 duration-150"
             style={{ top: menuPosition.top, right: menuPosition.right }}
           >
             {onAssign && assignablePeople.length > 0 && (
               <div className="relative">
                 <button
+                  role="menuitem"
+                  aria-haspopup="menu"
+                  aria-expanded={showAssignSubmenu}
                   onClick={() => setShowAssignSubmenu(!showAssignSubmenu)}
                   className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"
                 >
@@ -292,12 +321,12 @@ function ShoppingItemComponent({
                   <span className="flex-1">Asignar a...</span>
                 </button>
                 {showAssignSubmenu && (
-                  <div className="absolute left-full top-0 ml-1 w-48 bg-card border border-border rounded-xl shadow-xl z-[9999] py-1 animate-in fade-in slide-in-from-left-2 duration-150">
+                  <div role="menu" aria-label="Personas disponibles" className="absolute left-full top-0 ml-1 w-48 bg-card border border-border rounded-xl shadow-xl z-[9999] py-1 animate-in fade-in slide-in-from-left-2 duration-150">
                     {assignedToProfile && (
-                       <button onClick={() => handleAssign(null)} className="w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 text-danger"><X className="w-4 h-4" /> Quitar</button>
+                       <button role="menuitem" onClick={() => handleAssign(null)} className="w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 text-danger"><X className="w-4 h-4" /> Quitar</button>
                     )}
                     {assignablePeople.map(person => (
-                      <button key={person.id} onClick={() => handleAssign(person.id)} className={`w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 ${item.assigned_to === person.id ? 'bg-primary/10' : ''}`}>
+                      <button role="menuitem" key={person.id} onClick={() => handleAssign(person.id)} className={`w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 ${item.assigned_to === person.id ? 'bg-primary/10' : ''}`}>
                         <span className="truncate flex-1">{person.name}</span>
                         {item.assigned_to === person.id && <Check className="w-4 h-4 text-primary" />}
                       </button>
@@ -307,19 +336,19 @@ function ShoppingItemComponent({
               </div>
             )}
             {onAddToFavorites && (
-              <button onClick={handleAddToFavorites} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Star className="w-4 h-4 text-amber-500" /> <span>Favoritos</span></button>
+              <button role="menuitem" onClick={handleAddToFavorites} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Star className="w-4 h-4 text-amber-500" /> <span>Favoritos</span></button>
             )}
             {onAddImage && (
-              <button onClick={() => { onAddImage(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Camera className="w-4 h-4 text-muted" /> <span>{item.image_url ? 'Cambiar img' : 'Añadir img'}</span></button>
+              <button role="menuitem" onClick={() => { onAddImage(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Camera className="w-4 h-4 text-muted" /> <span>{item.image_url ? 'Cambiar img' : 'Añadir img'}</span></button>
             )}
             {onAddNote && (
-              <button onClick={() => { onAddNote(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><StickyNote className="w-4 h-4 text-muted" /> <span>{item.note ? 'Editar nota' : 'Añadir nota'}</span></button>
+              <button role="menuitem" onClick={() => { onAddNote(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><StickyNote className="w-4 h-4 text-muted" /> <span>{item.note ? 'Editar nota' : 'Añadir nota'}</span></button>
             )}
             {onAddTags && (
-              <button onClick={() => { onAddTags(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Tag className="w-4 h-4 text-primary" /> <span>{item.tags && item.tags.length > 0 ? 'Editar etiquetas' : 'Añadir etiquetas'}</span></button>
+              <button role="menuitem" onClick={() => { onAddTags(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Tag className="w-4 h-4 text-primary" /> <span>{item.tags && item.tags.length > 0 ? 'Editar etiquetas' : 'Añadir etiquetas'}</span></button>
             )}
-            <div className="h-px bg-border-light my-1" />
-            <button onClick={handleDelete} className="w-full px-3 py-2.5 text-left text-sm hover:bg-danger/10 flex items-center gap-3 text-danger"><Trash2 className="w-4 h-4" /> <span>Eliminar</span></button>
+            <div role="separator" className="h-px bg-border-light my-1" />
+            <button role="menuitem" onClick={handleDelete} className="w-full px-3 py-2.5 text-left text-sm hover:bg-danger/10 flex items-center gap-3 text-danger"><Trash2 className="w-4 h-4" /> <span>Eliminar</span></button>
           </div>
         </>
       )}

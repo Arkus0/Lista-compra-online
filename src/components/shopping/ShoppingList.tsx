@@ -29,6 +29,7 @@ import {
 import { useRealtimeList } from '@/hooks/useRealtimeList'
 import { sendPushNotification } from '@/lib/notifications'
 import { CATEGORIES, CategoryId, detectCategory, getSmartSuggestions, CommonProduct, getProductEmoji, getCategoryEmoji } from '@/lib/constants'
+import { normalizeText } from '@/lib/utils'
 
 // --- DATOS DEL CATÁLOGO RÁPIDO ---
 const QUICK_CATALOG: Record<CategoryId, string[]> = {
@@ -355,6 +356,10 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const supabase = supabaseRef.current
   const router = useRouter()
 
+  // Ref para items - permite que los handlers sean estables sin recrearse
+  const itemsRef = useRef(items)
+  useEffect(() => { itemsRef.current = items }, [items])
+
   const shareUrl = useMemo(() =>
     typeof window !== 'undefined' ? `${window.location.origin}/join/${list.share_code}` : '',
     [list.share_code]
@@ -374,16 +379,14 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return items
-    const query = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const query = normalizeText(searchQuery)
     return items.filter(item => {
-      const name = item.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      const name = normalizeText(item.name)
       // Buscar en nombre
       if (name.includes(query)) return true
       // Buscar en etiquetas
       if (item.tags && item.tags.length > 0) {
-        return item.tags.some(tag =>
-          tag.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(query)
-        )
+        return item.tags.some(tag => normalizeText(tag).includes(query))
       }
       return false
     })
@@ -472,8 +475,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   const handleAddItem = useCallback(async (name: string, category?: string, imageUrl?: string) => {
     if (!user) return
+    const currentItems = itemsRef.current
     const normalizedName = name.trim().toLowerCase()
-    const existingItem = items.find(item => item.name.trim().toLowerCase() === normalizedName)
+    const existingItem = currentItems.find(item => item.name.trim().toLowerCase() === normalizedName)
     if (existingItem) {
       const newQuantity = (existingItem.quantity || 1) + 1
       updateItem(existingItem.id, { quantity: newQuantity, checked: false })
@@ -482,7 +486,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
       showActionToast(`${existingItem.name} (×${newQuantity})`, 'success', <Plus className="w-4 h-4" />)
       sendPushNotification({ listId: list.id, listName: list.name, action: 'item_added', actorName: user.name || 'Alguien', itemName: existingItem.name, excludeUserId: user.id })
     } else {
-      const maxPosition = items.length > 0 ? Math.max(...items.map(i => i.position ?? 0)) : -1
+      const maxPosition = currentItems.length > 0 ? Math.max(...currentItems.map(i => i.position ?? 0)) : -1
       const itemData = { list_id: list.id, name: name.trim(), category, added_by: user.id, position: maxPosition + 1, image_url: imageUrl }
       const { data, error } = await supabase.from('list_items').insert(itemData).select().single()
       if (!error && data) {
@@ -491,10 +495,10 @@ export function ShoppingList({ list }: ShoppingListProps) {
         sendPushNotification({ listId: list.id, listName: list.name, action: 'item_added', actorName: user.name || 'Alguien', itemName: name, excludeUserId: user.id })
       }
     }
-  }, [user, items, list.id, list.name, supabase, updateItem, addItem, showActionToast])
+  }, [user, list.id, list.name, supabase, updateItem, addItem, showActionToast])
 
   const handleToggleItem = useCallback(async (id: string) => {
-    const item = items.find((i) => i.id === id); if (!item || !user) return
+    const item = itemsRef.current.find((i) => i.id === id); if (!item || !user) return
     const newChecked = !item.checked; toggleItemChecked(id)
     const undoAction = async () => { toggleItemChecked(id); await supabase.from('list_items').update({ checked: !newChecked, checked_by: !newChecked ? null : user.id }).eq('id', id) }
     if (newChecked) {
@@ -504,19 +508,19 @@ export function ShoppingList({ list }: ShoppingListProps) {
     }
     const { error } = await supabase.from('list_items').update({ checked: newChecked, checked_by: newChecked ? user.id : null }).eq('id', id)
     if (error) toggleItemChecked(id); else if (newChecked) sendPushNotification({ listId: list.id, listName: list.name, action: 'item_checked', actorName: user.name || 'Alguien', itemName: item.name, excludeUserId: user.id })
-  }, [items, user, toggleItemChecked, supabase, list.id, list.name, showActionToast])
+  }, [user, toggleItemChecked, supabase, list.id, list.name, showActionToast])
 
   const handleDeleteItem = useCallback(async (id: string) => {
-    const item = items.find((i) => i.id === id); if (!item || !user) return; removeItem(id)
+    const item = itemsRef.current.find((i) => i.id === id); if (!item || !user) return; removeItem(id)
     const undoAction = async () => { const { data } = await supabase.from('list_items').insert({ list_id: item.list_id, name: item.name, quantity: item.quantity, category: item.category, added_by: item.added_by, image_url: item.image_url, position: item.position }).select().single(); if (data) addItem(data as ListItem) }
     showUndoToast(`Eliminado: ${item.name}`, undoAction); const { error } = await supabase.from('list_items').delete().eq('id', id); if (error) addItem(item); else sendPushNotification({ listId: list.id, listName: list.name, action: 'item_removed', actorName: user.name || 'Alguien', itemName: item.name, excludeUserId: user.id })
-  }, [items, user, removeItem, addItem, supabase, list.id, list.name])
+  }, [user, removeItem, addItem, supabase, list.id, list.name])
 
-  const handleUpdateQuantity = useCallback(async (id: string, quantity: number) => { const item = items.find((i) => i.id === id); if (!item) return; const oldQuantity = item.quantity; updateItem(id, { quantity }); const { error } = await supabase.from('list_items').update({ quantity }).eq('id', id); if (error) updateItem(id, { quantity: oldQuantity }) }, [items, updateItem, supabase])
+  const handleUpdateQuantity = useCallback(async (id: string, quantity: number) => { const item = itemsRef.current.find((i) => i.id === id); if (!item) return; const oldQuantity = item.quantity; updateItem(id, { quantity }); const { error } = await supabase.from('list_items').update({ quantity }).eq('id', id); if (error) updateItem(id, { quantity: oldQuantity }) }, [updateItem, supabase])
 
   // Handle catalog decrement: reduce quantity or remove if quantity is 1
   const handleCatalogRemove = useCallback(async (id: string) => {
-    const item = items.find((i) => i.id === id)
+    const item = itemsRef.current.find((i) => i.id === id)
     if (!item) return
 
     const currentQuantity = item.quantity || 1
@@ -528,10 +532,14 @@ export function ShoppingList({ list }: ShoppingListProps) {
       // Decrement quantity
       await handleUpdateQuantity(id, currentQuantity - 1)
     }
-  }, [items, handleDeleteItem, handleUpdateQuantity])
+  }, [handleDeleteItem, handleUpdateQuantity])
   const handleAddToFavorites = useCallback(async (item: ListItem) => {
-    await addFavoriteItem({ name: item.name, quantity: item.quantity, unit: item.unit, category: item.category })
-    showActionToast(`Añadido a favoritos: ${item.name}`, 'success', <Star className="w-4 h-4" />)
+    const success = await addFavoriteItem({ name: item.name, quantity: item.quantity, unit: item.unit, category: item.category })
+    if (success) {
+      showActionToast(`Añadido a favoritos: ${item.name}`, 'success', <Star className="w-4 h-4" />)
+    } else {
+      showActionToast(`Error al guardar favorito`, 'warning', <Star className="w-4 h-4" />)
+    }
   }, [addFavoriteItem, showActionToast])
   const handleAddFromFavorite = useCallback(async (favorite: typeof favoriteItems[0]) => {
     const result = await addItemToListFromFavorite(favorite, list.id)
@@ -546,15 +554,16 @@ export function ShoppingList({ list }: ShoppingListProps) {
     }
   }, [addItemToListFromFavorite, list.id, addItem, updateItem, showActionToast])
   const handleAddFromSuggestion = useCallback((suggestion: CommonProduct) => { handleAddItem(suggestion.name, suggestion.category) }, [handleAddItem])
-  const handleAssignItem = useCallback(async (itemId: string, userId: string | null) => { const item = items.find(i => i.id === itemId); if (!item) return; updateItem(itemId, { assigned_to: userId } as any); const { error } = await supabase.from('list_items').update({ assigned_to: userId }).eq('id', itemId); if (error) updateItem(itemId, { assigned_to: item.assigned_to } as any) }, [items, updateItem, supabase])
+  const handleAssignItem = useCallback(async (itemId: string, userId: string | null) => { const item = itemsRef.current.find(i => i.id === itemId); if (!item) return; updateItem(itemId, { assigned_to: userId } as any); const { error } = await supabase.from('list_items').update({ assigned_to: userId }).eq('id', itemId); if (error) updateItem(itemId, { assigned_to: item.assigned_to } as any) }, [updateItem, supabase])
   const handleAddImage = useCallback((itemId: string) => { setEditingItemId(itemId); setShowImageModal(true); setTimeout(() => imageInputRef.current?.click(), 100) }, [])
-  const handleImageSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file || !editingItemId) return; const path = `items/${Date.now()}_${Math.random().toString(36).slice(2)}`; const imageUrl = await uploadImage(file, path); if (imageUrl) { updateItem(editingItemId, { image_url: imageUrl } as any); await supabase.from('list_items').update({ image_url: imageUrl }).eq('id', editingItemId) } setShowImageModal(false); setEditingItemId(null); if (imageInputRef.current) imageInputRef.current.value = '' }, [editingItemId, items, uploadImage, updateItem, supabase])
-  const handleAddNote = useCallback((itemId: string) => { const item = items.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemNote(item?.note || ''); setShowNoteModal(true) }, [items])
-  const handleAddTags = useCallback((itemId: string) => { const item = items.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemTags(item?.tags || []); setNewTagInput(''); setShowTagsModal(true) }, [items])
+  const handleImageSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file || !editingItemId) return; const path = `items/${Date.now()}_${Math.random().toString(36).slice(2)}`; const imageUrl = await uploadImage(file, path); if (imageUrl) { updateItem(editingItemId, { image_url: imageUrl } as any); await supabase.from('list_items').update({ image_url: imageUrl }).eq('id', editingItemId) } setShowImageModal(false); setEditingItemId(null); if (imageInputRef.current) imageInputRef.current.value = '' }, [editingItemId, uploadImage, updateItem, supabase])
+  const handleAddNote = useCallback((itemId: string) => { const item = itemsRef.current.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemNote(item?.note || ''); setShowNoteModal(true) }, [])
+  const handleAddTags = useCallback((itemId: string) => { const item = itemsRef.current.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemTags(item?.tags || []); setNewTagInput(''); setShowTagsModal(true) }, [])
   const handleSaveNote = useCallback(async () => {
     if (!editingItemId) return
     const noteValue = editingItemNote.trim() || null
-    const item = items.find(i => i.id === editingItemId)
+    const item = itemsRef.current.find(i => i.id === editingItemId)
+    const itemIdToSave = editingItemId
 
     // Actualizar estado local primero (optimistic update)
     updateItem(editingItemId, { note: noteValue })
@@ -563,14 +572,14 @@ export function ShoppingList({ list }: ShoppingListProps) {
     setEditingItemNote('')
 
     // Guardar en base de datos
-    const { error } = await supabase.from('list_items').update({ note: noteValue }).eq('id', editingItemId)
+    const { error } = await supabase.from('list_items').update({ note: noteValue }).eq('id', itemIdToSave)
 
     // Si hay error, revertir el cambio local
     if (error) {
       console.error('Error guardando nota:', error)
-      updateItem(editingItemId, { note: item?.note || null })
+      updateItem(itemIdToSave, { note: item?.note || null })
     }
-  }, [editingItemId, editingItemNote, items, updateItem, supabase])
+  }, [editingItemId, editingItemNote, updateItem, supabase])
 
   const handleAddTagToList = useCallback(() => {
     const tag = newTagInput.trim().toLowerCase()
@@ -586,7 +595,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
   const handleSaveTags = useCallback(async () => {
     if (!editingItemId) return
-    const item = items.find(i => i.id === editingItemId)
+    const item = itemsRef.current.find(i => i.id === editingItemId)
+    const itemIdToSave = editingItemId
+    const tagsToSave = [...editingItemTags]
 
     // Actualizar estado local primero (optimistic update)
     updateItem(editingItemId, { tags: editingItemTags } as any)
@@ -596,14 +607,14 @@ export function ShoppingList({ list }: ShoppingListProps) {
     setNewTagInput('')
 
     // Guardar en base de datos
-    const { error } = await supabase.from('list_items').update({ tags: editingItemTags }).eq('id', editingItemId)
+    const { error } = await supabase.from('list_items').update({ tags: tagsToSave }).eq('id', itemIdToSave)
 
     // Si hay error, revertir el cambio local
     if (error) {
       console.error('Error guardando etiquetas:', error)
-      updateItem(editingItemId, { tags: item?.tags || [] } as any)
+      updateItem(itemIdToSave, { tags: item?.tags || [] } as any)
     }
-  }, [editingItemId, editingItemTags, items, updateItem, supabase])
+  }, [editingItemId, editingItemTags, updateItem, supabase])
 
   const handleCloseTagsModal = useCallback(() => { setShowTagsModal(false); setEditingItemId(null); setEditingItemTags([]); setNewTagInput('') }, [])
 

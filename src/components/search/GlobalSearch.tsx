@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Search, X, ShoppingBag, Star, Package, ArrowRight, Loader2, Clock, TrendingUp } from 'lucide-react'
+import { Search, X, ShoppingBag, Star, Package, ArrowRight, Loader2, Clock, TrendingUp, SearchX } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { searchProducts, CommonProduct, CATEGORIES, CategoryId } from '@/lib/constants'
 import { UserFavoriteItem, ShoppingList } from '@/lib/supabase/types'
+import { normalizeText } from '@/lib/utils'
+import { useDebouncedValue } from '@/hooks/useDebounce'
 
 interface SearchResult {
   type: 'list' | 'favorite' | 'product' | 'recent'
@@ -85,21 +87,24 @@ export function GlobalSearch({ userId, placeholder = 'Buscar listas, favoritos, 
     }
   }, [isOpen])
 
-  // Search logic
-  const performSearch = useCallback((searchQuery: string) => {
-    if (!searchQuery.trim()) {
+  // Debounced query for search
+  const debouncedQuery = useDebouncedValue(query, 200)
+
+  // Search logic - runs when debouncedQuery changes
+  useEffect(() => {
+    if (!debouncedQuery.trim()) {
       setResults([])
+      setIsLoading(false)
       return
     }
 
     setIsLoading(true)
-    const normalizedQuery = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const normalizedQuery = normalizeText(debouncedQuery)
     const searchResults: SearchResult[] = []
 
     // Search in lists
     lists.forEach(list => {
-      const normalizedName = list.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      if (normalizedName.includes(normalizedQuery)) {
+      if (normalizeText(list.name).includes(normalizedQuery)) {
         searchResults.push({
           type: 'list',
           id: list.id,
@@ -112,8 +117,7 @@ export function GlobalSearch({ userId, placeholder = 'Buscar listas, favoritos, 
 
     // Search in favorites
     favorites.forEach(fav => {
-      const normalizedName = fav.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      if (normalizedName.includes(normalizedQuery)) {
+      if (normalizeText(fav.name).includes(normalizedQuery)) {
         searchResults.push({
           type: 'favorite',
           id: fav.id,
@@ -124,8 +128,8 @@ export function GlobalSearch({ userId, placeholder = 'Buscar listas, favoritos, 
       }
     })
 
-    // Search in common products
-    const productMatches = searchProducts(searchQuery, 5)
+    // Search in common products (already uses normalizeText internally)
+    const productMatches = searchProducts(debouncedQuery, 5)
     productMatches.forEach(product => {
       // Avoid duplicates with favorites
       if (!searchResults.some(r => r.type === 'favorite' && r.name.toLowerCase() === product.name.toLowerCase())) {
@@ -141,15 +145,19 @@ export function GlobalSearch({ userId, placeholder = 'Buscar listas, favoritos, 
 
     setResults(searchResults.slice(0, 10))
     setIsLoading(false)
-  }, [lists, favorites])
+  }, [debouncedQuery, lists, favorites])
 
-  // Debounced search
+  // Show loading indicator while typing
   useEffect(() => {
-    const timer = setTimeout(() => {
-      performSearch(query)
-    }, 200)
-    return () => clearTimeout(timer)
-  }, [query, performSearch])
+    if (query.trim() && query !== debouncedQuery) {
+      setIsLoading(true)
+    }
+  }, [query, debouncedQuery])
+
+  // Manual search for recent clicks
+  const performSearch = useCallback((searchQuery: string) => {
+    setQuery(searchQuery)
+  }, [])
 
   const handleOpen = () => {
     setIsOpen(true)
@@ -279,9 +287,20 @@ export function GlobalSearch({ userId, placeholder = 'Buscar listas, favoritos, 
                 ))}
               </div>
             ) : query.trim() && !isLoading ? (
-              <div className="py-8 text-center">
-                <p className="text-muted text-sm">No se encontraron resultados</p>
-                <p className="text-muted-light text-xs mt-1">Intenta con otro término</p>
+              <div className="py-8 flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
+                  <SearchX className="w-6 h-6 text-muted" />
+                </div>
+                <div className="text-center">
+                  <p className="text-foreground font-medium text-sm">Sin resultados</p>
+                  <p className="text-muted text-xs mt-1">No encontramos nada para "{query}"</p>
+                </div>
+                <button
+                  onClick={() => setQuery('')}
+                  className="text-xs text-primary hover:underline mt-1"
+                >
+                  Limpiar búsqueda
+                </button>
               </div>
             ) : (
               <div className="py-2">

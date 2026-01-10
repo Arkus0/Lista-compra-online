@@ -3,6 +3,7 @@ import {
   Coffee, SprayCan, Sparkles, Dog, Package,
   LucideIcon
 } from 'lucide-react'
+import { normalizeText } from './utils'
 
 export type CategoryId =
   | 'fruits-veg' | 'meat-fish' | 'dairy' | 'pantry'
@@ -293,7 +294,7 @@ export const CATEGORIES: Record<CategoryId, CategoryConfig> = {
 
 // Función helper para detectar categoría
 export function detectCategory(text: string): CategoryId {
-  const normalizedText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  const normalizedText = normalizeText(text)
 
   // Buscar en orden de prioridad (hogar primero para evitar confusiones)
   const priorityOrder: CategoryId[] = [
@@ -702,29 +703,44 @@ export const COMMON_PRODUCTS: CommonProduct[] = [
   { name: 'Antiparasitario', category: 'pets' },
 ]
 
-// Función de búsqueda predictiva mejorada
+// Productos pre-indexados para búsqueda rápida (normalización calculada una sola vez)
+interface IndexedProduct extends CommonProduct {
+  normalizedName: string
+}
+
+// Cache de productos indexados (lazy initialization)
+let INDEXED_PRODUCTS: IndexedProduct[] | null = null
+
+function getIndexedProducts(): IndexedProduct[] {
+  if (!INDEXED_PRODUCTS) {
+    INDEXED_PRODUCTS = COMMON_PRODUCTS.map(p => ({
+      ...p,
+      normalizedName: normalizeText(p.name)
+    }))
+  }
+  return INDEXED_PRODUCTS
+}
+
+// Función de búsqueda predictiva optimizada
 export function searchProducts(query: string, maxResults: number = 5): CommonProduct[] {
   if (!query || query.length < 2) return []
 
-  const normalizedQuery = query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  const normalizedQuery = normalizeText(query)
+  const indexedProducts = getIndexedProducts()
 
-  // Buscar coincidencias
-  const matches = COMMON_PRODUCTS.filter(product => {
-    const normalizedName = product.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    return normalizedName.includes(normalizedQuery)
-  })
+  // Buscar coincidencias usando índice pre-calculado
+  const matches = indexedProducts.filter(product =>
+    product.normalizedName.includes(normalizedQuery)
+  )
 
   // Ordenar por relevancia (coincidencias al inicio primero)
   matches.sort((a, b) => {
-    const aName = a.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    const bName = b.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-
-    const aStartsWith = aName.startsWith(normalizedQuery)
-    const bStartsWith = bName.startsWith(normalizedQuery)
+    const aStartsWith = a.normalizedName.startsWith(normalizedQuery)
+    const bStartsWith = b.normalizedName.startsWith(normalizedQuery)
 
     if (aStartsWith && !bStartsWith) return -1
     if (!aStartsWith && bStartsWith) return 1
-    return aName.localeCompare(bName)
+    return a.normalizedName.localeCompare(b.normalizedName)
   })
 
   return matches.slice(0, maxResults)
@@ -825,12 +841,9 @@ const PRODUCT_ASSOCIATIONS: Record<string, string[]> = {
   'toallitas': ['pañales', 'crema', 'jabón bebé'],
 }
 
-// Normalizar nombre para búsqueda
+// Normalizar nombre para búsqueda (con eliminación de plural)
 function normalizeForSearch(text: string): string {
-  return text.toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/s$/, '') // Quitar plural simple
+  return normalizeText(text).replace(/s$/, '') // Quitar plural simple
 }
 
 /**
@@ -1208,10 +1221,7 @@ const CATEGORY_EMOJIS: Record<CategoryId, string> = {
  * Búsqueda en cascada: producto específico -> subcategoría -> categoría
  */
 export function getProductEmoji(productName: string, category?: CategoryId): string {
-  const normalized = productName.toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
+  const normalized = normalizeText(productName).trim()
 
   // 1. Buscar coincidencia exacta en productos específicos
   if (PRODUCT_EMOJIS[normalized]) {
