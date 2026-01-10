@@ -7,12 +7,10 @@ import {
   Trash2, Edit2, Check, Link as LinkIcon,
   ChevronDown, ChevronRight, LayoutGrid, Undo2,
   Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X,
-  FileText, Zap, Plus
+  FileText, Zap, Plus, Eye, EyeOff
 } from 'lucide-react'
 import { ShoppingItem, AssignablePerson } from './ShoppingItem'
-// import { AddItemForm } -> Ya no se necesita aquí
-// import { FavoriteItems } -> Ya no se necesita aquí
-import { AddItemDrawer } from './AddItemDrawer' // NUEVO COMPONENTE
+import { AddItemDrawer } from './AddItemDrawer'
 import { PresenceIndicator } from './PresenceIndicator'
 import { ListNotes } from './ListNotes'
 import { useFavorites } from '@/hooks/useFavorites'
@@ -28,22 +26,6 @@ import {
   useUser,
 } from '@/store/useStore'
 import { useRealtimeList } from '@/hooks/useRealtimeList'
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { SortableShoppingItem } from './SortableShoppingItem'
 import { sendPushNotification } from '@/lib/notifications'
 import { CATEGORIES, CategoryId, detectCategory, getSmartSuggestions, CommonProduct } from '@/lib/constants'
 
@@ -257,7 +239,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   
-  const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list')
+  // ESTADO NUEVO: Controla la visibilidad de las notas globalmente
+  const [showNotes, setShowNotes] = useState(false)
+
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -265,7 +249,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
     isVisible: boolean, message: string, action: () => Promise<void> | void, timer: NodeJS.Timeout | null
   }>({ isVisible: false, message: '', action: () => {}, timer: null })
 
-  // Refs para medir la altura del header dinámicamente
   const headerRef = useRef<HTMLElement>(null)
   const [headerHeight, setHeaderHeight] = useState(130)
 
@@ -291,12 +274,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
     [list.share_code]
   )
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  )
-
-  // Medir altura del header cuando cambia el contenido
   useEffect(() => {
     if (headerRef.current) {
       const resizeObserver = new ResizeObserver((entries) => {
@@ -328,14 +305,14 @@ export function ShoppingList({ list }: ShoppingListProps) {
     return detectCategory(item.name)
   }, [])
 
+  // Agrupación siempre activa
   const groupedItems = useMemo(() => {
-    if (viewMode === 'list') return null
     const groups: Record<CategoryId, ListItem[]> = {} as Record<CategoryId, ListItem[]>
     Object.keys(CATEGORIES).forEach(key => { groups[key as CategoryId] = [] })
     uncheckedItems.forEach(item => { groups[normalizeCategory(item)].push(item) })
     Object.keys(groups).forEach(key => groups[key as CategoryId].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)))
     return Object.entries(groups).filter(([_, items]) => items.length > 0) as [CategoryId, ListItem[]][]
-  }, [uncheckedItems, viewMode, normalizeCategory])
+  }, [uncheckedItems, normalizeCategory])
 
   const smartSuggestions = useMemo(() => getSmartSuggestions(items.map(i => i.name), 4), [items])
 
@@ -433,7 +410,6 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleImageSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file || !editingItemId) return; const path = `items/${Date.now()}_${Math.random().toString(36).slice(2)}`; const imageUrl = await uploadImage(file, path); if (imageUrl) { updateItem(editingItemId, { image_url: imageUrl } as any); await supabase.from('list_items').update({ image_url: imageUrl }).eq('id', editingItemId) } setShowImageModal(false); setEditingItemId(null); if (imageInputRef.current) imageInputRef.current.value = '' }, [editingItemId, items, uploadImage, updateItem, supabase])
   const handleAddNote = useCallback((itemId: string) => { const item = items.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemNote(item?.note || ''); setShowNoteModal(true) }, [items])
   const handleSaveNote = useCallback(async () => { if (!editingItemId) return; const noteValue = editingItemNote.trim() || null; updateItem(editingItemId, { note: noteValue } as any); await supabase.from('list_items').update({ note: noteValue }).eq('id', editingItemId); setShowNoteModal(false); setEditingItemId(null); setEditingItemNote('') }, [editingItemId, editingItemNote, updateItem, supabase])
-  const handleDragEnd = useCallback(async (event: DragEndEvent) => { const { active, over } = event; if (!over || active.id === over.id) return; const oldIndex = uncheckedItems.findIndex((item) => item.id === active.id); const newIndex = uncheckedItems.findIndex((item) => item.id === over.id); if (oldIndex === -1 || newIndex === -1) return; const reorderedUnchecked = arrayMove(uncheckedItems, oldIndex, newIndex); const allItems = [...reorderedUnchecked, ...checkedItems]; setItems(allItems); const updates = reorderedUnchecked.map((item, index) => ({ id: item.id, position: index })); updateItemsPositions(updates); await Promise.all(updates.map(u => supabase.from('list_items').update({ position: u.position }).eq('id', u.id))) }, [uncheckedItems, checkedItems, setItems, updateItemsPositions, supabase])
   const handleCopyLink = () => { navigator.clipboard.writeText(shareUrl); setIsCopied(true); setTimeout(() => setIsCopied(false), 2000) }
   const closeModal = useCallback(() => setActiveModal(null), [])
   const handleUpdateName = async () => { if (!newName.trim()) return; await supabase.from('shopping_lists').update({ name: newName }).eq('id', list.id); closeModal(); router.refresh() }
@@ -477,7 +453,16 @@ export function ShoppingList({ list }: ShoppingListProps) {
 
               <div className="flex items-center gap-2 relative">
                 <button onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted" title="Buscar"><Search className="w-5 h-5" /></button>
-                <button onClick={() => setViewMode(prev => prev === 'list' ? 'grouped' : 'list')} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${viewMode === 'grouped' ? 'bg-primary/10 text-primary' : 'hover:bg-secondary text-muted'}`}><LayoutGrid className="w-5 h-5" /></button>
+                
+                {/* BOTÓN TOGGLE NOTAS (REUTILIZADO) */}
+                <button 
+                  onClick={() => setShowNotes(!showNotes)} 
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${showNotes ? 'bg-primary/10 text-primary' : 'hover:bg-secondary text-muted'}`}
+                  title={showNotes ? "Ocultar notas" : "Mostrar notas"}
+                >
+                  {showNotes ? <FileText className="w-5 h-5" /> : <FileText className="w-5 h-5 opacity-50" />}
+                </button>
+
                 {presenceUsers.length > 0 && <PresenceIndicator users={presenceUsers} maxVisible={3} />}
                 <button onClick={openCollaboratorsModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><Users className="w-5 h-5" /></button>
                 <button onClick={openShareModal} className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center text-muted"><Share2 className="w-5 h-5" /></button>
@@ -527,7 +512,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
           <div className="space-y-2"><ItemSkeleton /><ItemSkeleton /></div>
         ) : (
           <>
-            {viewMode === 'grouped' && groupedItems ? (
+            {/* VISTA ÚNICA AGRUPADA */}
+            {groupedItems ? (
                <div className="space-y-4 pb-4">
                  {groupedItems.map(([catId, groupItems]) => {
                    const CategoryConfig = CATEGORIES[catId] || CATEGORIES['other']
@@ -544,7 +530,23 @@ export function ShoppingList({ list }: ShoppingListProps) {
                        </div>
                        <div className="space-y-2 ml-1 pl-3 border-l-2 border-gray-100 dark:border-gray-800">
                           {groupItems.map(item => (
-                             <ShoppingItem key={item.id} item={item} onToggle={handleToggleItem} onDelete={handleDeleteItem} onUpdateQuantity={handleUpdateQuantity} onAddToFavorites={handleAddToFavorites} onAssign={handleAssignItem} onAddImage={handleAddImage} onAddNote={handleAddNote} assignablePeople={assignablePeople} assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null} addedByProfile={profilesCache.get(item.added_by)} checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null} isDragEnabled={false} />
+                             <ShoppingItem 
+                                key={item.id} 
+                                item={item} 
+                                onToggle={handleToggleItem} 
+                                onDelete={handleDeleteItem} 
+                                onUpdateQuantity={handleUpdateQuantity} 
+                                onAddToFavorites={handleAddToFavorites} 
+                                onAssign={handleAssignItem} 
+                                onAddImage={handleAddImage} 
+                                onAddNote={handleAddNote} 
+                                assignablePeople={assignablePeople} 
+                                assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null} 
+                                addedByProfile={profilesCache.get(item.added_by)} 
+                                checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null} 
+                                isDragEnabled={false}
+                                isNoteVisible={showNotes} // PROP NUEVA
+                             />
                           ))}
                        </div>
                      </div>
@@ -552,15 +554,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
                  })}
                  {groupedItems.length === 0 && <div className="text-center py-12 text-muted flex flex-col items-center gap-3"><ShoppingBag className="w-12 h-12 text-muted-light" /><p>No hay items pendientes</p></div>}
                </div>
-            ) : (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={uncheckedItems.map(item => item.id)} strategy={verticalListSortingStrategy}>
-                  {uncheckedItems.map((item) => (
-                    <SortableShoppingItem key={item.id} item={item} onToggle={handleToggleItem} onDelete={handleDeleteItem} onUpdateQuantity={handleUpdateQuantity} onAddToFavorites={handleAddToFavorites} onAssign={handleAssignItem} onAddImage={handleAddImage} onAddNote={handleAddNote} assignablePeople={assignablePeople} assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null} addedByProfile={profilesCache.get(item.added_by)} checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null} />
-                  ))}
-                </SortableContext>
-              </DndContext>
-            )}
+            ) : null}
 
             {checkedItems.length > 0 && (
               <div className="mt-8 pt-6 border-t-2 border-dashed border-border/50 bg-secondary/10 -mx-4 px-4 pb-10 rounded-t-3xl">
@@ -569,7 +563,23 @@ export function ShoppingList({ list }: ShoppingListProps) {
                   <span>Productos comprados ({checkedItems.length})</span>
                 </button>
                 {showCompleted && <div className="space-y-2 opacity-75 grayscale-[0.3] transition-all duration-300">{checkedItems.map((item) => (
-                      <ShoppingItem key={item.id} item={item} onToggle={handleToggleItem} onDelete={handleDeleteItem} onUpdateQuantity={handleUpdateQuantity} onAddToFavorites={handleAddToFavorites} onAssign={handleAssignItem} onAddImage={handleAddImage} onAddNote={handleAddNote} assignablePeople={assignablePeople} assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null} addedByProfile={profilesCache.get(item.added_by)} checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null} isDragEnabled={false} />
+                      <ShoppingItem 
+                        key={item.id} 
+                        item={item} 
+                        onToggle={handleToggleItem} 
+                        onDelete={handleDeleteItem} 
+                        onUpdateQuantity={handleUpdateQuantity} 
+                        onAddToFavorites={handleAddToFavorites} 
+                        onAssign={handleAssignItem} 
+                        onAddImage={handleAddImage} 
+                        onAddNote={handleAddNote} 
+                        assignablePeople={assignablePeople} 
+                        assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null} 
+                        addedByProfile={profilesCache.get(item.added_by)} 
+                        checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null} 
+                        isDragEnabled={false}
+                        isNoteVisible={showNotes}
+                      />
                     ))}</div>}
               </div>
             )}
