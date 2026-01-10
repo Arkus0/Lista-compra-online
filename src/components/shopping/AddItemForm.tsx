@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
-import { Plus, ChevronUp, Loader2, Mic, MicOff, ScanBarcode, Star } from 'lucide-react'
+import { Plus, ChevronUp, Loader2, Mic, MicOff, ScanBarcode, Star, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { CATEGORIES, detectCategory, CategoryId, searchProducts } from '@/lib/constants'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
@@ -10,6 +10,7 @@ import { BarcodeScannerModal } from './BarcodeScannerModal'
 
 interface AddItemFormProps {
   onAdd: (name: string, category: string, imageUrl?: string) => void | Promise<void>
+  onOpenCatalog?: () => void
   suggestionsSource?: UserFavoriteItem[]
   isVisible?: boolean
   onFocusChange?: (isFocused: boolean) => void
@@ -24,7 +25,13 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
-function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true, onFocusChange }: AddItemFormProps) {
+function AddItemFormComponent({ 
+  onAdd, 
+  onOpenCatalog,
+  suggestionsSource = [], 
+  isVisible = true, 
+  onFocusChange 
+}: AddItemFormProps) {
   const [name, setName] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('other')
   const [showCategories, setShowCategories] = useState(false)
@@ -34,6 +41,9 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
   const [isInputFocused, setIsInputFocused] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Estado para controlar la posición del teclado
+  const [bottomOffset, setBottomOffset] = useState(0)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
@@ -43,16 +53,34 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
     onFocusChange?.(isInputFocused)
   }, [isInputFocused, onFocusChange])
 
-  // Detección avanzada de viewport para móviles (Teclado)
+  // --- SOLUCIÓN GAP 0: Manejo robusto del Teclado Virtual ---
   useEffect(() => {
     if (typeof window !== 'undefined' && window.visualViewport) {
       const handleResize = () => {
-        // Forzar actualización si es necesario
+        if (!window.visualViewport) return
+        
+        // Si el viewport visual es más pequeño que la ventana, el teclado probablemente está abierto
+        const isKeyboardOpen = window.visualViewport.height < window.innerHeight
+        
+        if (isKeyboardOpen && isInputFocused) {
+          // Calculamos cuánto espacio ocupa el teclado
+          // Ajustamos un poco (10px) para dar aire
+          const offset = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop
+          setBottomOffset(Math.max(0, offset))
+        } else {
+          setBottomOffset(0)
+        }
       }
+
       window.visualViewport.addEventListener('resize', handleResize)
-      return () => window.visualViewport?.removeEventListener('resize', handleResize)
+      window.visualViewport.addEventListener('scroll', handleResize)
+      
+      return () => {
+        window.visualViewport?.removeEventListener('resize', handleResize)
+        window.visualViewport?.removeEventListener('scroll', handleResize)
+      }
     }
-  }, [])
+  }, [isInputFocused])
 
   const { isListening, transcript, isSupported: voiceSupported, startListening, stopListening } = useVoiceInput()
 
@@ -62,6 +90,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
 
   const debouncedName = useDebounce(name, 300)
 
+  // Lógica de sugerencias (sin cambios mayores)
   useEffect(() => {
     if (name.trim().length >= 2) {
       const normalizedName = name.toLowerCase()
@@ -118,6 +147,12 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
     if (e) e.preventDefault()
     if (name.trim() && !isSubmitting) {
       setIsSubmitting(true)
+      
+      // Feedback háptico al enviar
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(50)
+      }
+
       await onAdd(name.trim(), selectedCategory, undefined)
       setName('')
       setSelectedCategory('other')
@@ -125,6 +160,8 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
       setManuallySelected(false)
       setShowSuggestions(false)
       setIsSubmitting(false)
+      
+      // Mantener foco para añadir múltiples items rápido
       inputRef.current?.focus()
     }
   }, [name, selectedCategory, onAdd, isSubmitting])
@@ -176,10 +213,13 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
 
   return (
     <div 
-      className={`fixed bottom-0 left-0 right-0 w-full bg-card border-t border-border-light z-30 transition-transform duration-300 ${
-        shouldBeVisible ? 'translate-y-0' : 'translate-y-full'
+      className={`fixed left-0 right-0 w-full bg-card border-t border-border-light z-30 transition-all duration-300 ease-out shadow-[0_-4px_20px_rgba(0,0,0,0.1)] ${
+        shouldBeVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'
       }`}
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      style={{ 
+        bottom: `${bottomOffset}px`,
+        paddingBottom: bottomOffset > 0 ? '10px' : 'env(safe-area-inset-bottom)' 
+      }}
     >
       {/* Sugerencias Flotantes */}
       {showSuggestions && (
@@ -191,7 +231,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
                 key={suggestion.id}
                 type="button"
                 onClick={() => handleSuggestionClick(suggestion)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-card rounded-xl shadow-md border border-border/50 hover:bg-secondary whitespace-nowrap transition-transform active:scale-95 flex-shrink-0"
+                className="flex items-center gap-1.5 px-3 py-2 bg-card rounded-xl shadow-md border border-border/50 hover:bg-secondary whitespace-nowrap transition-transform active:scale-95 flex-shrink-0 animate-in zoom-in-95 duration-200"
               >
                 {suggestion.source === 'favorite' && <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />}
                 <span className="font-medium text-sm text-foreground">{suggestion.name}</span>
@@ -203,7 +243,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
         </div>
       )}
 
-      <form ref={formRef} onSubmit={handleSubmit} className="p-4 max-w-md mx-auto relative">
+      <form ref={formRef} onSubmit={handleSubmit} className="p-3 sm:p-4 max-w-2xl mx-auto relative">
         {showCategories && (
           <div className="absolute bottom-full left-4 right-4 mb-2 bg-card rounded-xl shadow-xl border border-border p-3 grid grid-cols-5 gap-2 animate-in slide-in-from-bottom-2 z-40">
             {Object.values(CATEGORIES).map((cat) => (
@@ -221,6 +261,18 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
         )}
 
         <div className="flex items-center gap-2">
+          {/* Botón Catálogo (Nuevo Gap 1) */}
+          {!isInputFocused && onOpenCatalog && (
+             <button
+               type="button"
+               onClick={onOpenCatalog}
+               className="flex-shrink-0 w-11 h-11 rounded-xl bg-secondary text-foreground hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-center"
+               aria-label="Abrir catálogo rápido"
+             >
+               <LayoutGrid className="w-5 h-5" />
+             </button>
+          )}
+
           <button type="button" onClick={toggleCategories} className={`flex-shrink-0 w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-300 relative ${showCategories ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'} ${CurrentCategoryConfig.color}`}>
             <CurrentCategoryConfig.icon className="w-5 h-5" />
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-card rounded-full shadow border border-border-light flex items-center justify-center"><ChevronUp className="w-2.5 h-2.5 text-muted" /></div>
@@ -250,8 +302,8 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true,
             </div>
           )}
 
-          <Button type="submit" disabled={!name.trim() || isSubmitting} className="w-11 h-11 rounded-xl p-0 flex items-center justify-center shrink-0">
-            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+          <Button type="submit" disabled={!name.trim() || isSubmitting} className="w-11 h-11 rounded-xl p-0 flex items-center justify-center shrink-0 shadow-sm">
+            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-6 h-6" />}
           </Button>
         </div>
       </form>
