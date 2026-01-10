@@ -11,6 +11,7 @@ import { BarcodeScannerModal } from './BarcodeScannerModal'
 interface AddItemFormProps {
   onAdd: (name: string, category: string, imageUrl?: string) => void | Promise<void>
   suggestionsSource?: UserFavoriteItem[]
+  isVisible?: boolean // <--- NUEVA PROP
 }
 
 // Hook personalizado para debounce
@@ -30,7 +31,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
-function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProps) {
+function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true }: AddItemFormProps) {
   const [name, setName] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('other')
   const [showCategories, setShowCategories] = useState(false)
@@ -52,13 +53,11 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
 
   // Estados para control de visibilidad y UI
   const [isInputFocused, setIsInputFocused] = useState(false)
-  const [isFormVisible, setIsFormVisible] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
+  
   // Hook de reconocimiento de voz
   const {
     isListening,
@@ -91,7 +90,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
           item.name.toLowerCase().includes(normalizedName) &&
           item.name.toLowerCase() !== normalizedName
         )
-        .slice(0, 3)
+        .slice(0, 5) // Mostramos un poco más ahora que es horizontal
         .forEach(fav => {
           if (!addedNames.has(fav.name.toLowerCase())) {
             combinedSuggestions.push({
@@ -119,7 +118,7 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
         }
       })
 
-      setSuggestions(combinedSuggestions.slice(0, 5))
+      setSuggestions(combinedSuggestions)
       setShowSuggestions(combinedSuggestions.length > 0)
     } else {
       setShowSuggestions(false)
@@ -145,35 +144,6 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
     }
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
-  }, [])
-
-  // Ocultar formulario al hacer scroll
-  useEffect(() => {
-    let lastScrollY = window.scrollY
-
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY
-      // Ocultar si bajamos scroll (>50px)
-      if (currentScrollY > lastScrollY && currentScrollY > 50) {
-        setIsFormVisible(false)
-      } else {
-        setIsFormVisible(true)
-      }
-      lastScrollY = currentScrollY
-
-      // Resetear timer para volver a mostrarlo
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
-      
-      scrollTimeoutRef.current = setTimeout(() => {
-        setIsFormVisible(true)
-      }, 1000)
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => {
-      window.removeEventListener('scroll', handleScroll)
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
-    }
   }, [])
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
@@ -249,16 +219,12 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
   return (
     <div 
       className={`sticky bottom-0 bg-card border-t border-border-light z-30 pb-safe transition-transform duration-300 ${
-        isFormVisible ? 'translate-y-0' : 'translate-y-full'
+        isVisible ? 'translate-y-0' : 'translate-y-full'
       }`}
     >
-      {/* Sugerencias Flotantes */}
+      {/* Sugerencias Flotantes - AHORA EN HORIZONTAL */}
       {showSuggestions && (
-        <div className="absolute bottom-full left-4 right-4 mb-2 bg-card rounded-xl shadow-lg border border-border overflow-hidden animate-in slide-in-from-bottom-2 z-20">
-          <div className="bg-secondary/50 px-4 py-1.5 text-xs text-muted font-medium flex items-center gap-1">
-            <Sparkles className="w-3 h-3" />
-            Sugerencias
-          </div>
+        <div className="absolute bottom-full left-0 right-0 mb-2 px-4 flex gap-2 overflow-x-auto pb-2 z-20 scrollbar-hide mask-fade-sides">
           {suggestions.map((suggestion) => {
             const CategoryConfig = suggestion.category ? CATEGORIES[suggestion.category as CategoryId] : null
             return (
@@ -266,21 +232,17 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
                 key={suggestion.id}
                 type="button"
                 onClick={() => handleSuggestionClick(suggestion)}
-                className="w-full text-left px-4 py-2.5 hover:bg-secondary flex items-center justify-between group transition-colors border-b border-border/50 last:border-0"
+                className="flex items-center gap-1.5 px-3 py-2 bg-card rounded-xl shadow-md border border-border/50 hover:bg-secondary whitespace-nowrap transition-transform active:scale-95 flex-shrink-0"
               >
-                <div className="flex items-center gap-2">
-                  {suggestion.source === 'favorite' && (
-                    <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />
-                  )}
-                  <span className="font-medium text-foreground">{suggestion.name}</span>
-                  {suggestion.quantity && suggestion.quantity > 1 && (
-                    <span className="text-xs text-muted bg-secondary px-1.5 py-0.5 rounded">x{suggestion.quantity}</span>
-                  )}
-                </div>
+                {suggestion.source === 'favorite' && (
+                  <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />
+                )}
+                <span className="font-medium text-sm text-foreground">{suggestion.name}</span>
+                {suggestion.quantity && suggestion.quantity > 1 && (
+                  <span className="text-[10px] text-muted bg-secondary px-1 py-0.5 rounded">x{suggestion.quantity}</span>
+                )}
                 {CategoryConfig && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${CategoryConfig.color}`}>
-                    {CategoryConfig.label.split(' ')[0]}
-                  </span>
+                  <div className={`w-2 h-2 rounded-full ${CategoryConfig.color.split(' ')[0].replace('text-', 'bg-')}`} />
                 )}
               </button>
             )
