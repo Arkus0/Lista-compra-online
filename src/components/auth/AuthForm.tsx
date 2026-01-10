@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Mail, Lock, User, Loader2 } from 'lucide-react'
+import { Mail, Lock, User, Loader2, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
@@ -10,7 +10,12 @@ import { createClient } from '@/lib/supabase/client'
 
 type AuthMode = 'login' | 'register'
 
-export function AuthForm() {
+interface AuthFormProps {
+  confirmed?: boolean
+  authError?: string
+}
+
+export function AuthForm({ confirmed, authError }: AuthFormProps) {
   const [mode, setMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -38,6 +43,7 @@ export function AuthForm() {
           password,
           options: {
             data: { name },
+            emailRedirectTo: `${window.location.origin}/auth/callback?type=signup`,
           },
         })
 
@@ -100,6 +106,19 @@ export function AuthForm() {
           {mode === 'login' ? 'Inicia sesión en tu cuenta' : 'Crea tu cuenta'}
         </p>
       </div>
+
+      {confirmed && (
+        <div className="p-3 rounded-lg bg-green-100 text-green-800 text-sm flex items-center gap-2 mb-4">
+          <CheckCircle className="w-5 h-5 flex-shrink-0" />
+          <span>Email confirmado exitosamente. Ya puedes iniciar sesión.</span>
+        </div>
+      )}
+
+      {authError && (
+        <div className="p-3 rounded-lg bg-danger/10 text-danger text-sm mb-4">
+          {authError}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {mode === 'register' && (
