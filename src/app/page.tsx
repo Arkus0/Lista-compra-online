@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { Plus, ShoppingBag, TrendingDown, Users } from 'lucide-react'
 import Link from 'next/link'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
+import { RecipeSection } from '@/components/recipes/RecipeSection'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -18,8 +19,8 @@ export default async function Home() {
     return null
   }
 
-  // Ejecutar ambas queries en PARALELO para mayor velocidad
-  const [ownListsResult, sharedListsResult] = await Promise.all([
+  // Ejecutar queries en PARALELO para mayor velocidad
+  const [ownListsResult, sharedListsResult, allUserListsResult] = await Promise.all([
     supabase
       .from('shopping_lists')
       .select('id, name, updated_at, list_items(count)')
@@ -30,7 +31,15 @@ export default async function Home() {
       .from('list_collaborators')
       .select('shopping_lists(id, name, updated_at, list_items(count))')
       .eq('user_id', user.id)
-      .limit(5)
+      .limit(5),
+    // Todas las listas del usuario (para selector de recetas)
+    supabase
+      .from('shopping_lists')
+      .select('id, name, owner_id, share_code, created_at, updated_at')
+      .eq('owner_id', user.id)
+      .eq('is_archived', false)
+      .order('updated_at', { ascending: false })
+      .limit(20)
   ])
 
   interface ListItem {
@@ -42,6 +51,7 @@ export default async function Home() {
 
   const ownLists = ownListsResult.data || []
   const allSharedLists = (sharedListsResult.data?.map((s: any) => s.shopping_lists).filter(Boolean) || []) as ListItem[]
+  const allUserLists = allUserListsResult.data || []
 
   // Combinar y ordenar
   const lists = [...ownLists, ...allSharedLists]
@@ -137,6 +147,9 @@ export default async function Home() {
             </Card>
           )}
         </section>
+
+        {/* Recetas */}
+        <RecipeSection userId={user.id} userLists={allUserLists} />
 
         {/* Features preview */}
         <section>

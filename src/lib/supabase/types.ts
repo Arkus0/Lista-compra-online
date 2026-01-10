@@ -346,6 +346,42 @@ export interface Database {
   }
 }
 
+// Tipos para Recetas (tabla user_recipes)
+export interface RecipeIngredient {
+  name: string
+  quantity: string
+  unit: string
+  category?: string
+}
+
+export interface UserRecipe {
+  id: string
+  user_id: string
+  title: string
+  description: string | null
+  image_url: string | null
+  source_url: string | null
+  source_type: 'themealdb' | 'url' | 'manual'
+  external_id: string | null
+  servings: number
+  ingredients: RecipeIngredient[]
+  instructions: string | null
+  category: string | null
+  cuisine: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TheMealDBRecipe {
+  id: string
+  title: string
+  category: string
+  cuisine: string
+  instructions: string
+  image_url: string
+  ingredients: RecipeIngredient[]
+}
+
 // Tipos helpers
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type ShoppingList = Database['public']['Tables']['shopping_lists']['Row']
