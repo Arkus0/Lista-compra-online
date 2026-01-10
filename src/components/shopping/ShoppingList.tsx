@@ -8,7 +8,7 @@ import {
   Trash2, Edit2, Check, Link as LinkIcon,
   ChevronDown, ChevronRight, LayoutGrid, Undo2,
   Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X,
-  FileText, Zap, Plus, Eye, EyeOff, Star, Minus, ArrowLeft
+  FileText, Zap, Plus, Eye, EyeOff, Star, Minus, ArrowLeft, Tag
 } from 'lucide-react'
 import { ShoppingItem, AssignablePerson } from './ShoppingItem'
 import { AddItemDrawer } from './AddItemDrawer'
@@ -346,6 +346,9 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const [editingItemNote, setEditingItemNote] = useState('')
   const [showNoteModal, setShowNoteModal] = useState(false)
   const [showImageModal, setShowImageModal] = useState(false)
+  const [showTagsModal, setShowTagsModal] = useState(false)
+  const [editingItemTags, setEditingItemTags] = useState<string[]>([])
+  const [newTagInput, setNewTagInput] = useState('')
   const imageInputRef = useRef<HTMLInputElement>(null)
 
   const supabaseRef = useRef(createClient())
@@ -374,7 +377,15 @@ export function ShoppingList({ list }: ShoppingListProps) {
     const query = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     return items.filter(item => {
       const name = item.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      return name.includes(query)
+      // Buscar en nombre
+      if (name.includes(query)) return true
+      // Buscar en etiquetas
+      if (item.tags && item.tags.length > 0) {
+        return item.tags.some(tag =>
+          tag.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(query)
+        )
+      }
+      return false
     })
   }, [items, searchQuery])
 
@@ -539,6 +550,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleAddImage = useCallback((itemId: string) => { setEditingItemId(itemId); setShowImageModal(true); setTimeout(() => imageInputRef.current?.click(), 100) }, [])
   const handleImageSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file || !editingItemId) return; const path = `items/${Date.now()}_${Math.random().toString(36).slice(2)}`; const imageUrl = await uploadImage(file, path); if (imageUrl) { updateItem(editingItemId, { image_url: imageUrl } as any); await supabase.from('list_items').update({ image_url: imageUrl }).eq('id', editingItemId) } setShowImageModal(false); setEditingItemId(null); if (imageInputRef.current) imageInputRef.current.value = '' }, [editingItemId, items, uploadImage, updateItem, supabase])
   const handleAddNote = useCallback((itemId: string) => { const item = items.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemNote(item?.note || ''); setShowNoteModal(true) }, [items])
+  const handleAddTags = useCallback((itemId: string) => { const item = items.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemTags(item?.tags || []); setNewTagInput(''); setShowTagsModal(true) }, [items])
   const handleSaveNote = useCallback(async () => {
     if (!editingItemId) return
     const noteValue = editingItemNote.trim() || null
@@ -559,6 +571,42 @@ export function ShoppingList({ list }: ShoppingListProps) {
       updateItem(editingItemId, { note: item?.note || null })
     }
   }, [editingItemId, editingItemNote, items, updateItem, supabase])
+
+  const handleAddTagToList = useCallback(() => {
+    const tag = newTagInput.trim().toLowerCase()
+    if (tag && !editingItemTags.includes(tag)) {
+      setEditingItemTags(prev => [...prev, tag])
+    }
+    setNewTagInput('')
+  }, [newTagInput, editingItemTags])
+
+  const handleRemoveTag = useCallback((tagToRemove: string) => {
+    setEditingItemTags(prev => prev.filter(t => t !== tagToRemove))
+  }, [])
+
+  const handleSaveTags = useCallback(async () => {
+    if (!editingItemId) return
+    const item = items.find(i => i.id === editingItemId)
+
+    // Actualizar estado local primero (optimistic update)
+    updateItem(editingItemId, { tags: editingItemTags } as any)
+    setShowTagsModal(false)
+    setEditingItemId(null)
+    setEditingItemTags([])
+    setNewTagInput('')
+
+    // Guardar en base de datos
+    const { error } = await supabase.from('list_items').update({ tags: editingItemTags }).eq('id', editingItemId)
+
+    // Si hay error, revertir el cambio local
+    if (error) {
+      console.error('Error guardando etiquetas:', error)
+      updateItem(editingItemId, { tags: item?.tags || [] } as any)
+    }
+  }, [editingItemId, editingItemTags, items, updateItem, supabase])
+
+  const handleCloseTagsModal = useCallback(() => { setShowTagsModal(false); setEditingItemId(null); setEditingItemTags([]); setNewTagInput('') }, [])
+
   const handleCopyLink = () => { navigator.clipboard.writeText(shareUrl); setIsCopied(true); setTimeout(() => setIsCopied(false), 2000) }
   const closeModal = useCallback(() => setActiveModal(null), [])
   const handleUpdateName = async () => { if (!newName.trim()) return; await supabase.from('shopping_lists').update({ name: newName }).eq('id', list.id); closeModal(); router.refresh() }
@@ -691,20 +739,21 @@ export function ShoppingList({ list }: ShoppingListProps) {
                        </div>
                        <div className="space-y-2 ml-1 pl-3 border-l-2 border-gray-100 dark:border-gray-800">
                           {groupItems.map(item => (
-                             <ShoppingItem 
-                                key={item.id} 
-                                item={item} 
-                                onToggle={handleToggleItem} 
-                                onDelete={handleDeleteItem} 
-                                onUpdateQuantity={handleUpdateQuantity} 
-                                onAddToFavorites={handleAddToFavorites} 
-                                onAssign={handleAssignItem} 
-                                onAddImage={handleAddImage} 
-                                onAddNote={handleAddNote} 
-                                assignablePeople={assignablePeople} 
-                                assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null} 
-                                addedByProfile={profilesCache.get(item.added_by)} 
-                                checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null} 
+                             <ShoppingItem
+                                key={item.id}
+                                item={item}
+                                onToggle={handleToggleItem}
+                                onDelete={handleDeleteItem}
+                                onUpdateQuantity={handleUpdateQuantity}
+                                onAddToFavorites={handleAddToFavorites}
+                                onAssign={handleAssignItem}
+                                onAddImage={handleAddImage}
+                                onAddNote={handleAddNote}
+                                onAddTags={handleAddTags}
+                                assignablePeople={assignablePeople}
+                                assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
+                                addedByProfile={profilesCache.get(item.added_by)}
+                                checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null}
                                 isDragEnabled={false}
                              />
                           ))}
@@ -723,20 +772,21 @@ export function ShoppingList({ list }: ShoppingListProps) {
                   <span>Productos comprados ({checkedItems.length})</span>
                 </button>
                 {showCompleted && <div className="space-y-2 opacity-75 grayscale-[0.3] transition-all duration-300">{checkedItems.map((item) => (
-                      <ShoppingItem 
-                        key={item.id} 
-                        item={item} 
-                        onToggle={handleToggleItem} 
-                        onDelete={handleDeleteItem} 
-                        onUpdateQuantity={handleUpdateQuantity} 
-                        onAddToFavorites={handleAddToFavorites} 
-                        onAssign={handleAssignItem} 
-                        onAddImage={handleAddImage} 
-                        onAddNote={handleAddNote} 
-                        assignablePeople={assignablePeople} 
-                        assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null} 
-                        addedByProfile={profilesCache.get(item.added_by)} 
-                        checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null} 
+                      <ShoppingItem
+                        key={item.id}
+                        item={item}
+                        onToggle={handleToggleItem}
+                        onDelete={handleDeleteItem}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        onAddToFavorites={handleAddToFavorites}
+                        onAssign={handleAssignItem}
+                        onAddImage={handleAddImage}
+                        onAddNote={handleAddNote}
+                        onAddTags={handleAddTags}
+                        assignablePeople={assignablePeople}
+                        assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
+                        addedByProfile={profilesCache.get(item.added_by)}
+                        checkedByProfile={item.checked_by ? profilesCache.get(item.checked_by) : null}
                         isDragEnabled={false}
                       />
                     ))}</div>}
@@ -799,6 +849,71 @@ export function ShoppingList({ list }: ShoppingListProps) {
       <Modal isOpen={activeModal === 'edit'} onClose={closeModal} title="Editar Nombre"><div className="gap-2 flex flex-col"><Input value={newName} onChange={e => setNewName(e.target.value)} /><Button onClick={handleUpdateName}>Guardar</Button></div></Modal>
       <Modal isOpen={activeModal === 'delete'} onClose={closeModal} title="Eliminar Lista"><div className="text-center"><p className="mb-4">¿Seguro?</p><Button variant="danger" onClick={handleDeleteList}>Eliminar</Button></div></Modal>
       <Modal isOpen={showNoteModal} onClose={handleCloseNoteModal} title="Añadir nota"><div className="space-y-4"><p className="text-sm text-muted">Añade una nota para este producto.</p><textarea value={editingItemNote} onChange={(e) => setEditingItemNote(e.target.value)} placeholder="Escribe tu nota aquí..." className="w-full h-32 px-4 py-3 rounded-xl border-2 border-border bg-input-bg text-foreground placeholder:text-muted-light focus:outline-none focus:border-primary transition-colors resize-none" autoFocus /><div className="flex gap-3 justify-end"><Button variant="secondary" onClick={handleCloseNoteModal}>Cancelar</Button><Button onClick={handleSaveNote}>Guardar</Button></div></div></Modal>
+      <Modal isOpen={showTagsModal} onClose={handleCloseTagsModal} title="Etiquetas">
+        <div className="space-y-4">
+          <p className="text-sm text-muted">Añade etiquetas para organizar y buscar este producto (ej: mercadona, lidl, urgente).</p>
+
+          {/* Current tags */}
+          {editingItemTags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {editingItemTags.map((tag, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-sm font-medium rounded-full"
+                >
+                  <Tag className="w-3 h-3" />
+                  {tag}
+                  <button
+                    onClick={() => handleRemoveTag(tag)}
+                    className="ml-1 hover:bg-primary/20 rounded-full p-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Add new tag */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newTagInput}
+              onChange={(e) => setNewTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleAddTagToList()
+                }
+              }}
+              placeholder="Nueva etiqueta..."
+              className="flex-1 h-10 px-4 rounded-xl border-2 border-border bg-input-bg text-foreground placeholder:text-muted-light focus:outline-none focus:border-primary transition-colors"
+              autoFocus
+            />
+            <Button onClick={handleAddTagToList} disabled={!newTagInput.trim()}>
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {/* Quick suggestions */}
+          <div className="flex flex-wrap gap-2">
+            {['mercadona', 'lidl', 'carrefour', 'dia', 'aldi', 'urgente', 'oferta'].filter(s => !editingItemTags.includes(s)).slice(0, 4).map(suggestion => (
+              <button
+                key={suggestion}
+                onClick={() => setEditingItemTags(prev => [...prev, suggestion])}
+                className="px-2.5 py-1 bg-secondary hover:bg-secondary/80 text-sm rounded-full text-muted-foreground"
+              >
+                + {suggestion}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-3 justify-end pt-2">
+            <Button variant="secondary" onClick={handleCloseTagsModal}>Cancelar</Button>
+            <Button onClick={handleSaveTags}>Guardar</Button>
+          </div>
+        </div>
+      </Modal>
       <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleImageSelected} />
       {isUploadingImage && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"><div className="bg-card p-6 rounded-2xl shadow-xl flex flex-col items-center gap-4"><div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" /><p className="text-foreground font-medium">Subiendo imagen...</p></div></div>}
     </div>

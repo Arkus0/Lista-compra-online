@@ -3,7 +3,7 @@
 import { useState, memo, useCallback, useRef, useEffect } from 'react'
 import {
   Check, Trash2, GripVertical, Minus, Plus, User, Star,
-  UserPlus, X, MoreVertical, StickyNote, Camera
+  UserPlus, X, MoreVertical, StickyNote, Camera, Tag
 } from 'lucide-react'
 import { ListItem, Profile } from '@/lib/supabase/types'
 import { getProductEmoji, CategoryId } from '@/lib/constants'
@@ -24,6 +24,7 @@ interface ShoppingItemProps {
   onAssign?: (itemId: string, userId: string | null) => void
   onAddImage?: (itemId: string) => void
   onAddNote?: (itemId: string) => void
+  onAddTags?: (itemId: string) => void
   assignablePeople?: AssignablePerson[]
   assignedToProfile?: Profile | null
   dragHandleProps?: any
@@ -55,6 +56,7 @@ function ShoppingItemComponent({
   onAssign,
   onAddImage,
   onAddNote,
+  onAddTags,
   assignablePeople = [],
   assignedToProfile,
   dragHandleProps,
@@ -208,11 +210,28 @@ function ShoppingItemComponent({
             )}
           </div>
 
-          {/* NOTA SIEMPRE VISIBLE (si existe) */}
-          {item.note && (
-             <p className="text-xs text-muted-foreground mt-0.5 leading-tight break-words pr-2">
-               {item.note}
-             </p>
+          {/* NOTA Y ETIQUETAS (si existen) */}
+          {(item.note || (item.tags && item.tags.length > 0)) && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+              {item.note && (
+                <p className="text-xs text-muted-foreground leading-tight break-words pr-1">
+                  {item.note}
+                </p>
+              )}
+              {item.tags && item.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {item.tags.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] font-medium rounded-full"
+                    >
+                      <Tag className="w-2.5 h-2.5" />
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -296,6 +315,9 @@ function ShoppingItemComponent({
             {onAddNote && (
               <button onClick={() => { onAddNote(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><StickyNote className="w-4 h-4 text-muted" /> <span>{item.note ? 'Editar nota' : 'Añadir nota'}</span></button>
             )}
+            {onAddTags && (
+              <button onClick={() => { onAddTags(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Tag className="w-4 h-4 text-primary" /> <span>{item.tags && item.tags.length > 0 ? 'Editar etiquetas' : 'Añadir etiquetas'}</span></button>
+            )}
             <div className="h-px bg-border-light my-1" />
             <button onClick={handleDelete} className="w-full px-3 py-2.5 text-left text-sm hover:bg-danger/10 flex items-center gap-3 text-danger"><Trash2 className="w-4 h-4" /> <span>Eliminar</span></button>
           </div>
@@ -313,6 +335,14 @@ function ShoppingItemComponent({
 }
 
 export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) => {
+  // Compare tags arrays
+  const tagsEqual = (a: string[] | undefined, b: string[] | undefined) => {
+    if (!a && !b) return true
+    if (!a || !b) return false
+    if (a.length !== b.length) return false
+    return a.every((tag, i) => tag === b[i])
+  }
+
   return (
     prevProps.item.id === nextProps.item.id &&
     prevProps.item.name === nextProps.item.name &&
@@ -324,11 +354,13 @@ export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) =
     prevProps.item.checked_by === nextProps.item.checked_by &&
     prevProps.item.assigned_to === nextProps.item.assigned_to &&
     prevProps.item.note === nextProps.item.note &&
+    tagsEqual(prevProps.item.tags, nextProps.item.tags) &&
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onDelete === nextProps.onDelete &&
     prevProps.onAddToFavorites === nextProps.onAddToFavorites &&
     prevProps.onAddImage === nextProps.onAddImage &&
     prevProps.onAddNote === nextProps.onAddNote &&
+    prevProps.onAddTags === nextProps.onAddTags &&
     prevProps.onAssign === nextProps.onAssign &&
     prevProps.onUpdateQuantity === nextProps.onUpdateQuantity
   )

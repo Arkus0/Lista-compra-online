@@ -72,6 +72,7 @@ export interface Database {
           position?: number
           image_url: string | null
           note: string | null
+          tags: string[]
           created_at: string
           updated_at: string
         }
@@ -89,6 +90,7 @@ export interface Database {
           position?: number
           image_url?: string | null
           note?: string | null
+          tags?: string[]
           created_at?: string
           updated_at?: string
         }
@@ -103,6 +105,7 @@ export interface Database {
           position?: number
           image_url?: string | null
           note?: string | null
+          tags?: string[]
           updated_at?: string
         }
       }
