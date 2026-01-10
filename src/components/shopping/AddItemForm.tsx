@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
-import { Plus, ChevronUp, Loader2, Mic, MicOff, ScanBarcode, Star, Sparkles } from 'lucide-react'
+import { Plus, ChevronUp, Loader2, Mic, MicOff, ScanBarcode, Star } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { CATEGORIES, detectCategory, CategoryId, searchProducts } from '@/lib/constants'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
@@ -11,15 +11,20 @@ import { BarcodeScannerModal } from './BarcodeScannerModal'
 interface AddItemFormProps {
   onAdd: (name: string, category: string, imageUrl?: string) => void | Promise<void>
   suggestionsSource?: UserFavoriteItem[]
+  isVisible?: boolean
+  onFocusChange?: (isFocused: boolean) => void
 }
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
-  useEffect(() => { const handler = setTimeout(() => { setDebouncedValue(value) }, delay); return () => { clearTimeout(handler) } }, [value, delay])
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay)
+    return () => clearTimeout(handler)
+  }, [value, delay])
   return debouncedValue
 }
 
-function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProps) {
+function AddItemFormComponent({ onAdd, suggestionsSource = [], isVisible = true, onFocusChange }: AddItemFormProps) {
   const [name, setName] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('other')
   const [showCategories, setShowCategories] = useState(false)
@@ -33,9 +38,28 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
   const inputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   
+  // Comunicar cambio de foco al padre
+  useEffect(() => {
+    onFocusChange?.(isInputFocused)
+  }, [isInputFocused, onFocusChange])
+
+  // Detección avanzada de viewport para móviles (Teclado)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.visualViewport) {
+      const handleResize = () => {
+        // Forzar actualización si es necesario
+      }
+      window.visualViewport.addEventListener('resize', handleResize)
+      return () => window.visualViewport?.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
   const { isListening, transcript, isSupported: voiceSupported, startListening, stopListening } = useVoiceInput()
 
-  useEffect(() => { if (transcript) setName(transcript) }, [transcript])
+  useEffect(() => {
+    if (transcript) setName(transcript)
+  }, [transcript])
+
   const debouncedName = useDebounce(name, 300)
 
   useEffect(() => {
@@ -43,28 +67,65 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
       const normalizedName = name.toLowerCase()
       const combinedSuggestions: any[] = []
       const addedNames = new Set<string>()
-      suggestionsSource.filter(item => item.name.toLowerCase().includes(normalizedName) && item.name.toLowerCase() !== normalizedName).slice(0, 5).forEach(fav => {
-          if (!addedNames.has(fav.name.toLowerCase())) { combinedSuggestions.push({ id: fav.id, name: fav.name, category: fav.category, source: 'favorite', quantity: fav.quantity }); addedNames.add(fav.name.toLowerCase()) }
+
+      suggestionsSource
+        .filter(item => item.name.toLowerCase().includes(normalizedName) && item.name.toLowerCase() !== normalizedName)
+        .slice(0, 5)
+        .forEach(fav => {
+          if (!addedNames.has(fav.name.toLowerCase())) {
+            combinedSuggestions.push({
+              id: fav.id, name: fav.name, category: fav.category, source: 'favorite', quantity: fav.quantity
+            })
+            addedNames.add(fav.name.toLowerCase())
+          }
         })
+
       const commonMatches = searchProducts(name, 5)
       commonMatches.forEach(product => {
-        if (!addedNames.has(product.name.toLowerCase())) { combinedSuggestions.push({ id: `common-${product.name}`, name: product.name, category: product.category, source: 'common' }); addedNames.add(product.name.toLowerCase()) }
+        if (!addedNames.has(product.name.toLowerCase())) {
+          combinedSuggestions.push({
+            id: `common-${product.name}`, name: product.name, category: product.category, source: 'common'
+          })
+          addedNames.add(product.name.toLowerCase())
+        }
       })
-      setSuggestions(combinedSuggestions); setShowSuggestions(combinedSuggestions.length > 0)
-    } else { setShowSuggestions(false); setSuggestions([]) }
-    if (!manuallySelected && debouncedName.trim().length > 2) { const detected = detectCategory(debouncedName); if (detected !== 'other') setSelectedCategory(detected) }
+
+      setSuggestions(combinedSuggestions)
+      setShowSuggestions(combinedSuggestions.length > 0)
+    } else {
+      setShowSuggestions(false)
+      setSuggestions([])
+    }
+
+    if (!manuallySelected && debouncedName.trim().length > 2) {
+      const detected = detectCategory(debouncedName)
+      if (detected !== 'other') setSelectedCategory(detected)
+    }
   }, [debouncedName, manuallySelected, name, suggestionsSource])
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => { if (formRef.current && !formRef.current.contains(e.target as Node)) { setShowCategories(false); setShowSuggestions(false) } }
-    document.addEventListener('click', handleClickOutside); return () => document.removeEventListener('click', handleClickOutside)
+    const handleClickOutside = (e: MouseEvent) => {
+      if (formRef.current && !formRef.current.contains(e.target as Node)) {
+        setShowCategories(false)
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (name.trim() && !isSubmitting) {
-      setIsSubmitting(true); await onAdd(name.trim(), selectedCategory, undefined)
-      setName(''); setSelectedCategory('other'); setShowCategories(false); setManuallySelected(false); setShowSuggestions(false); setIsSubmitting(false); inputRef.current?.focus()
+      setIsSubmitting(true)
+      await onAdd(name.trim(), selectedCategory, undefined)
+      setName('')
+      setSelectedCategory('other')
+      setShowCategories(false)
+      setManuallySelected(false)
+      setShowSuggestions(false)
+      setIsSubmitting(false)
+      inputRef.current?.focus()
     }
   }, [name, selectedCategory, onAdd, isSubmitting])
 
@@ -72,26 +133,66 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
     const categoryToUse = suggestion.category ? (suggestion.category as CategoryId) : 'other'
     setShowSuggestions(false)
     if (!isSubmitting) {
-      setIsSubmitting(true); await onAdd(suggestion.name, categoryToUse, undefined)
-      setName(''); setSelectedCategory('other'); setManuallySelected(false); setIsSubmitting(false); inputRef.current?.focus()
+      setIsSubmitting(true)
+      await onAdd(suggestion.name, categoryToUse, undefined)
+      setName('')
+      setSelectedCategory('other')
+      setManuallySelected(false)
+      setIsSubmitting(false)
+      inputRef.current?.focus()
     }
   }
 
-  const handleCategorySelect = useCallback((categoryId: CategoryId) => { setSelectedCategory(categoryId); setShowCategories(false); setManuallySelected(true); inputRef.current?.focus() }, [])
-  const toggleCategories = useCallback(() => { setShowCategories(prev => !prev); setShowSuggestions(false) }, [])
-  const handleBarcodeProductFound = useCallback((productName: string, category?: string) => { setName(productName); if (category) { setSelectedCategory(category as CategoryId); setManuallySelected(true) }; inputRef.current?.focus() }, [])
-  const handleVoiceButton = useCallback(() => { if (isListening) stopListening(); else startListening() }, [isListening, startListening, stopListening])
+  const handleCategorySelect = useCallback((categoryId: CategoryId) => {
+    setSelectedCategory(categoryId)
+    setShowCategories(false)
+    setManuallySelected(true)
+    inputRef.current?.focus()
+  }, [])
+
+  const toggleCategories = useCallback(() => {
+    setShowCategories(prev => !prev)
+    setShowSuggestions(false)
+  }, [])
+
+  const handleBarcodeProductFound = useCallback((productName: string, category?: string) => {
+    setName(productName)
+    if (category) {
+      setSelectedCategory(category as CategoryId)
+      setManuallySelected(true)
+    }
+    inputRef.current?.focus()
+  }, [])
+
+  const handleVoiceButton = useCallback(() => {
+    if (isListening) stopListening()
+    else startListening()
+  }, [isListening, startListening, stopListening])
+
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
+  // Si tiene foco, forzamos visibilidad ignorando al padre
+  const shouldBeVisible = isVisible || isInputFocused
+
   return (
-    <div className="bg-card border-t border-border-light pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
-      {/* Sugerencias Flotantes - HORIZONTAL */}
+    <div 
+      className={`fixed bottom-0 left-0 right-0 w-full bg-card border-t border-border-light z-30 transition-transform duration-300 ${
+        shouldBeVisible ? 'translate-y-0' : 'translate-y-full'
+      }`}
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      {/* Sugerencias Flotantes */}
       {showSuggestions && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 px-4 flex gap-2 overflow-x-auto pb-2 z-20 scrollbar-hide mask-fade-sides pointer-events-auto">
+        <div className="absolute bottom-full left-0 right-0 mb-2 px-4 flex gap-2 overflow-x-auto pb-2 z-20 scrollbar-hide mask-fade-sides">
           {suggestions.map((suggestion) => {
             const CategoryConfig = suggestion.category ? CATEGORIES[suggestion.category as CategoryId] : null
             return (
-              <button key={suggestion.id} type="button" onClick={() => handleSuggestionClick(suggestion)} className="flex items-center gap-1.5 px-3 py-2 bg-card rounded-xl shadow-md border border-border/50 hover:bg-secondary whitespace-nowrap transition-transform active:scale-95 flex-shrink-0">
+              <button
+                key={suggestion.id}
+                type="button"
+                onClick={() => handleSuggestionClick(suggestion)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-card rounded-xl shadow-md border border-border/50 hover:bg-secondary whitespace-nowrap transition-transform active:scale-95 flex-shrink-0"
+              >
                 {suggestion.source === 'favorite' && <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />}
                 <span className="font-medium text-sm text-foreground">{suggestion.name}</span>
                 {suggestion.quantity && suggestion.quantity > 1 && <span className="text-[10px] text-muted bg-secondary px-1 py-0.5 rounded">x{suggestion.quantity}</span>}
@@ -106,8 +207,14 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
         {showCategories && (
           <div className="absolute bottom-full left-4 right-4 mb-2 bg-card rounded-xl shadow-xl border border-border p-3 grid grid-cols-5 gap-2 animate-in slide-in-from-bottom-2 z-40">
             {Object.values(CATEGORIES).map((cat) => (
-              <button key={cat.id} type="button" onClick={() => handleCategorySelect(cat.id)} className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${selectedCategory === cat.id ? 'bg-primary/10 text-primary ring-2 ring-primary/20 scale-105' : 'hover:bg-hover text-muted'}`}>
-                <cat.icon className="w-6 h-6 mb-1.5" /><span className="text-[10px] truncate w-full text-center font-medium leading-tight">{cat.label.split(' ')[0]}</span>
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => handleCategorySelect(cat.id)}
+                className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${selectedCategory === cat.id ? 'bg-primary/10 text-primary ring-2 ring-primary/20 scale-105' : 'hover:bg-hover text-muted'}`}
+              >
+                <cat.icon className="w-6 h-6 mb-1.5" />
+                <span className="text-[10px] truncate w-full text-center font-medium leading-tight">{cat.label.split(' ')[0]}</span>
               </button>
             ))}
           </div>
@@ -115,11 +222,25 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
 
         <div className="flex items-center gap-2">
           <button type="button" onClick={toggleCategories} className={`flex-shrink-0 w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-300 relative ${showCategories ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'} ${CurrentCategoryConfig.color}`}>
-            <CurrentCategoryConfig.icon className="w-5 h-5" /><div className="absolute -top-1 -right-1 w-4 h-4 bg-card rounded-full shadow border border-border-light flex items-center justify-center"><ChevronUp className="w-2.5 h-2.5 text-muted" /></div>
+            <CurrentCategoryConfig.icon className="w-5 h-5" />
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-card rounded-full shadow border border-border-light flex items-center justify-center"><ChevronUp className="w-2.5 h-2.5 text-muted" /></div>
           </button>
 
           <div className="flex-1 relative">
-            <input ref={inputRef} type="text" value={name} onChange={(e) => { setName(e.target.value); if (e.target.value.trim() === '') { setManuallySelected(false); setSelectedCategory('other') } }} onFocus={() => setIsInputFocused(true)} onBlur={() => setTimeout(() => setIsInputFocused(false), 200)} placeholder={isListening ? "Escuchando..." : "Añadir producto..."} className={`w-full h-11 rounded-xl bg-secondary px-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-light ${isListening ? 'ring-2 ring-red-500 bg-red-50 dark:bg-red-900/20' : ''}`} autoComplete="off" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value)
+                if (e.target.value.trim() === '') { setManuallySelected(false); setSelectedCategory('other') }
+              }}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setTimeout(() => setIsInputFocused(false), 200)}
+              placeholder={isListening ? "Escuchando..." : "Añadir producto..."}
+              className={`w-full h-11 rounded-xl bg-secondary px-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-light ${isListening ? 'ring-2 ring-red-500 bg-red-50 dark:bg-red-900/20' : ''}`}
+              autoComplete="off"
+            />
           </div>
 
           {isInputFocused && (
@@ -129,9 +250,12 @@ function AddItemFormComponent({ onAdd, suggestionsSource = [] }: AddItemFormProp
             </div>
           )}
 
-          <Button type="submit" disabled={!name.trim() || isSubmitting} className="w-11 h-11 rounded-xl p-0 flex items-center justify-center shrink-0">{isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}</Button>
+          <Button type="submit" disabled={!name.trim() || isSubmitting} className="w-11 h-11 rounded-xl p-0 flex items-center justify-center shrink-0">
+            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+          </Button>
         </div>
       </form>
+
       <BarcodeScannerModal isOpen={showBarcodeScanner} onClose={() => setShowBarcodeScanner(false)} onProductFound={handleBarcodeProductFound} />
     </div>
   )

@@ -176,10 +176,28 @@ function ShoppingItemComponent({
 
         {/* Contenido principal: Nombre prominente */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <p className={`text-base font-medium truncate ${item.checked ? 'line-through text-muted' : 'text-foreground'}`}>
               {item.name}
             </p>
+            
+            {/* Nota visual sutil */}
+            {item.note && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddNote?.(item.id);
+                }}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 hover:bg-yellow-200 transition-colors"
+                title={item.note}
+              >
+                <StickyNote className="w-3 h-3" />
+                <span className="text-[10px] font-medium max-w-[60px] truncate hidden sm:inline">
+                  {item.note}
+                </span>
+              </button>
+            )}
+
             {/* Avatar pequeño si está asignado */}
             {assignedToProfile && (
               <span
@@ -397,6 +415,7 @@ export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) =
     prevProps.item.unit === nextProps.item.unit &&
     prevProps.item.checked_by === nextProps.item.checked_by &&
     prevProps.item.assigned_to === nextProps.item.assigned_to &&
+    prevProps.item.note === nextProps.item.note && // <--- AÑADIDO CHEQUEO DE NOTA
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onDelete === nextProps.onDelete &&
     prevProps.onUpdateQuantity === nextProps.onUpdateQuantity &&
