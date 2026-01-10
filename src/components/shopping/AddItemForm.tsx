@@ -153,28 +153,7 @@ function AddItemFormComponent({
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
 
   return (
-    <div className="w-full bg-card pt-2 pb-4">
-      {/* Sugerencias integradas en el flujo */}
-      {showSuggestions && (
-        <div className="mb-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide mask-fade-sides">
-          {suggestions.map((suggestion) => {
-            const CategoryConfig = suggestion.category ? CATEGORIES[suggestion.category as CategoryId] : null
-            return (
-              <button
-                key={suggestion.id}
-                type="button"
-                onClick={() => handleSuggestionClick(suggestion)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary whitespace-nowrap active:scale-95 transition-transform"
-              >
-                {suggestion.source === 'favorite' && <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />}
-                <span className="font-medium text-sm text-foreground">{suggestion.name}</span>
-                {CategoryConfig && <div className={`w-2 h-2 rounded-full ${CategoryConfig.color.split(' ')[0].replace('text-', 'bg-')}`} />}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
+    <div className="w-full bg-card pt-2 pb-4 flex flex-col-reverse">
       <form onSubmit={handleSubmit} className="relative">
         {/* Selector de Categorías (Overlay relativo) */}
         {showCategories && (
@@ -280,6 +259,27 @@ function AddItemFormComponent({
           )}
         </div>
       </form>
+
+      {/* Sugerencias - con flex-col-reverse aparecen visualmente arriba del form */}
+      {showSuggestions && (
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide mask-fade-sides">
+          {suggestions.map((suggestion) => {
+            const CategoryConfig = suggestion.category ? CATEGORIES[suggestion.category as CategoryId] : null
+            return (
+              <button
+                key={suggestion.id}
+                type="button"
+                onClick={() => handleSuggestionClick(suggestion)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-secondary/50 rounded-xl border border-border/50 hover:bg-secondary whitespace-nowrap active:scale-95 transition-transform"
+              >
+                {suggestion.source === 'favorite' && <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />}
+                <span className="font-medium text-sm text-foreground">{suggestion.name}</span>
+                {CategoryConfig && <div className={`w-2 h-2 rounded-full ${CategoryConfig.color.split(' ')[0].replace('text-', 'bg-')}`} />}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <BarcodeScannerModal isOpen={showBarcodeScanner} onClose={() => setShowBarcodeScanner(false)} onProductFound={handleBarcodeProductFound} />
     </div>

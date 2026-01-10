@@ -59,25 +59,27 @@ export function AddItemDrawer({
           {/* Handle visual */}
           <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted-foreground/20 mt-3 mb-1" />
 
-          <div className="px-4 pt-2 pb-[env(safe-area-inset-bottom,8px)] overflow-y-auto">
-            <Drawer.Title className="font-bold text-lg mb-3 text-center">Añadir Productos</Drawer.Title>
+          <Drawer.Title className="font-bold text-lg mb-2 text-center px-4">Añadir Productos</Drawer.Title>
 
-            {/* Sección de Favoritos dentro del Drawer */}
-            <div className="mb-4">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Frecuentes</h3>
-                <FavoriteItems
-                    favorites={favoriteItems}
-                    isLoading={isLoadingFavorites}
-                    onAddToList={onAddFromFavorite}
-                    onRemove={onRemoveFavorite}
-                />
+          {/* Sección de Favoritos con scroll independiente */}
+          <div className="flex-1 overflow-y-auto px-4 min-h-0">
+            <div className="mb-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Frecuentes</h3>
+              <FavoriteItems
+                favorites={favoriteItems}
+                isLoading={isLoadingFavorites}
+                onAddToList={onAddFromFavorite}
+                onRemove={onRemoveFavorite}
+              />
             </div>
+          </div>
 
-            {/* El formulario principal */}
+          {/* El formulario principal - siempre visible en la parte inferior */}
+          <div className="flex-shrink-0 px-4 pb-[env(safe-area-inset-bottom,8px)] border-t border-border/50 bg-background">
             <AddItemForm
-                onAdd={handleAddWrapper}
-                onOpenCatalog={handleOpenCatalogWrapper}
-                suggestionsSource={favoriteItems}
+              onAdd={handleAddWrapper}
+              onOpenCatalog={handleOpenCatalogWrapper}
+              suggestionsSource={favoriteItems}
             />
           </div>
         </Drawer.Content>
