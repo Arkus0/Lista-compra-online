@@ -1,5 +1,6 @@
 'use client'
 
+import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, ListTodo, Star, User, LucideIcon } from 'lucide-react'
@@ -25,15 +26,86 @@ interface BottomNavProps {
   }
 }
 
-export function BottomNav({ badges }: BottomNavProps) {
+// Memoized NavItem component for better performance
+const NavItemLink = memo(function NavItemLink({
+  item,
+  isActive,
+  badgeCount,
+}: {
+  item: NavItem
+  isActive: boolean
+  badgeCount?: number
+}) {
+  const Icon = item.icon
+
+  return (
+    <Link
+      href={item.href}
+      className={`
+        relative flex flex-col items-center justify-center gap-0.5 px-4 py-2 min-w-[64px]
+        rounded-xl transition-all duration-200 ripple
+        ${isActive
+          ? 'text-primary'
+          : 'text-muted-light hover:text-muted active:scale-95'
+        }
+      `}
+      aria-current={isActive ? 'page' : undefined}
+      aria-label={item.label}
+    >
+      {/* Background indicator for active state */}
+      {isActive && (
+        <span className="absolute inset-x-2 inset-y-1 bg-primary/10 rounded-xl -z-10 animate-in fade-in zoom-in-90 duration-200" />
+      )}
+
+      {/* Icon with badge */}
+      <span className="relative">
+        <Icon
+          className={`w-6 h-6 transition-transform duration-200 ${
+            isActive ? 'scale-110' : ''
+          }`}
+          strokeWidth={isActive ? 2.5 : 2}
+        />
+        {badgeCount !== undefined && badgeCount > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-danger text-white text-[10px] font-bold rounded-full flex items-center justify-center badge-bounce">
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </span>
+        )}
+      </span>
+
+      {/* Label */}
+      <span
+        className={`text-[10px] font-medium tracking-wide transition-all duration-200 ${
+          isActive ? 'font-semibold' : ''
+        }`}
+      >
+        {item.label}
+      </span>
+
+      {/* Active dot indicator */}
+      {isActive && (
+        <span className="absolute -bottom-0.5 w-1 h-1 bg-primary rounded-full animate-in fade-in duration-300" />
+      )}
+    </Link>
+  )
+})
+
+function BottomNavComponent({ badges }: BottomNavProps) {
   const pathname = usePathname()
 
-  const getBadgeCount = (href: string): number | undefined => {
-    if (!badges) return undefined
-    if (href === '/lists') return badges.lists
-    if (href === '/favorites') return badges.favorites
-    return undefined
-  }
+  // Memoize badge lookup
+  const badgeMap = useMemo(() => ({
+    '/lists': badges?.lists,
+    '/favorites': badges?.favorites,
+  }), [badges?.lists, badges?.favorites])
+
+  // Memoize active states calculation
+  const activeStates = useMemo(() => {
+    return navItems.map(item => ({
+      item,
+      isActive: pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)),
+      badgeCount: badgeMap[item.href as keyof typeof badgeMap],
+    }))
+  }, [pathname, badgeMap])
 
   return (
     <nav
@@ -42,65 +114,18 @@ export function BottomNav({ badges }: BottomNavProps) {
       aria-label="Navegación principal"
     >
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
-        {navItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== '/' && pathname.startsWith(item.href))
-          const Icon = item.icon
-          const badgeCount = getBadgeCount(item.href)
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`
-                relative flex flex-col items-center justify-center gap-0.5 px-4 py-2 min-w-[64px]
-                rounded-xl transition-all duration-200 ripple
-                ${isActive
-                  ? 'text-primary'
-                  : 'text-muted-light hover:text-muted active:scale-95'
-                }
-              `}
-              aria-current={isActive ? 'page' : undefined}
-              aria-label={item.label}
-            >
-              {/* Background indicator for active state */}
-              {isActive && (
-                <span className="absolute inset-x-2 inset-y-1 bg-primary/10 rounded-xl -z-10 animate-in fade-in zoom-in-90 duration-200" />
-              )}
-
-              {/* Icon with badge */}
-              <span className="relative">
-                <Icon
-                  className={`w-6 h-6 transition-transform duration-200 ${
-                    isActive ? 'scale-110' : ''
-                  }`}
-                  strokeWidth={isActive ? 2.5 : 2}
-                />
-                {badgeCount !== undefined && badgeCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-danger text-white text-[10px] font-bold rounded-full flex items-center justify-center badge-bounce">
-                    {badgeCount > 99 ? '99+' : badgeCount}
-                  </span>
-                )}
-              </span>
-
-              {/* Label */}
-              <span
-                className={`text-[10px] font-medium tracking-wide transition-all duration-200 ${
-                  isActive ? 'font-semibold' : ''
-                }`}
-              >
-                {item.label}
-              </span>
-
-              {/* Active dot indicator */}
-              {isActive && (
-                <span className="absolute -bottom-0.5 w-1 h-1 bg-primary rounded-full animate-in fade-in duration-300" />
-              )}
-            </Link>
-          )
-        })}
+        {activeStates.map(({ item, isActive, badgeCount }) => (
+          <NavItemLink
+            key={item.href}
+            item={item}
+            isActive={isActive}
+            badgeCount={badgeCount}
+          />
+        ))}
       </div>
     </nav>
   )
 }
+
+// Export memoized component
+export const BottomNav = memo(BottomNavComponent)

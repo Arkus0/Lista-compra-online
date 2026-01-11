@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, memo, useCallback } from 'react'
 import { Search, ArrowLeft, X, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -9,7 +9,7 @@ import dynamic from 'next/dynamic'
 
 const NotificationButton = dynamic(
   () => import('@/components/notifications/NotificationButton').then(mod => ({ default: mod.NotificationButton })),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="w-10 h-10" /> }
 )
 
 interface HeaderProps {
@@ -20,7 +20,7 @@ interface HeaderProps {
   searchPlaceholder?: string
 }
 
-export function Header({
+function HeaderComponent({
   title = 'ShoppyJuan',
   showSearch = false,
   showBack = false,
@@ -65,17 +65,29 @@ export function Header({
     }
   }, [searchQuery, onSearch])
 
-  const handleCloseSearch = () => {
+  const handleCloseSearch = useCallback(() => {
     setSearchQuery('')
     setIsSearchOpen(false)
     onSearch?.('')
-  }
+  }, [onSearch])
 
-  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       handleCloseSearch()
     }
-  }
+  }, [handleCloseSearch])
+
+  const handleBack = useCallback(() => {
+    router.back()
+  }, [router])
+
+  const handleOpenSearch = useCallback(() => {
+    setIsSearchOpen(true)
+  }, [])
+
+  const handleClearQuery = useCallback(() => {
+    setSearchQuery('')
+  }, [])
 
   return (
     <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-lg border-b border-border-light">
@@ -106,7 +118,7 @@ export function Header({
                 <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-light animate-spin" />
               ) : searchQuery ? (
                 <button
-                  onClick={() => setSearchQuery('')}
+                  onClick={handleClearQuery}
                   className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full hover:bg-hover flex items-center justify-center"
                   aria-label="Limpiar búsqueda"
                 >
@@ -123,7 +135,7 @@ export function Header({
             {showBack ? (
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => router.back()}
+                  onClick={handleBack}
                   className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   aria-label="Volver atrás"
                 >
@@ -146,7 +158,7 @@ export function Header({
             <div className="flex items-center gap-1">
               {showSearch && (
                 <button
-                  onClick={() => setIsSearchOpen(true)}
+                  onClick={handleOpenSearch}
                   className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   aria-label="Abrir búsqueda"
                 >
@@ -173,3 +185,14 @@ export function Header({
     </header>
   )
 }
+
+// Export memoized component with custom comparison
+export const Header = memo(HeaderComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.title === nextProps.title &&
+    prevProps.showSearch === nextProps.showSearch &&
+    prevProps.showBack === nextProps.showBack &&
+    prevProps.onSearch === nextProps.onSearch &&
+    prevProps.searchPlaceholder === nextProps.searchPlaceholder
+  )
+})

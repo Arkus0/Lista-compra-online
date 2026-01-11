@@ -28,34 +28,45 @@ export function useRealtimeList({
   const supabaseRef = useRef(createClient())
   const channelRef = useRef<RealtimeChannel | null>(null)
 
+  // Use refs for stable callbacks to avoid re-subscriptions
   const { addItem, updateItem, removeItem } = useItemsActions()
+  const actionsRef = useRef({ addItem, updateItem, removeItem })
+  actionsRef.current = { addItem, updateItem, removeItem }
+
+  const onNoteChangeRef = useRef(onNoteChange)
+  onNoteChangeRef.current = onNoteChange
+
+  const userIdRef = useRef(user?.id)
+  userIdRef.current = user?.id
 
   // Sincronizar presencia cuando cambia el estado
   const syncPresence = useCallback((state: RealtimePresenceState<PresenceState>) => {
     const users: PresenceState[] = []
+    const currentUserId = userIdRef.current
 
     Object.values(state).forEach((presences) => {
       presences.forEach((presence) => {
         // Evitar duplicados y excluir al usuario actual
-        if (presence.id !== user?.id && !users.find(u => u.id === presence.id)) {
+        if (presence.id !== currentUserId && !users.find(u => u.id === presence.id)) {
           users.push(presence as PresenceState)
         }
       })
     })
 
     setPresenceUsers(users)
-  }, [user?.id])
+  }, [])
 
   useEffect(() => {
     if (!listId || !user) return
 
     const supabase = supabaseRef.current
+    const userId = user.id
 
     // Crear canal único para esta lista
     const channel = supabase.channel(`list-realtime-${listId}`, {
       config: {
         presence: {
-          key: user.id,
+          key: userId,
         },
       },
     })
@@ -70,11 +81,12 @@ export function useRealtimeList({
         filter: `list_id=eq.${listId}`,
       },
       (payload) => {
+        const { addItem, updateItem, removeItem } = actionsRef.current
         switch (payload.eventType) {
           case 'INSERT':
             // Solo añadir si no es un item que nosotros creamos
             const newItem = payload.new as ListItem
-            if (newItem.added_by !== user.id) {
+            if (newItem.added_by !== userId) {
               addItem(newItem)
             }
             break
@@ -89,23 +101,24 @@ export function useRealtimeList({
     )
 
     // Suscribirse a cambios en notas
-    if (onNoteChange) {
-      channel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'list_notes',
-          filter: `list_id=eq.${listId}`,
-        },
-        (payload) => {
-          onNoteChange({
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'list_notes',
+        filter: `list_id=eq.${listId}`,
+      },
+      (payload) => {
+        const noteCallback = onNoteChangeRef.current
+        if (noteCallback) {
+          noteCallback({
             eventType: payload.eventType,
             note: (payload.eventType === 'DELETE' ? payload.old : payload.new) as ListNote,
           })
         }
-      )
-    }
+      }
+    )
 
     // Configurar presence
     channel
@@ -113,13 +126,11 @@ export function useRealtimeList({
         const state = channel.presenceState<PresenceState>()
         syncPresence(state)
       })
-      .on('presence', { event: 'join' }, ({ newPresences }) => {
-        // Usuario se unió
-        console.log('User joined:', newPresences)
+      .on('presence', { event: 'join' }, () => {
+        // Usuario se unió - silenciado para mejor rendimiento
       })
-      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-        // Usuario se fue
-        console.log('User left:', leftPresences)
+      .on('presence', { event: 'leave' }, () => {
+        // Usuario se fue - silenciado para mejor rendimiento
       })
 
     // Suscribirse y trackear presencia
@@ -152,7 +163,7 @@ export function useRealtimeList({
       setIsConnected(false)
       setPresenceUsers([])
     }
-  }, [listId, user, addItem, updateItem, removeItem, syncPresence, onNoteChange])
+  }, [listId, user, syncPresence]) // Reduced dependencies - callbacks accessed via refs
 
   return {
     presenceUsers,
