@@ -350,6 +350,8 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const [showTagsModal, setShowTagsModal] = useState(false)
   const [editingItemTags, setEditingItemTags] = useState<string[]>([])
   const [newTagInput, setNewTagInput] = useState('')
+  const [showEditNameModal, setShowEditNameModal] = useState(false)
+  const [editingItemName, setEditingItemName] = useState('')
   const imageInputRef = useRef<HTMLInputElement>(null)
 
   const supabaseRef = useRef(createClient())
@@ -559,6 +561,24 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleImageSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file || !editingItemId) return; const path = `items/${Date.now()}_${Math.random().toString(36).slice(2)}`; const imageUrl = await uploadImage(file, path); if (imageUrl) { updateItem(editingItemId, { image_url: imageUrl } as any); await supabase.from('list_items').update({ image_url: imageUrl }).eq('id', editingItemId) } setShowImageModal(false); setEditingItemId(null); if (imageInputRef.current) imageInputRef.current.value = '' }, [editingItemId, uploadImage, updateItem, supabase])
   const handleAddNote = useCallback((itemId: string) => { const item = itemsRef.current.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemNote(item?.note || ''); setShowNoteModal(true) }, [])
   const handleAddTags = useCallback((itemId: string) => { const item = itemsRef.current.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemTags(item?.tags || []); setNewTagInput(''); setShowTagsModal(true) }, [])
+  const handleEditName = useCallback((itemId: string) => { const item = itemsRef.current.find(i => i.id === itemId); setEditingItemId(itemId); setEditingItemName(item?.name || ''); setShowEditNameModal(true) }, [])
+  const handleSaveName = useCallback(async () => {
+    if (!editingItemId || !editingItemName.trim()) return
+    const newName = editingItemName.trim()
+    const item = itemsRef.current.find(i => i.id === editingItemId)
+    const itemIdToSave = editingItemId
+
+    updateItem(editingItemId, { name: newName })
+    setShowEditNameModal(false)
+    setEditingItemId(null)
+    setEditingItemName('')
+
+    const { error } = await supabase.from('list_items').update({ name: newName }).eq('id', itemIdToSave)
+    if (error) {
+      console.error('Error guardando nombre:', error)
+      updateItem(itemIdToSave, { name: item?.name || '' })
+    }
+  }, [editingItemId, editingItemName, updateItem, supabase])
   const handleSaveNote = useCallback(async () => {
     if (!editingItemId) return
     const noteValue = editingItemNote.trim() || null
@@ -627,7 +647,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   const handleSaveAsTemplate = async () => { if (!user) return; const { data: newTemplate, error } = await supabase.from('shopping_lists').insert({ name: `${list.name} (plantilla)`, owner_id: user.id, is_template: true }).select().single(); if (error || !newTemplate) return; if (items.length > 0) { const itemsCopy = items.map((item, index) => ({ list_id: newTemplate.id, name: item.name, quantity: item.quantity, unit: item.unit, category: item.category, checked: false, added_by: user.id, position: index })); await supabase.from('list_items').insert(itemsCopy) } setShowMenu(false); showUndoToast('Plantilla creada correctamente', () => { router.push('/lists/templates') }) }
   const handleMarkAllComplete = async () => { if (!user) return; const updates = uncheckedItems.map(item => ({ ...item, checked: true, checked_by: user.id })); setItems([...updates, ...checkedItems]); await supabase.from('list_items').update({ checked: true, checked_by: user.id }).eq('list_id', list.id).eq('checked', false); setShowMenu(false) }
   const handleClearCompleted = async () => { if (checkedItems.length === 0) return; const itemsToDelete = [...checkedItems]; setItems(uncheckedItems); const undoAction = async () => { const itemsToRestore = itemsToDelete.map(item => ({ list_id: item.list_id, name: item.name, quantity: item.quantity, category: item.category, added_by: item.added_by, checked: true, position: item.position })); const { data } = await supabase.from('list_items').insert(itemsToRestore).select(); if (data) { const { data: allItems } = await supabase.from('list_items').select('*').eq('list_id', list.id).order('position', { ascending: true }); if (allItems) setItems(allItems as ListItem[]) } }; showUndoToast(`${itemsToDelete.length} items eliminados`, undoAction); await supabase.from('list_items').delete().eq('list_id', list.id).eq('checked', true); setShowMenu(false) }
-  const openShareModal = () => setActiveModal('share'); const openCollaboratorsModal = () => setActiveModal('collaborators'); const toggleMenu = () => setShowMenu(p => !p); const handleCloseNoteModal = useCallback(() => { setShowNoteModal(false); setEditingItemId(null); setEditingItemNote('') }, [])
+  const openShareModal = () => setActiveModal('share'); const openCollaboratorsModal = () => setActiveModal('collaborators'); const toggleMenu = () => setShowMenu(p => !p); const handleCloseNoteModal = useCallback(() => { setShowNoteModal(false); setEditingItemId(null); setEditingItemNote('') }, []); const handleCloseEditNameModal = useCallback(() => { setShowEditNameModal(false); setEditingItemId(null); setEditingItemName('') }, [])
 
   return (
     <div className="flex flex-col h-full relative bg-background">
@@ -761,6 +781,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
                                 onAddImage={handleAddImage}
                                 onAddNote={handleAddNote}
                                 onAddTags={handleAddTags}
+                                onEditName={handleEditName}
                                 assignablePeople={assignablePeople}
                                 assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
                                 addedByProfile={profilesCache.get(item.added_by)}
@@ -794,6 +815,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
                         onAddImage={handleAddImage}
                         onAddNote={handleAddNote}
                         onAddTags={handleAddTags}
+                        onEditName={handleEditName}
                         assignablePeople={assignablePeople}
                         assignedToProfile={item.assigned_to ? profilesCache.get(item.assigned_to) : null}
                         addedByProfile={profilesCache.get(item.added_by)}
@@ -860,6 +882,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
       <Modal isOpen={activeModal === 'edit'} onClose={closeModal} title="Editar Nombre"><div className="gap-2 flex flex-col"><Input value={newName} onChange={e => setNewName(e.target.value)} /><Button onClick={handleUpdateName}>Guardar</Button></div></Modal>
       <Modal isOpen={activeModal === 'delete'} onClose={closeModal} title="Eliminar Lista"><div className="text-center"><p className="mb-4">¿Seguro?</p><Button variant="danger" onClick={handleDeleteList}>Eliminar</Button></div></Modal>
       <Modal isOpen={showNoteModal} onClose={handleCloseNoteModal} title="Añadir nota"><div className="space-y-4"><p className="text-sm text-muted">Añade una nota para este producto.</p><textarea value={editingItemNote} onChange={(e) => setEditingItemNote(e.target.value)} placeholder="Escribe tu nota aquí..." className="w-full h-32 px-4 py-3 rounded-xl border-2 border-border bg-input-bg text-foreground placeholder:text-muted-light focus:outline-none focus:border-primary transition-colors resize-none" autoFocus /><div className="flex gap-3 justify-end"><Button variant="secondary" onClick={handleCloseNoteModal}>Cancelar</Button><Button onClick={handleSaveNote}>Guardar</Button></div></div></Modal>
+      <Modal isOpen={showEditNameModal} onClose={handleCloseEditNameModal} title="Editar nombre"><div className="space-y-4"><p className="text-sm text-muted">Edita el nombre de este producto.</p><input type="text" value={editingItemName} onChange={(e) => setEditingItemName(e.target.value)} placeholder="Nombre del producto..." className="w-full px-4 py-3 rounded-xl border-2 border-border bg-input-bg text-foreground placeholder:text-muted-light focus:outline-none focus:border-primary transition-colors" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName() }} /><div className="flex gap-3 justify-end"><Button variant="secondary" onClick={handleCloseEditNameModal}>Cancelar</Button><Button onClick={handleSaveName} disabled={!editingItemName.trim()}>Guardar</Button></div></div></Modal>
       <Modal isOpen={showTagsModal} onClose={handleCloseTagsModal} title="Etiquetas">
         <div className="space-y-4">
           <p className="text-sm text-muted">Añade etiquetas para organizar y buscar este producto (ej: mercadona, lidl, urgente).</p>

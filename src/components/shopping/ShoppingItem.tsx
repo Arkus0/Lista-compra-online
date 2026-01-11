@@ -4,7 +4,7 @@ import { useState, memo, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Check, Trash2, GripVertical, Minus, Plus, User, Star,
-  UserPlus, X, MoreVertical, StickyNote, Camera, Tag
+  UserPlus, X, MoreVertical, StickyNote, Camera, Tag, Pencil
 } from 'lucide-react'
 import { ListItem, Profile } from '@/lib/supabase/types'
 import { getProductEmoji, CategoryId } from '@/lib/constants'
@@ -26,6 +26,7 @@ interface ShoppingItemProps {
   onAddImage?: (itemId: string) => void
   onAddNote?: (itemId: string) => void
   onAddTags?: (itemId: string) => void
+  onEditName?: (itemId: string) => void
   assignablePeople?: AssignablePerson[]
   assignedToProfile?: Profile | null
   dragHandleProps?: any
@@ -58,6 +59,7 @@ function ShoppingItemComponent({
   onAddImage,
   onAddNote,
   onAddTags,
+  onEditName,
   assignablePeople = [],
   assignedToProfile,
   dragHandleProps,
@@ -353,6 +355,9 @@ function ShoppingItemComponent({
               <button role="menuitem" onClick={() => { onAddTags(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Tag className="w-4 h-4 text-primary" /> <span>{item.tags && item.tags.length > 0 ? 'Editar etiquetas' : 'Añadir etiquetas'}</span></button>
             )}
             <div role="separator" className="h-px bg-border-light my-1" />
+            {onEditName && (
+              <button role="menuitem" onClick={() => { onEditName(item.id); setShowActionMenu(false); }} className="w-full px-3 py-2.5 text-left text-sm hover:bg-hover flex items-center gap-3"><Pencil className="w-4 h-4 text-muted" /> <span>Editar nombre</span></button>
+            )}
             <button role="menuitem" onClick={handleDelete} className="w-full px-3 py-2.5 text-left text-sm hover:bg-danger/10 flex items-center gap-3 text-danger"><Trash2 className="w-4 h-4" /> <span>Eliminar</span></button>
           </div>
         </>,
@@ -396,6 +401,7 @@ export const ShoppingItem = memo(ShoppingItemComponent, (prevProps, nextProps) =
     prevProps.onAddImage === nextProps.onAddImage &&
     prevProps.onAddNote === nextProps.onAddNote &&
     prevProps.onAddTags === nextProps.onAddTags &&
+    prevProps.onEditName === nextProps.onEditName &&
     prevProps.onAssign === nextProps.onAssign &&
     prevProps.onUpdateQuantity === nextProps.onUpdateQuantity
   )

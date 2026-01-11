@@ -200,13 +200,14 @@ export default function RecipesPage() {
         -1
       )
 
+      // Siempre cantidad 1
       const itemsToInsert = newIngredients.map((ing) => {
         maxPosition++
         return {
           list_id: listId,
           name: ing.name,
-          quantity: parseInt(ing.quantity) || 1,
-          unit: ing.unit || null,
+          quantity: 1,
+          unit: null,
           category: ing.category || 'pantry',
           added_by: user.id,
           position: maxPosition,
