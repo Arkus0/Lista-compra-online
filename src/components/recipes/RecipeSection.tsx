@@ -29,14 +29,22 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
 
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRecipe, setSelectedRecipe] = useState<TheMealDBRecipe | null>(null)
+  
+  // URL Import states
   const [showUrlImport, setShowUrlImport] = useState(false)
   const [importUrl, setImportUrl] = useState('')
   const [importedRecipe, setImportedRecipe] = useState<any>(null)
+  
+  // Export states
   const [showListSelector, setShowListSelector] = useState(false)
   const [ingredientsToExport, setIngredientsToExport] = useState<RecipeIngredient[]>([])
   const [isExporting, setIsExporting] = useState(false)
   const [exportSuccess, setExportSuccess] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
+
+  // Save Recipe states
+  const [isSavingRecipe, setIsSavingRecipe] = useState(false)
+  const [isRecipeSaved, setIsRecipeSaved] = useState(false)
 
   const supabase = createClient()
 
@@ -66,10 +74,50 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
     }
   }
 
+  const handleSaveRecipe = async () => {
+    if (!selectedRecipe || isSavingRecipe) return
+
+    setIsSavingRecipe(true)
+
+    try {
+      // Preparar objeto para guardar en user_recipes
+      const newRecipe = {
+        owner_id: userId,
+        title: selectedRecipe.title,
+        description: `Receta de ${selectedRecipe.cuisine} - ${selectedRecipe.category}`,
+        image_url: selectedRecipe.image_url,
+        category: selectedRecipe.category,
+        cuisine: selectedRecipe.cuisine,
+        ingredients: selectedRecipe.ingredients,
+        instructions: selectedRecipe.instructions,
+        servings: 4, // Valor por defecto
+      }
+
+      const { error } = await supabase
+        .from('user_recipes')
+        .insert(newRecipe)
+
+      if (error) throw error
+
+      setIsRecipeSaved(true)
+      
+      // Resetear estado después de unos segundos
+      setTimeout(() => {
+        setIsRecipeSaved(false)
+      }, 3000)
+
+    } catch (err) {
+      console.error('Error saving recipe:', err)
+    } finally {
+      setIsSavingRecipe(false)
+    }
+  }
+
   const handleExportToList = (ingredients: RecipeIngredient[]) => {
     setIngredientsToExport(ingredients)
     setShowListSelector(true)
-    setSelectedRecipe(null)
+    // No cerramos selectedRecipe aquí para que el usuario pueda seguir viendo la receta
+    // si lo prefiere, pero el modal de lista se superpondrá
   }
 
   const handleExportToSelectedList = async (listId: string) => {
@@ -105,6 +153,8 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
           setIngredientsToExport([])
           setExportSuccess(false)
           setExportMessage('')
+          // Si veníamos de una receta seleccionada, la cerramos también si queremos
+          // setSelectedRecipe(null) 
         }, 2000)
         return
       }
@@ -147,6 +197,8 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
         setIngredientsToExport([])
         setExportSuccess(false)
         setExportMessage('')
+        // Opcional: Cerrar la receta al terminar de exportar
+        if (selectedRecipe) setSelectedRecipe(null)
       }, 2000)
 
     } catch (err) {
@@ -239,7 +291,10 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
             <RecipeCard
               key={recipe.id}
               recipe={recipe}
-              onSelect={setSelectedRecipe}
+              onSelect={(r) => {
+                setSelectedRecipe(r)
+                setIsRecipeSaved(false) // Resetear estado al abrir nueva receta
+              }}
             />
           ))}
         </div>
@@ -259,6 +314,9 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
           recipe={selectedRecipe}
           onClose={() => setSelectedRecipe(null)}
           onExportToList={handleExportToList}
+          onSave={handleSaveRecipe}
+          isSaving={isSavingRecipe}
+          isSaved={isRecipeSaved}
         />
       )}
 
