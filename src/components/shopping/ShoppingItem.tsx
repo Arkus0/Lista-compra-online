@@ -326,7 +326,7 @@ function ShoppingItemComponent({
                   <span className="flex-1">Asignar a...</span>
                 </button>
                 {showAssignSubmenu && (
-                  <div role="menu" aria-label="Personas disponibles" className="absolute left-full top-0 ml-1 w-48 bg-card border border-border rounded-xl shadow-xl z-[9999] py-1 animate-in fade-in slide-in-from-left-2 duration-150" onClick={(e) => e.stopPropagation()}>
+                  <div role="menu" aria-label="Personas disponibles" className="absolute right-full top-0 ml-1 w-48 bg-card border border-border rounded-xl shadow-xl z-[9999] py-1 animate-in fade-in slide-in-from-left-2 duration-150" onClick={(e) => e.stopPropagation()}>
                     {assignedToProfile && (
                        <button role="menuitem" onClick={() => handleAssign(null)} className="w-full px-3 py-2 text-left text-sm hover:bg-hover flex items-center gap-2 text-danger"><X className="w-4 h-4" /> Quitar</button>
                     )}
