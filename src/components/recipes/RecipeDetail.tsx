@@ -1,6 +1,6 @@
 'use client'
 
-import { X, ChefHat, ShoppingCart, BookmarkPlus } from 'lucide-react'
+import { X, ChefHat, ShoppingCart, BookmarkPlus, Loader2, Check } from 'lucide-react'
 import { TheMealDBRecipe, RecipeIngredient } from '@/lib/supabase/types'
 import { Button } from '@/components/ui/Button'
 
@@ -9,9 +9,18 @@ interface RecipeDetailProps {
   onClose: () => void
   onExportToList: (ingredients: RecipeIngredient[]) => void
   onSave?: () => void
+  isSaving?: boolean
+  isSaved?: boolean
 }
 
-export function RecipeDetail({ recipe, onClose, onExportToList, onSave }: RecipeDetailProps) {
+export function RecipeDetail({ 
+  recipe, 
+  onClose, 
+  onExportToList, 
+  onSave, 
+  isSaving = false, 
+  isSaved = false 
+}: RecipeDetailProps) {
   if (!recipe) return null
 
   const handleExport = () => {
@@ -39,7 +48,7 @@ export function RecipeDetail({ recipe, onClose, onExportToList, onSave }: Recipe
         {/* Botón cerrar */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors z-10"
         >
           <X className="w-5 h-5" />
         </button>
@@ -113,18 +122,31 @@ export function RecipeDetail({ recipe, onClose, onExportToList, onSave }: Recipe
       </div>
 
       {/* Botones fijos */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-md border-t border-border">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-md border-t border-border z-20">
         <div className="flex gap-2">
           {onSave && (
             <Button
               onClick={onSave}
+              disabled={isSaving || isSaved}
               variant="secondary"
-              className="h-12 px-4"
+              className={`h-12 px-4 transition-all ${isSaved ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800' : ''}`}
             >
-              <BookmarkPlus className="w-5 h-5 mr-2" />
-              Guardar
+              {isSaving ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : isSaved ? (
+                <>
+                  <Check className="w-5 h-5 mr-2" />
+                  Guardado
+                </>
+              ) : (
+                <>
+                  <BookmarkPlus className="w-5 h-5 mr-2" />
+                  Guardar
+                </>
+              )}
             </Button>
           )}
+          
           <Button
             onClick={handleExport}
             disabled={recipe.ingredients.length === 0}
