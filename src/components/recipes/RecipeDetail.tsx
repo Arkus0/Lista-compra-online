@@ -1,159 +1,152 @@
 'use client'
 
-import { X, ChefHat, ShoppingCart, BookmarkPlus, Loader2, Check } from 'lucide-react'
+import { useEffect } from 'react' // Importamos useEffect
+import { X, Clock, Users, ChefHat, ExternalLink, Save, ArrowRight, Check } from 'lucide-react' // AÑADIDO: Check
 import { TheMealDBRecipe, RecipeIngredient } from '@/lib/supabase/types'
 import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
 
 interface RecipeDetailProps {
-  recipe: TheMealDBRecipe | null
+  recipe: TheMealDBRecipe
   onClose: () => void
   onExportToList: (ingredients: RecipeIngredient[]) => void
-  onSave?: () => void
+  onSave: () => void
   isSaving?: boolean
   isSaved?: boolean
 }
 
-export function RecipeDetail({ 
-  recipe, 
-  onClose, 
-  onExportToList, 
-  onSave, 
-  isSaving = false, 
-  isSaved = false 
+export function RecipeDetail({
+  recipe,
+  onClose,
+  onExportToList,
+  onSave,
+  isSaving = false,
+  isSaved = false
 }: RecipeDetailProps) {
-  if (!recipe) return null
-
-  const handleExport = () => {
-    // Exportar TODOS los ingredientes
-    onExportToList(recipe.ingredients)
-  }
+  
+  // BLOQUEO DE SCROLL DEL FONDO
+  useEffect(() => {
+    // Al montar: bloquear scroll
+    document.body.style.overflow = 'hidden'
+    
+    // Al desmontar: desbloquear scroll
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [])
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background animate-in slide-in-from-bottom duration-300">
-      {/* Header con imagen */}
-      <div className="relative h-56 sm:h-72 flex-shrink-0">
-        {recipe.image_url ? (
-          <img
-            src={recipe.image_url}
-            alt={recipe.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-secondary flex items-center justify-center">
-            <ChefHat className="w-20 h-20 text-muted" />
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div 
+        className="bg-card w-full max-w-2xl max-h-[90dvh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header Image */}
+        <div className="relative h-48 sm:h-64 flex-shrink-0 group">
+          {recipe.image_url ? (
+            <img
+              src={recipe.image_url}
+              alt={recipe.title}
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            />
+          ) : (
+            <div className="w-full h-full bg-secondary flex items-center justify-center">
+              <ChefHat className="w-16 h-16 text-muted" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+          
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors backdrop-blur-md z-10"
+          >
+            <X className="w-5 h-5" />
+          </button>
 
-        {/* Botón cerrar */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors z-10"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Info sobre imagen */}
-        <div className="absolute bottom-4 left-4 right-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-2 py-1 bg-primary text-primary-foreground rounded-full text-xs font-medium">
+          <div className="absolute bottom-4 left-4 right-4 text-white">
+            <Badge variant="secondary" className="mb-2 bg-white/20 hover:bg-white/30 text-white border-none backdrop-blur-md">
               {recipe.category}
-            </span>
-            <span className="px-2 py-1 bg-white/20 backdrop-blur-sm text-white rounded-full text-xs">
-              {recipe.cuisine}
-            </span>
+            </Badge>
+            <h2 className="text-2xl sm:text-3xl font-bold leading-tight line-clamp-2 text-shadow-sm">{recipe.title}</h2>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white line-clamp-2">
-            {recipe.title}
-          </h1>
         </div>
-      </div>
 
-      {/* Contenido scrolleable */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Ingredientes */}
-        <div className="p-4 border-b border-border">
-          <h2 className="font-bold text-lg flex items-center gap-2 mb-3">
-            <ShoppingCart className="w-5 h-5 text-primary" />
-            Ingredientes ({recipe.ingredients.length})
-          </h2>
-
-          <div className="space-y-1">
-            {recipe.ingredients.map((ing, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/50"
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 overscroll-contain">
+          {/* Metadata */}
+          <div className="flex items-center gap-4 text-sm text-muted-foreground border-b border-border pb-4">
+            <div className="flex items-center gap-1.5">
+              <Users className="w-4 h-4" />
+              <span>{recipe.cuisine}</span>
+            </div>
+            {recipe.source_url && (
+              <a 
+                href={recipe.source_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-primary hover:underline ml-auto"
               >
-                <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                <span className="flex-1 text-sm">
-                  <span className="font-medium">{ing.name}</span>
-                  {(ing.quantity || ing.unit) && (
-                    <span className="text-muted-foreground ml-1">
-                      - {ing.quantity} {ing.unit}
-                    </span>
-                  )}
-                </span>
-              </div>
-            ))}
+                <ExternalLink className="w-4 h-4" />
+                <span>Ver receta original</span>
+              </a>
+            )}
           </div>
-        </div>
 
-        {/* Instrucciones */}
-        {recipe.instructions && (
-          <div className="p-4">
-            <h2 className="font-bold text-lg mb-3 flex items-center gap-2">
-              <ChefHat className="w-5 h-5 text-primary" />
-              Preparación
-            </h2>
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              {recipe.instructions.split('\n').map((paragraph, i) => (
-                paragraph.trim() && (
-                  <p key={i} className="text-sm text-muted-foreground mb-3 leading-relaxed">
-                    {paragraph}
-                  </p>
-                )
+          {/* Ingredients */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                Ingredientes
+                <span className="text-xs font-normal text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
+                  {recipe.ingredients.length}
+                </span>
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {recipe.ingredients.map((ing, i) => (
+                <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/30 border border-border/50 hover:bg-secondary/50 transition-colors">
+                  <div className="w-2 h-2 rounded-full bg-primary/70 flex-shrink-0 shadow-[0_0_8px] shadow-primary/30" />
+                  <span className="font-medium text-sm sm:text-base">{ing.name}</span>
+                  {ing.quantity && <span className="text-muted-foreground text-xs sm:text-sm ml-auto font-mono bg-background/50 px-1.5 py-0.5 rounded">{ing.quantity} {ing.unit}</span>}
+                </div>
               ))}
             </div>
           </div>
-        )}
 
-        {/* Espacio para el botón fijo */}
-        <div className="h-24" />
-      </div>
-
-      {/* Botones fijos */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-md border-t border-border z-20">
-        <div className="flex gap-2">
-          {onSave && (
-            <Button
-              onClick={onSave}
-              disabled={isSaving || isSaved}
-              variant="secondary"
-              className={`h-12 px-4 transition-all ${isSaved ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800' : ''}`}
-            >
-              {isSaving ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : isSaved ? (
-                <>
-                  <Check className="w-5 h-5 mr-2" />
-                  Guardado
-                </>
-              ) : (
-                <>
-                  <BookmarkPlus className="w-5 h-5 mr-2" />
-                  Guardar
-                </>
-              )}
-            </Button>
+          {/* Instructions */}
+          {recipe.instructions && (
+            <div>
+              <h3 className="font-semibold text-lg mb-3">Instrucciones</h3>
+              <div className="prose prose-sm dark:prose-invert text-muted-foreground whitespace-pre-line leading-relaxed bg-secondary/10 p-4 rounded-xl border border-border/50">
+                {recipe.instructions}
+              </div>
+            </div>
           )}
-          
-          <Button
-            onClick={handleExport}
-            disabled={recipe.ingredients.length === 0}
-            className={`h-12 text-base font-semibold ${onSave ? 'flex-1' : 'w-full'}`}
+        </div>
+
+        {/* Footer Actions - Fixed at bottom */}
+        <div className="p-4 bg-background/95 backdrop-blur-md border-t border-border flex gap-3 flex-shrink-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+          <Button 
+            variant="outline" 
+            className={`flex-1 gap-2 transition-all ${isSaved ? 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900' : ''}`}
+            onClick={onSave}
+            disabled={isSaving || isSaved}
           >
-            <ShoppingCart className="w-5 h-5 mr-2" />
-            Añadir a lista
+            {isSaved ? (
+              <>
+                <Check className="w-4 h-4" /> Guardado
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" /> {isSaving ? 'Guardando...' : 'Guardar'}
+              </>
+            )}
+          </Button>
+          <Button 
+            className="flex-[1.5] gap-2 shadow-lg shadow-primary/20"
+            onClick={() => onExportToList(recipe.ingredients)}
+          >
+            Añadir a lista <ArrowRight className="w-4 h-4" />
           </Button>
         </div>
       </div>
