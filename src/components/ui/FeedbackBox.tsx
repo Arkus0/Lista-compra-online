@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { MessageSquare, Send, X, CheckCircle } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { MessageSquare, Send, CheckCircle } from 'lucide-react'
 import { Modal } from './Modal'
 import { Button } from './Button'
 
@@ -15,6 +15,21 @@ export function FeedbackBox({ variant = 'button' }: FeedbackBoxProps) {
   const [email, setEmail] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [isSent, setIsSent] = useState(false)
+
+  // FIX: Usamos useCallback para que la función no cambie en cada renderizado
+  // Esto evita que el Modal pierda el foco al escribir
+  const handleClose = useCallback(() => {
+    setIsOpen(false)
+  }, [])
+
+  const openMailto = () => {
+    const subject = encodeURIComponent('Sugerencia - Lista de Compras')
+    const body = encodeURIComponent(`${message}\n\nEmail de contacto: ${email || 'No proporcionado'}`)
+    window.location.href = `mailto:juanjosemova@outlook.es?subject=${subject}&body=${body}`
+    handleClose()
+    setMessage('')
+    setEmail('')
+  }
 
   const handleSubmit = async () => {
     if (!message.trim()) return
@@ -31,33 +46,27 @@ export function FeedbackBox({ variant = 'button' }: FeedbackBoxProps) {
         })
       })
 
-      if (response.ok) {
+      const data = await response.json()
+
+      if (response.ok && data.success) {
         setIsSent(true)
         setTimeout(() => {
-          setIsOpen(false)
+          handleClose()
           setMessage('')
           setEmail('')
           setIsSent(false)
         }, 2000)
       } else {
-        // Fallback to mailto
+        // Si falla el envío por API, abrimos el cliente de correo
+        console.warn('API error, falling back to mailto:', data.error)
         openMailto()
       }
-    } catch {
-      // Fallback to mailto
+    } catch (error) {
+      console.error('Network error, falling back to mailto:', error)
       openMailto()
     } finally {
       setIsSending(false)
     }
-  }
-
-  const openMailto = () => {
-    const subject = encodeURIComponent('Sugerencia - Lista de Compras')
-    const body = encodeURIComponent(`${message}\n\nEmail de contacto: ${email || 'No proporcionado'}`)
-    window.location.href = `mailto:juanjosemova@outlook.es?subject=${subject}&body=${body}`
-    setIsOpen(false)
-    setMessage('')
-    setEmail('')
   }
 
   if (variant === 'card') {
@@ -78,7 +87,7 @@ export function FeedbackBox({ variant = 'button' }: FeedbackBoxProps) {
 
         <FeedbackModal
           isOpen={isOpen}
-          onClose={() => setIsOpen(false)}
+          onClose={handleClose}
           message={message}
           setMessage={setMessage}
           email={email}
@@ -103,7 +112,7 @@ export function FeedbackBox({ variant = 'button' }: FeedbackBoxProps) {
 
       <FeedbackModal
         isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
+        onClose={handleClose}
         message={message}
         setMessage={setMessage}
         email={email}
@@ -159,6 +168,7 @@ function FeedbackModal({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Escribe tu sugerencia aquí..."
+              autoFocus
               className="w-full h-32 px-4 py-3 rounded-xl border-2 border-border bg-input-bg text-foreground placeholder:text-muted-light focus:outline-none focus:border-primary transition-colors resize-none"
             />
           </div>
