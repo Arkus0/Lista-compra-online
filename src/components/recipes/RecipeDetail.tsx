@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect } from 'react' // Importamos useEffect
-import { X, Clock, Users, ChefHat, ExternalLink, Save, ArrowRight, Check } from 'lucide-react' // AÑADIDO: Check
+import { useEffect } from 'react'
+import { X, Users, ChefHat, ExternalLink, Save, ArrowRight, Check } from 'lucide-react'
 import { TheMealDBRecipe, RecipeIngredient } from '@/lib/supabase/types'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -24,12 +24,9 @@ export function RecipeDetail({
   isSaved = false
 }: RecipeDetailProps) {
   
-  // BLOQUEO DE SCROLL DEL FONDO
+  // Bloquear scroll del fondo cuando el modal está abierto
   useEffect(() => {
-    // Al montar: bloquear scroll
     document.body.style.overflow = 'hidden'
-    
-    // Al desmontar: desbloquear scroll
     return () => {
       document.body.style.overflow = 'unset'
     }
@@ -64,9 +61,11 @@ export function RecipeDetail({
           </button>
 
           <div className="absolute bottom-4 left-4 right-4 text-white">
-            <Badge variant="secondary" className="mb-2 bg-white/20 hover:bg-white/30 text-white border-none backdrop-blur-md">
-              {recipe.category}
-            </Badge>
+            <div className="flex gap-2 mb-2">
+                <Badge variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-none backdrop-blur-md">
+                {recipe.category}
+                </Badge>
+            </div>
             <h2 className="text-2xl sm:text-3xl font-bold leading-tight line-clamp-2 text-shadow-sm">{recipe.title}</h2>
           </div>
         </div>
@@ -79,6 +78,7 @@ export function RecipeDetail({
               <Users className="w-4 h-4" />
               <span>{recipe.cuisine}</span>
             </div>
+            {/* Aquí usamos la propiedad que acabamos de añadir al tipo */}
             {recipe.source_url && (
               <a 
                 href={recipe.source_url} 
