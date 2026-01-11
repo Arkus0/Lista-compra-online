@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Search, ChefHat, Shuffle, Link2, Loader2, X, ArrowRight,
-  Plus, Users, Clock, BookOpen, ArrowLeft
+  Plus, Users, Clock, BookOpen, ArrowLeft, MoreVertical, Share2, Trash2, Copy, Check
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRecipes } from '@/hooks/useRecipes'
@@ -17,12 +17,14 @@ import { Input } from '@/components/ui/Input'
 import { TheMealDBRecipe, RecipeIngredient, UserRecipe, ShoppingList } from '@/lib/supabase/types'
 import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
+import { useToast } from '@/components/ui/Toast'
 
 type TabType = 'search' | 'my-recipes'
 
 export default function RecipesPage() {
   const router = useRouter()
   const supabase = createClient()
+  const { showToast } = useToast()
 
   const [activeTab, setActiveTab] = useState<TabType>('search')
   const [user, setUser] = useState<any>(null)
@@ -62,6 +64,10 @@ export default function RecipesPage() {
   const [isJoining, setIsJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
 
+  // Recipe menu state
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [copiedShareCode, setCopiedShareCode] = useState<string | null>(null)
+
   // Load user and lists
   useEffect(() => {
     const loadUser = async () => {
@@ -73,7 +79,6 @@ export default function RecipesPage() {
           .from('shopping_lists')
           .select('*')
           .eq('owner_id', user.id)
-          .eq('is_archived', false)
           .order('updated_at', { ascending: false })
           .limit(20)
         if (lists) setUserLists(lists)
@@ -195,13 +200,14 @@ export default function RecipesPage() {
         -1
       )
 
+      // Siempre cantidad 1
       const itemsToInsert = newIngredients.map((ing) => {
         maxPosition++
         return {
           list_id: listId,
           name: ing.name,
-          quantity: parseInt(ing.quantity) || 1,
-          unit: ing.unit || null,
+          quantity: 1,
+          unit: null,
           category: ing.category || 'pantry',
           added_by: user.id,
           position: maxPosition,
@@ -263,7 +269,10 @@ export default function RecipesPage() {
 
   // Save TheMealDB recipe to my recipes
   const handleSaveRecipe = async (recipe: TheMealDBRecipe) => {
-    if (!user) return
+    if (!user) {
+      showToast('Debes iniciar sesión para guardar recetas', 'error')
+      return
+    }
 
     try {
       const shareCode = Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -287,11 +296,46 @@ export default function RecipesPage() {
 
       if (error) throw error
 
+      showToast('¡Receta guardada en Mis Recetas!', 'success')
       setSelectedRecipe(null)
       setActiveTab('my-recipes')
       loadMyRecipes()
     } catch (err) {
       console.error('Error saving recipe:', err)
+      showToast('Error al guardar la receta', 'error')
+    }
+  }
+
+  // Delete recipe
+  const handleDeleteRecipe = async (recipeId: string) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar esta receta?')) return
+
+    try {
+      const { error } = await supabase
+        .from('user_recipes')
+        .delete()
+        .eq('id', recipeId)
+
+      if (error) throw error
+
+      showToast('Receta eliminada', 'success')
+      setMenuOpenId(null)
+      loadMyRecipes()
+    } catch (err) {
+      console.error('Error deleting recipe:', err)
+      showToast('Error al eliminar la receta', 'error')
+    }
+  }
+
+  // Copy share code
+  const handleCopyShareCode = async (shareCode: string) => {
+    try {
+      await navigator.clipboard.writeText(shareCode)
+      setCopiedShareCode(shareCode)
+      showToast('Código copiado al portapapeles', 'success')
+      setTimeout(() => setCopiedShareCode(null), 2000)
+    } catch (err) {
+      showToast('Error al copiar', 'error')
     }
   }
 
@@ -463,29 +507,80 @@ export default function RecipesPage() {
                   {myRecipes.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {myRecipes.map((recipe) => (
-                        <Link
+                        <div
                           key={recipe.id}
-                          href={`/recipes/${recipe.id}`}
-                          className="bg-card rounded-xl border border-border overflow-hidden hover:shadow-md transition-shadow"
+                          className="relative bg-card rounded-xl border border-border overflow-hidden hover:shadow-md transition-shadow"
                         >
-                          {recipe.image_url ? (
-                            <img
-                              src={recipe.image_url}
-                              alt={recipe.title}
-                              className="w-full h-24 object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-24 bg-secondary flex items-center justify-center">
-                              <ChefHat className="w-8 h-8 text-muted" />
-                            </div>
+                          {/* Menu button */}
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setMenuOpenId(menuOpenId === recipe.id ? null : recipe.id)
+                            }}
+                            className="absolute top-2 right-2 z-10 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+
+                          {/* Dropdown menu */}
+                          {menuOpenId === recipe.id && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-20"
+                                onClick={() => setMenuOpenId(null)}
+                              />
+                              <div className="absolute top-10 right-2 z-30 bg-card border border-border rounded-lg shadow-lg overflow-hidden min-w-[140px]">
+                                {recipe.share_code && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleCopyShareCode(recipe.share_code!)
+                                    }}
+                                    className="w-full px-3 py-2 text-sm text-left hover:bg-secondary flex items-center gap-2"
+                                  >
+                                    {copiedShareCode === recipe.share_code ? (
+                                      <Check className="w-4 h-4 text-green-500" />
+                                    ) : (
+                                      <Copy className="w-4 h-4" />
+                                    )}
+                                    {copiedShareCode === recipe.share_code ? 'Copiado!' : 'Compartir'}
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeleteRecipe(recipe.id)
+                                  }}
+                                  className="w-full px-3 py-2 text-sm text-left hover:bg-secondary flex items-center gap-2 text-red-500"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Eliminar
+                                </button>
+                              </div>
+                            </>
                           )}
-                          <div className="p-2">
-                            <p className="font-medium text-sm truncate">{recipe.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {recipe.ingredients?.length || 0} ingredientes
-                            </p>
-                          </div>
-                        </Link>
+
+                          <Link href={`/recipes/${recipe.id}`}>
+                            {recipe.image_url ? (
+                              <img
+                                src={recipe.image_url}
+                                alt={recipe.title}
+                                className="w-full h-24 object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-24 bg-secondary flex items-center justify-center">
+                                <ChefHat className="w-8 h-8 text-muted" />
+                              </div>
+                            )}
+                            <div className="p-2">
+                              <p className="font-medium text-sm truncate">{recipe.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {recipe.ingredients?.length || 0} ingredientes
+                              </p>
+                            </div>
+                          </Link>
+                        </div>
                       ))}
                     </div>
                   ) : (
