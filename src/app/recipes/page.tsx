@@ -73,7 +73,7 @@ export default function RecipesPage() {
           .from('shopping_lists')
           .select('*')
           .eq('owner_id', user.id)
-          .eq('is_archived', false)
+          .or('is_archived.eq.false,is_archived.is.null')
           .order('updated_at', { ascending: false })
           .limit(20)
         if (lists) setUserLists(lists)

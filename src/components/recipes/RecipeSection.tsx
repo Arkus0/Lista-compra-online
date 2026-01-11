@@ -10,6 +10,8 @@ import { RecipeIngredient, TheMealDBRecipe, ShoppingList } from '@/lib/supabase/
 import { createClient } from '@/lib/supabase/client'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
+import type { User } from '@supabase/supabase-js'
 
 interface RecipeSectionProps {
   userId: string
@@ -46,7 +48,20 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
   const [isSavingRecipe, setIsSavingRecipe] = useState(false)
   const [isRecipeSaved, setIsRecipeSaved] = useState(false)
 
+  // Auth state
+  const [authUser, setAuthUser] = useState<User | null>(null)
+
   const supabase = createClient()
+  const { showToast } = useToast()
+
+  // Obtener usuario autenticado del cliente
+  useEffect(() => {
+    const getAuthUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setAuthUser(user)
+    }
+    getAuthUser()
+  }, [supabase])
 
   // Cargar recetas aleatorias al inicio
   useEffect(() => {
@@ -75,22 +90,33 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
   }
 
   const handleSaveRecipe = async () => {
-    if (!selectedRecipe || isSavingRecipe) return
+    if (!selectedRecipe || isSavingRecipe || !authUser) {
+      if (!authUser) {
+        showToast('Debes iniciar sesión para guardar recetas', 'error')
+      }
+      return
+    }
 
     setIsSavingRecipe(true)
 
     try {
+      // Generar código de compartir
+      const shareCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+
       // Preparar objeto para guardar en user_recipes
       const newRecipe = {
-        owner_id: userId,
+        owner_id: authUser.id,
         title: selectedRecipe.title,
         description: `Receta de ${selectedRecipe.cuisine} - ${selectedRecipe.category}`,
         image_url: selectedRecipe.image_url,
+        source_type: 'themealdb' as const,
+        external_id: selectedRecipe.id,
         category: selectedRecipe.category,
         cuisine: selectedRecipe.cuisine,
         ingredients: selectedRecipe.ingredients,
         instructions: selectedRecipe.instructions,
-        servings: 4, // Valor por defecto
+        servings: 4,
+        share_code: shareCode,
       }
 
       const { error } = await supabase
@@ -100,7 +126,8 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
       if (error) throw error
 
       setIsRecipeSaved(true)
-      
+      showToast('¡Receta guardada en Mis Recetas!', 'success')
+
       // Resetear estado después de unos segundos
       setTimeout(() => {
         setIsRecipeSaved(false)
@@ -108,6 +135,7 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
 
     } catch (err) {
       console.error('Error saving recipe:', err)
+      showToast('Error al guardar la receta', 'error')
     } finally {
       setIsSavingRecipe(false)
     }
