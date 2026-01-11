@@ -398,6 +398,7 @@ export interface TheMealDBRecipe {
   instructions: string
   image_url: string
   ingredients: RecipeIngredient[]
+  source_url?: string | null
 }
 
 // Tipos helpers
