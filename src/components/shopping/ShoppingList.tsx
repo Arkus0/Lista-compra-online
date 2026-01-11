@@ -6,14 +6,15 @@ import Link from 'next/link'
 import {
   ShoppingBag, Users, Share2, MoreVertical,
   Trash2, Edit2, Check, Link as LinkIcon,
-  ChevronDown, ChevronRight, LayoutGrid, Undo2,
+  ChevronDown, ChevronRight, Undo2,
   Archive, CheckCheck, Eraser, Copy as CopyIcon, Search, X,
-  FileText, Zap, Plus, Eye, EyeOff, Star, Minus, ArrowLeft, Tag
+  FileText, Zap, Plus, Star, ArrowLeft, Tag
 } from 'lucide-react'
 import { ShoppingItem, AssignablePerson } from './ShoppingItem'
 import { AddItemDrawer } from './AddItemDrawer'
 import { PresenceIndicator } from './PresenceIndicator'
 import { ListNotes } from './ListNotes'
+import { CatalogModal } from './CatalogModal'
 import { useFavorites } from '@/hooks/useFavorites'
 import { useImageUpload } from '@/hooks/useImageUpload'
 import { Modal } from '@/components/ui/Modal'
@@ -31,50 +32,6 @@ import { sendPushNotification } from '@/lib/notifications'
 import { CATEGORIES, CategoryId, detectCategory, getSmartSuggestions, CommonProduct, getProductEmoji, getCategoryEmoji } from '@/lib/constants'
 import { normalizeText } from '@/lib/utils'
 
-// --- DATOS DEL CATÁLOGO RÁPIDO ---
-const QUICK_CATALOG: Record<CategoryId, string[]> = {
-  'fruits-veg': [
-    'Manzanas', 'Plátanos', 'Lechuga', 'Tomates', 'Zanahorias', 
-    'Cebollas', 'Patatas', 'Aguacate', 'Limones', 'Ajos', 
-    'Pimientos', 'Naranjas', 'Calabacín', 'Pepino'
-  ],
-  'meat-fish': [
-    'Pollo', 'Ternera', 'Carne picada', 'Jamón serrano', 'Jamón cocido', 
-    'Pechuga de pavo', 'Salmón', 'Atún', 'Huevos', 'Bacon', 
-    'Lomo', 'Salchichas', 'Merluza', 'Gambas'
-  ],
-  'dairy': [
-    'Leche entera', 'Leche semi', 'Queso', 'Yogur natural', 'Yogur sabores', 
-    'Mantequilla', 'Nata cocinar', 'Queso rallado', 'Leche vegetal', 'Queso fresco'
-  ],
-  'pantry': [
-    'Arroz', 'Pasta', 'Pan', 'Aceite de oliva', 'Azúcar', 
-    'Sal', 'Harina', 'Tomate frito', 'Legumbres', 'Cereales', 
-    'Galletas', 'Café molido', 'Cacao en polvo', 'Especias'
-  ],
-  'frozen': [
-    'Pizza', 'Guisantes', 'Helado', 'Verduras salteadas', 'Croquetas', 
-    'Pescado congelado', 'Patatas fritas', 'Hielo', 'Frutos rojos'
-  ],
-  'beverages': [
-    'Agua mineral', 'Refrescos', 'Cerveza', 'Vino tinto', 'Vino blanco', 
-    'Zumo de naranja', 'Zumo de piña', 'Gaseosa', 'Aquarius'
-  ],
-  'household': [
-    'Papel higiénico', 'Detergente ropa', 'Suavizante', 'Pastillas lavavajillas', 
-    'Papel de cocina', 'Bolsas de basura', 'Fregasuelos', 'Lejía', 'Estropajos'
-  ],
-  'hygiene': [
-    'Gel de ducha', 'Champú', 'Pasta de dientes', 'Desodorante', 'Jabón de manos', 
-    'Compresas/Tampones', 'Espuma afeitar', 'Cuchillas', 'Crema hidratante'
-  ],
-  'pets': [
-    'Comida perro', 'Comida gato', 'Arena de gato', 'Premios mascotas', 'Bolsas caca'
-  ],
-  'other': [
-    'Pilas', 'Bombillas', 'Velas', 'Papel aluminio', 'Papel film'
-  ]
-}
 
 interface ShoppingListProps {
   list: ShoppingListType
@@ -173,128 +130,6 @@ function UndoToast({
   )
 }
 
-// COMPONENTE MODAL DE CATÁLOGO
-function CatalogModal({
-  isOpen,
-  onClose,
-  onSelect,
-  onRemove,
-  currentItems
-}: {
-  isOpen: boolean,
-  onClose: () => void,
-  onSelect: (name: string, category: string) => void,
-  onRemove: (id: string) => void,
-  currentItems: ListItem[]
-}) {
-  const [activeTab, setActiveTab] = useState<CategoryId>('fruits-veg')
-
-  if (!isOpen) return null
-
-  const handleAddClick = (item: string, categoryId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
-    onSelect(item, categoryId)
-  }
-
-  const handleRemoveClick = (itemId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
-    onRemove(itemId)
-  }
-
-  // Map of item names to their quantity and id (only unchecked items)
-  const itemQuantityMap = new Map<string, { quantity: number, id: string }>()
-  currentItems.filter(i => !i.checked).forEach(item => {
-    const key = item.name.toLowerCase()
-    itemQuantityMap.set(key, { quantity: item.quantity || 1, id: item.id })
-  })
-
-  return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-background animate-in slide-in-from-bottom duration-300">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-card">
-        <h2 className="font-bold text-lg flex items-center gap-2">
-          <LayoutGrid className="w-5 h-5 text-primary" />
-          Catálogo Rápido
-        </h2>
-        <button onClick={onClose} className="p-2 bg-secondary rounded-full hover:bg-gray-200 transition-colors">
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      <div className="flex overflow-x-auto py-3 px-2 gap-2 border-b border-border bg-card/50 no-scrollbar">
-        {Object.values(CATEGORIES).map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveTab(cat.id)}
-            className={`flex flex-col items-center gap-1 min-w-[70px] p-2 rounded-xl transition-all ${
-              activeTab === cat.id
-                ? 'bg-primary text-primary-foreground shadow-md scale-105'
-                : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
-            }`}
-          >
-            <cat.icon className="w-6 h-6" />
-            <span className="text-[10px] font-medium leading-none">{cat.label.split(' ')[0]}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 bg-secondary/10">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pb-20">
-          {QUICK_CATALOG[activeTab]?.map((item) => {
-             const itemData = itemQuantityMap.get(item.toLowerCase())
-             const quantity = itemData?.quantity || 0
-             const hasItem = quantity > 0
-
-             return (
-              <div
-                key={item}
-                className={`
-                  aspect-square flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-200
-                  ${hasItem
-                    ? 'bg-primary/10 border-primary shadow-[0_0_0_2px] shadow-primary/20'
-                    : 'bg-card border-border shadow-sm'
-                  }
-                `}
-              >
-                {hasItem ? (
-                  // Show quantity with +/- buttons
-                  <div className="flex items-center gap-2 mb-2">
-                    <button
-                      onClick={(e) => handleRemoveClick(itemData!.id, e)}
-                      className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/50 active:scale-95 transition-all"
-                    >
-                      <span className="text-xl font-bold leading-none">−</span>
-                    </button>
-                    <span className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-base font-bold">
-                      {quantity}
-                    </span>
-                    <button
-                      onClick={(e) => handleAddClick(item, activeTab, e)}
-                      className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/50 active:scale-95 transition-all"
-                    >
-                      <span className="text-xl font-bold leading-none">+</span>
-                    </button>
-                  </div>
-                ) : (
-                  // Show add button
-                  <button
-                    onClick={(e) => handleAddClick(item, activeTab, e)}
-                    className="w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-colors bg-secondary text-muted-foreground hover:bg-primary hover:text-primary-foreground active:scale-95"
-                  >
-                    <Plus className="w-6 h-6" />
-                  </button>
-                )}
-                <span className="text-2xl mb-1">{getProductEmoji(item, activeTab)}</span>
-                <span className="text-sm text-center font-medium leading-tight line-clamp-2">{item}</span>
-              </div>
-             )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export function ShoppingList({ list }: ShoppingListProps) {
   const items = useItems() as ListItem[]

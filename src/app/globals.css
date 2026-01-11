@@ -131,6 +131,45 @@ html {
 }
 
 /* ============================================
+   PERFORMANCE OPTIMIZATIONS
+   ============================================ */
+
+/* GPU-accelerated transforms for smoother animations */
+.gpu-accelerated {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Content visibility for long lists - improves rendering */
+.content-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 80px;
+}
+
+/* Contain paint for complex components */
+.contain-paint {
+  contain: paint;
+}
+
+/* Optimize repaints for animated elements */
+.optimize-animation {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* Prevent layout shifts */
+.aspect-square {
+  aspect-ratio: 1 / 1;
+}
+
+/* Hardware acceleration for modals and overlays */
+.modal-layer {
+  will-change: opacity, transform;
+  transform: translate3d(0, 0, 0);
+}
+
+/* ============================================
    UI/UX IMPROVEMENTS
    ============================================ */
 
@@ -618,4 +657,167 @@ html.theme-transition *::after {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ============================================
+   ENHANCED ANIMATIONS & TRANSITIONS
+   ============================================ */
+
+/* Smooth list item animations */
+@keyframes list-item-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.list-item-animate {
+  animation: list-item-enter 0.2s ease-out;
+}
+
+/* Staggered list animation */
+.stagger-1 { animation-delay: 0.02s; }
+.stagger-2 { animation-delay: 0.04s; }
+.stagger-3 { animation-delay: 0.06s; }
+.stagger-4 { animation-delay: 0.08s; }
+.stagger-5 { animation-delay: 0.1s; }
+
+/* Smooth fade for category headers */
+@keyframes category-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.category-animate {
+  animation: category-fade-in 0.25s ease-out;
+}
+
+/* Quick bounce for interactive elements */
+@keyframes quick-bounce {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+.quick-bounce:active {
+  animation: quick-bounce 0.15s ease-out;
+}
+
+/* Glow effect for primary actions */
+.glow-primary {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  transition: box-shadow 0.3s ease;
+}
+
+.glow-primary:hover {
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+}
+
+/* Smooth counter animation */
+@keyframes counter-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.counter-animate {
+  animation: counter-pop 0.2s ease-out;
+}
+
+/* Slide reveal for drawers */
+@keyframes drawer-reveal {
+  from {
+    transform: translateY(100%);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.drawer-animate {
+  animation: drawer-reveal 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Optimized scroll snap for horizontal lists */
+.snap-x-mandatory {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.snap-start {
+  scroll-snap-align: start;
+}
+
+/* Hide scrollbar but keep functionality */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Micro-interaction for checkboxes */
+@keyframes checkbox-check {
+  0% {
+    transform: scale(0) rotate(-45deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.checkbox-animate {
+  animation: checkbox-check 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Pulsing notification dot */
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.7;
+  }
+}
+
+.pulse-dot {
+  animation: pulse-dot 2s infinite;
+}
+
+/* Optimized transitions for interactive cards */
+.card-transition {
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, background-color 0.15s ease-out;
+  will-change: transform;
+}
+
+/* Fast fade for UI elements */
+.fast-fade {
+  transition: opacity 0.1s ease-out;
+}
+
+/* Smooth color transitions */
+.smooth-colors {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
 }
