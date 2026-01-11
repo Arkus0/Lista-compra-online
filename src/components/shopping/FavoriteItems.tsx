@@ -90,7 +90,7 @@ export function FavoriteItems({
           role="region"
           aria-label="Lista de productos favoritos"
         >
-          <div className="px-4 py-4 max-h-56 overflow-y-auto">
+          <div className="px-4 py-4 max-h-40 overflow-y-auto">
             <div className="flex flex-wrap gap-2">
               {favorites.map((favorite) => (
                 <div

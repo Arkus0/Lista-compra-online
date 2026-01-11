@@ -155,11 +155,22 @@ function AddItemFormComponent({
 
   // Push-to-talk: iniciar al presionar, detener al soltar
   const handleVoiceStart = useCallback(() => {
-    if (!isListening) startListening()
+    if (!isListening) {
+      // Mantener foco en el input para que el teclado no se cierre
+      inputRef.current?.focus()
+      startListening()
+    }
   }, [isListening, startListening])
 
   const handleVoiceEnd = useCallback(() => {
-    if (isListening) stopListening()
+    if (isListening) {
+      stopListening()
+      // Volver a enfocar el input después de detener la escucha
+      // para que el teclado permanezca visible
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 100)
+    }
   }, [isListening, stopListening])
 
   const CurrentCategoryConfig = CATEGORIES[selectedCategory]
@@ -224,6 +235,7 @@ function AddItemFormComponent({
               className={`w-full h-11 rounded-xl bg-secondary px-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground ${isListening ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
               autoComplete="off"
               autoFocus
+              inputMode="text"
             />
           </div>
 

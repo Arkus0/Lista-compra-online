@@ -37,6 +37,7 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
   const [isExporting, setIsExporting] = useState(false)
   const [exportSuccess, setExportSuccess] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   const supabase = createClient()
 
@@ -156,6 +157,43 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
     }
   }
 
+  const handleSaveRecipe = async () => {
+    if (!selectedRecipe) return
+
+    setIsSaving(true)
+    try {
+      const shareCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+
+      const { error } = await supabase
+        .from('user_recipes')
+        .insert({
+          owner_id: userId,
+          title: selectedRecipe.title,
+          image_url: selectedRecipe.image_url,
+          source_type: 'themealdb',
+          external_id: selectedRecipe.id,
+          ingredients: selectedRecipe.ingredients,
+          instructions: selectedRecipe.instructions,
+          category: selectedRecipe.category,
+          cuisine: selectedRecipe.cuisine,
+          share_code: shareCode,
+        })
+
+      if (error) throw error
+
+      // Cerrar modal con éxito
+      setSelectedRecipe(null)
+
+      // Opcional: mostrar mensaje de éxito
+      // Podrías agregar un toast/notificación aquí si quieres
+    } catch (err) {
+      console.error('Error saving recipe:', err)
+      // Opcional: mostrar mensaje de error
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <section className="space-y-4">
       {/* Header */}
@@ -259,6 +297,7 @@ export function RecipeSection({ userId, userLists }: RecipeSectionProps) {
           recipe={selectedRecipe}
           onClose={() => setSelectedRecipe(null)}
           onExportToList={handleExportToList}
+          onSave={handleSaveRecipe}
         />
       )}
 
