@@ -38,7 +38,6 @@ export default async function Home() {
       .from('shopping_lists')
       .select('id, name, owner_id, share_code, created_at, updated_at')
       .eq('owner_id', user.id)
-      .or('is_archived.eq.false,is_archived.is.null')
       .order('updated_at', { ascending: false })
       .limit(20)
   ])

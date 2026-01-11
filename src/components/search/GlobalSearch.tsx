@@ -46,7 +46,6 @@ export function GlobalSearch({ userId, placeholder = 'Buscar listas, favoritos, 
           .from('shopping_lists')
           .select('id, name, updated_at')
           .eq('owner_id', userId)
-          .eq('is_archived', false)
           .order('updated_at', { ascending: false })
           .limit(50),
         supabase
