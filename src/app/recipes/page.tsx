@@ -17,12 +17,14 @@ import { Input } from '@/components/ui/Input'
 import { TheMealDBRecipe, RecipeIngredient, UserRecipe, ShoppingList } from '@/lib/supabase/types'
 import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
+import { useToast } from '@/components/ui/Toast'
 
 type TabType = 'search' | 'my-recipes'
 
 export default function RecipesPage() {
   const router = useRouter()
   const supabase = createClient()
+  const { showToast } = useToast()
 
   const [activeTab, setActiveTab] = useState<TabType>('search')
   const [user, setUser] = useState<any>(null)
@@ -262,7 +264,10 @@ export default function RecipesPage() {
 
   // Save TheMealDB recipe to my recipes
   const handleSaveRecipe = async (recipe: TheMealDBRecipe) => {
-    if (!user) return
+    if (!user) {
+      showToast('Debes iniciar sesión para guardar recetas', 'error')
+      return
+    }
 
     try {
       const shareCode = Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -286,11 +291,13 @@ export default function RecipesPage() {
 
       if (error) throw error
 
+      showToast('¡Receta guardada en Mis Recetas!', 'success')
       setSelectedRecipe(null)
       setActiveTab('my-recipes')
       loadMyRecipes()
     } catch (err) {
       console.error('Error saving recipe:', err)
+      showToast('Error al guardar la receta', 'error')
     }
   }
 
