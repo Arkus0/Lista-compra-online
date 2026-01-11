@@ -448,7 +448,7 @@ export function ShoppingList({ list }: ShoppingListProps) {
   useEffect(() => {
     const loadProfiles = async () => {
       const userIds = new Set<string>()
-      items.forEach((item) => { if (item.added_by) userIds.add(item.added_by); if (item.checked_by) userIds.add(item.checked_by) })
+      items.forEach((item) => { if (item.added_by) userIds.add(item.added_by); if (item.checked_by) userIds.add(item.checked_by); if (item.assigned_to) userIds.add(item.assigned_to) })
       const missingIds = Array.from(userIds).filter((id) => !profilesCache.has(id))
       if (missingIds.length === 0) return
       const { data } = await supabase.from('profiles').select('*').in('id', missingIds)
